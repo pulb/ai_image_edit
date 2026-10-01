@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-2.0-or-later
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 Gradio frontend — needed for Hugging Face ZeroGPU Spaces, which require the
 Gradio SDK. Entry point is run(model, model_backend), called by app.py —

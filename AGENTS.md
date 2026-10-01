@@ -43,8 +43,8 @@ Rules for any AI coding agent working in this repository.
 - **Working directory**: generated/uploaded/composited files live under
   `core/paths.py`'s `WORK_DIR`, shared by both frontends, served to the
   browser at `/files/<name>`.
-- **License headers**: this project is GPL-2.0-or-later. Every source
-  file starts with `# SPDX-License-Identifier: GPL-2.0-or-later` (or the
+- **License headers**: this project is GPL-3.0-or-later. Every source
+  file starts with `# SPDX-License-Identifier: GPL-3.0-or-later` (or the
   file-format-appropriate comment syntax) as its very first line, before
   any module docstring. Keep this on new files.
 

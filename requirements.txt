@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-2.0-or-later
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Requirements for running this app as a ZeroGPU Space with
 # MODEL_BACKEND=qwen_image (the app's default — see app.py). A ZeroGPU
 # Space installs a top-level requirements.txt automatically; it does NOT

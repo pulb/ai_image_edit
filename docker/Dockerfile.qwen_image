@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-2.0-or-later
+# SPDX-License-Identifier: GPL-3.0-or-later
 # This file is GPL like the rest of this repo's own code; it only builds
 # and runs it. The actual model weights it downloads at runtime
 # (Qwen/Qwen-Image-2.1) are licensed separately under Alibaba's Qwen

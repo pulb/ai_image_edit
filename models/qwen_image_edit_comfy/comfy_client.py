@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-2.0-or-later
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 ComfyUI wire protocol: launching the server process, uploading images,
 submitting a workflow and waiting for it to finish, and fetching the

@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-2.0-or-later
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 Pixel-level helpers shared by every model backend that does external
 crop/mask/composite around inference: LAB color-space color matching,

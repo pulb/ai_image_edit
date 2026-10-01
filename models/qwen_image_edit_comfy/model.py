@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-2.0-or-later
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 ModelBackend implementation for Phr00t's Qwen-Image-Edit-Rapid-AIO,
 served through a local ComfyUI instance:

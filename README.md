@@ -120,7 +120,7 @@ the package public from its GitHub package settings to skip that step.
 
 ## License
 
-Licensed under the GNU General Public License v2.0 or later
-(GPL-2.0-or-later). See [`LICENSE`](LICENSE) for the full text.
+Licensed under the GNU General Public License v3.0 or later
+(GPL-3.0-or-later). See [`LICENSE`](LICENSE) for the full text.
 
 Copyright (C) 2026 AI Image Edit authors

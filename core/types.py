@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-2.0-or-later
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 Data contracts shared between the UI layer (frontends/nicegui.py,
 frontends/gradio_ui.py) and every model backend under models/. Deliberately
