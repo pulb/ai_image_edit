@@ -58,11 +58,24 @@ jobs:
             type=ref,event=tag
             type=sha,format=short
 
+      # Newest commit of the separately licensed ai_image_edit_qwen package
+      # (public repo, so no credentials needed). Passed to the Dockerfile as
+      # QWEN_LIB_REF: each build uses that exact commit, and the cached pip
+      # layer is rebuilt whenever the package changed.
+      - name: Resolve ai_image_edit_qwen commit
+        id: qwen_lib
+        run: |
+          sha=$(git ls-remote https://github.com/pulb/ai_image_edit_qwen HEAD | cut -f1)
+          test -n "$sha"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+
       - uses: docker/build-push-action@v6
         with:
           context: .
           file: docker/Dockerfile.qwen_image
           push: true
+          build-args: |
+            QWEN_LIB_REF=${{ steps.qwen_lib.outputs.sha }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
