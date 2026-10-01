@@ -42,6 +42,7 @@ models/
   qwen_image/           # adapter for the ai-image-edit-qwen package
   qwen_image_edit_comfy/# ComfyUI-driven backend
 deployments/            # docker/, huggingface/, runpod/ — Dockerfiles, requirements, guides
+doc/                    # documentation assets (comfy_workflow.png: ComfyUI workflow screenshot)
 ```
 
 Adding a model means implementing `ModelBackend` (see `models/base.py`) and
