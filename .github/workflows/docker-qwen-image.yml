@@ -14,13 +14,8 @@ on:
     tags: ["v*"]
     paths:
       - "deployments/docker/Dockerfile.qwen_image"
-      - "app.py"
-      - "core/**"
-      - "frontends/__init__.py"
-      - "frontends/nicegui.py"
-      - "models/__init__.py"
-      - "models/base.py"
-      - "models/qwen_image/**"
+      - "pyproject.toml"
+      - "src/**"
   workflow_dispatch: {}
 
 env:

@@ -26,11 +26,11 @@ from typing import Dict, Optional, Tuple
 from ai_image_edit_qwen import pipeline
 from PIL import Image
 
-from core import imaging
-from core.errors import GenerationError
-from core.paths import WORK_DIR
-from core.types import GenerationParams, GenerationResult, ModelCapabilities, RangeSpec
-from models.base import ModelBackend
+from ai_image_edit.core import imaging
+from ai_image_edit.core.errors import GenerationError
+from ai_image_edit.core.paths import WORK_DIR
+from ai_image_edit.core.types import GenerationParams, GenerationResult, ModelCapabilities, RangeSpec
+from ai_image_edit.models.base import ModelBackend
 
 MAX_INPUT_IMAGES = 10
 MAX_SEED = 2 ** 31 - 1

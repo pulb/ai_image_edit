@@ -23,11 +23,11 @@ from typing import Dict, List, Optional, Tuple
 
 from PIL import Image
 
-from core import imaging
-from core.errors import GenerationError
-from core.types import GenerationParams, GenerationResult, ModelCapabilities, RangeSpec
-from models.base import ModelBackend
-from models.qwen_image_edit_comfy import comfy_client
+from ai_image_edit.core import imaging
+from ai_image_edit.core.errors import GenerationError
+from ai_image_edit.core.types import GenerationParams, GenerationResult, ModelCapabilities, RangeSpec
+from ai_image_edit.models.base import ModelBackend
+from ai_image_edit.models.qwen_image_edit_comfy import comfy_client
 
 LORA_DIR = "models/loras"
 

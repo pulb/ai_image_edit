@@ -21,10 +21,10 @@ import gradio as gr
 import numpy as np
 from PIL import Image
 
-from core.errors import GenerationError
-from core.paths import WORK_DIR
-from core.types import GenerationParams
-from models.base import ModelBackend
+from ai_image_edit.core.errors import GenerationError
+from ai_image_edit.core.paths import WORK_DIR
+from ai_image_edit.core.types import GenerationParams
+from ai_image_edit.models.base import ModelBackend
 
 # --- Configuration constants ---
 

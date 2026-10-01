@@ -18,18 +18,18 @@ MODEL_LOADERS — nothing else in the app needs to change.
 """
 from typing import Callable, Dict
 
-from models.base import ModelBackend
+from ai_image_edit.models.base import ModelBackend
 
 
 def _load_qwen_image_edit_comfy() -> ModelBackend:
-    from models.qwen_image_edit_comfy import QwenImageEditComfyModel
+    from ai_image_edit.models.qwen_image_edit_comfy import QwenImageEditComfyModel
 
     return QwenImageEditComfyModel()
 
 
 def _load_qwen_image() -> ModelBackend:
     try:
-        from models.qwen_image import QwenImageModel
+        from ai_image_edit.models.qwen_image import QwenImageModel
     except ModuleNotFoundError as exc:
         if (exc.name or "").split(".")[0] != "ai_image_edit_qwen":
             raise

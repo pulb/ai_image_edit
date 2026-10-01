@@ -14,7 +14,7 @@ qwen_image_edit_comfy without either one needing to know about the other.
 from abc import ABC, abstractmethod
 from typing import Dict, List
 
-from core.types import GenerationParams, GenerationResult, ModelCapabilities
+from ai_image_edit.core.types import GenerationParams, GenerationResult, ModelCapabilities
 
 
 class ModelBackend(ABC):

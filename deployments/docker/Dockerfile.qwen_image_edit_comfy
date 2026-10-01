@@ -20,8 +20,7 @@ WORKDIR $HOME/app
 
 # This image is built for the ComfyUI-based model specifically (it clones
 # ComfyUI and downloads its checkpoint/LoRAs below) — pin the backend
-# explicitly rather than relying on app.py's own default, which may not
-# always be this one (it currently defaults to qwen_image).
+# explicitly rather than relying on the app's own default.
 ENV MODEL_BACKEND=qwen_image_edit_comfy
 
 # Clone ComfyUI
@@ -34,13 +33,10 @@ RUN pip install --no-cache-dir --user torch==2.11.0 torchvision==0.26.0 torchaud
     --index-url https://download.pytorch.org/whl/cu126
     
 # Install Python dependencies (including packages for Custom Nodes).
-# requirements.txt here is ComfyUI's own, from the git clone above — not
-# deployments/huggingface/requirements.txt (that one is for Hugging Face
-# Spaces and isn't used by this Dockerfile). nicegui is installed explicitly
-# below since app.py needs it regardless of backend, and this Dockerfile
-# is this backend's own deployment path for getting it installed.
+# requirements.txt here is ComfyUI's own, from the git clone above. The app's
+# own dependencies come from the ai-image-edit package's extras, installed
+# below.
 RUN pip install --no-cache-dir --user -r requirements.txt
-RUN pip install --user nicegui requests websocket-client sentencepiece transformers
 
 # Download the Qwen Model (16 concurrent connections)
 RUN aria2c -x 16 -s 16 -k 1M \
@@ -106,24 +102,16 @@ RUN GIT_LFS_SKIP_SMUDGE=1 git clone https://huggingface.co/Phr00t/Qwen-Image-Edi
     mv /tmp/qwen_repo/fixed-textencode-node custom_nodes/ && \
     rm -rf /tmp/qwen_repo
 
-# Inject own files into the container.
-# app.py is now a thin entry point that picks a UI frontend via the
-# FRONTEND env var (see frontends/__init__.py) — the actual UI code lives
-# under frontends/ (frontends/nicegui.py, frontends/gradio_ui.py; this
-# image doesn't set FRONTEND, so it defaults to nicegui, matching this
-# backend's original single-frontend app.py). core/ holds shared data
-# contracts and path helpers; models/ holds the model backends (including
-# models/qwen_image_edit_comfy/workflow_api.json, which replaces the old
-# top-level workflow_api.json COPY). Note this deliberately does NOT copy
-# deployments/huggingface/requirements.txt — that file is for Hugging Face
-# Spaces, not this image.
-COPY --chown=user app.py $HOME/app/app.py
-COPY --chown=user frontends $HOME/app/frontends
-COPY --chown=user core $HOME/app/core
-COPY --chown=user models $HOME/app/models
+# Install the app as a package. It is built from its own directory, not the
+# ComfyUI checkout (which has a pyproject.toml of its own). The app is
+# started from the ComfyUI root, which the backend relies on (main.py,
+# models/loras).
+COPY --chown=user pyproject.toml LICENSE $HOME/pkg/
+COPY --chown=user src $HOME/pkg/src
+RUN pip install --no-cache-dir --user "$HOME/pkg[comfy_backend,nicegui_frontend]"
 
 # Enable port 
 EXPOSE 7860
 
 # Start App
-CMD ["python", "app.py"]
+CMD ["python", "-m", "ai_image_edit"]

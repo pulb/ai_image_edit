@@ -14,11 +14,11 @@ exposes a single function, run(model, model_backend), which builds and
 launches its UI (ui.run() / demo.queue().launch()) against the given
 model. Importing a frontend module does nothing by itself; run_frontend()
 below imports the chosen module and calls its run() with the already-built
-model, so the root app.py doesn't need to know any of that — it just
+model, so app.py doesn't need to know any of that — it just
 picks a name by FRONTEND, the same way models/__init__.py's get_model()
 picks one by MODEL_BACKEND.
 
-Model selection also happens once, in app.py, rather than each frontend
+Model selection also happens once, in app.py's main(), rather than each frontend
 module building its own model — run_frontend() takes the already-built
 model and passes it straight to the chosen module's run() as a plain
 function argument, so both frontends stay ordinary, explicit Python:
@@ -31,17 +31,17 @@ line in FRONTEND_LOADERS — nothing else needs to change.
 """
 from typing import Callable, Dict
 
-from models.base import ModelBackend
+from ai_image_edit.models.base import ModelBackend
 
 
 def _load_nicegui(model: ModelBackend, model_backend: str) -> None:
-    import frontends.nicegui as _frontend
+    import ai_image_edit.frontends.nicegui as _frontend
 
     _frontend.run(model, model_backend)
 
 
 def _load_gradio_ui(model: ModelBackend, model_backend: str) -> None:
-    import frontends.gradio_ui as _frontend
+    import ai_image_edit.frontends.gradio_ui as _frontend
 
     _frontend.run(model, model_backend)
 

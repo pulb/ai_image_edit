@@ -44,30 +44,17 @@ ENV FRONTEND=nicegui
 RUN pip install --no-cache-dir --user torch==2.11.0 torchvision==0.26.0 \
     --index-url https://download.pytorch.org/whl/cu126
 
-# The qwen_image backend's inference package (it brings the pinned
-# diffusers commit, transformers, accelerate and `spaces`; override
-# QWEN_LIB_REF with a branch, tag or commit to pin a version) plus nicegui
-# for the frontend and the core's own numpy/pillow. No gradio: this image
-# only ever runs FRONTEND=nicegui.
+# Install the app as a package with the NiceGUI frontend, plus the qwen_image
+# backend's inference package ai-image-edit-qwen, installed separately so
+# QWEN_LIB_REF can pin it to a branch, tag or commit. It brings the pinned
+# diffusers commit, transformers, accelerate and `spaces`. No gradio: this
+# image only ever runs FRONTEND=nicegui.
 ARG QWEN_LIB_REF=main
+COPY --chown=user pyproject.toml LICENSE $HOME/pkg/
+COPY --chown=user src $HOME/pkg/src
 RUN pip install --no-cache-dir --user \
     "ai-image-edit-qwen @ git+https://github.com/pulb/ai_image_edit_qwen@${QWEN_LIB_REF}" \
-    pillow \
-    numpy \
-    nicegui
-
-# Inject own files into the container. Only what qwen_image + nicegui
-# actually need: frontends/gradio_ui.py and models/qwen_image_edit_comfy/
-# are both omitted (their loaders in frontends/__init__.py and
-# models/__init__.py are only ever reached via FRONTEND=gradio /
-# MODEL_BACKEND=qwen_image_edit_comfy, neither of which this image sets).
-COPY --chown=user app.py $HOME/app/app.py
-COPY --chown=user core $HOME/app/core
-COPY --chown=user frontends/__init__.py $HOME/app/frontends/__init__.py
-COPY --chown=user frontends/nicegui.py $HOME/app/frontends/nicegui.py
-COPY --chown=user models/__init__.py $HOME/app/models/__init__.py
-COPY --chown=user models/base.py $HOME/app/models/base.py
-COPY --chown=user models/qwen_image $HOME/app/models/qwen_image
+    "$HOME/pkg[nicegui_frontend]"
 
 # HF_TOKEN (for gated weights or a private AOTI repo) and QWEN21_AOTI /
 # QWEN21_AOTI_REPO (see models/qwen_image/model.py's start()) are read
@@ -83,4 +70,4 @@ COPY --chown=user models/qwen_image $HOME/app/models/qwen_image
 
 EXPOSE 7860
 
-CMD ["python", "app.py"]
+CMD ["python", "-m", "ai_image_edit"]

@@ -1,22 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Requirements for a Hugging Face Space running MODEL_BACKEND=qwen_image.
-# A Space installs the requirements.txt at its own repo root, so copy this
-# file there (see deployments/huggingface/DEPLOY.md). The Dockerfiles under
-# deployments/docker/ install their own dependencies and don't use it.
-#
-# Both frontends' dependencies are listed: ZeroGPU needs FRONTEND=gradio,
-# a paid GPU Space can use either.
-gradio
-nicegui
-
-# Qwen-Image-2.1 inference (diffusers pipeline and AOTI kernels), a
-# separate package under the Qwen Research License rather than the GPL. It
-# pulls in the pinned diffusers commit, transformers, accelerate,
-# torchvision and `spaces`. `torch` itself is assumed to already be
-# present (as it is on a ZeroGPU Space).
-ai-image-edit-qwen @ git+https://github.com/pulb/ai_image_edit_qwen
-
-# core/imaging.py's LAB color-space math (shared by both models' masking)
-# imports numpy and Pillow directly, so each gets its own line here.
-numpy
-pillow
+# Requirements for a Hugging Face Space running the qwen_image backend. A
+# Space installs the requirements.txt at its own repo root, so copy this
+# file there (see deployments/huggingface/DEPLOY.md). The Gradio frontend
+# comes with the Space's Gradio SDK; NiceGUI is installed so FRONTEND can be
+# switched in app.py.
+ai-image-edit[qwen_image_backend,nicegui_frontend] @ git+https://github.com/pulb/ai_image_edit

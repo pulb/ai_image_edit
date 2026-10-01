@@ -18,8 +18,8 @@ from typing import Optional
 import requests
 import websocket
 
-from core.errors import GenerationError
-from core.paths import WORK_DIR
+from ai_image_edit.core.errors import GenerationError
+from ai_image_edit.core.paths import WORK_DIR
 
 SERVER_ADDRESS = "127.0.0.1:8188"
 

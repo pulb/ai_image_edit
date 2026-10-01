@@ -17,10 +17,10 @@ from typing import Awaitable, Callable, Dict, List, Optional, Tuple
 from nicegui import app, ui
 from nicegui import run as nicegui_run
 
-from core.errors import GenerationError
-from core.paths import WORK_DIR, to_url, from_url
-from core.types import GenerationParams
-from models.base import ModelBackend
+from ai_image_edit.core.errors import GenerationError
+from ai_image_edit.core.paths import WORK_DIR, to_url, from_url
+from ai_image_edit.core.types import GenerationParams
+from ai_image_edit.models.base import ModelBackend
 
 
 # --- Configuration Constants ---
@@ -1287,7 +1287,7 @@ def run(model: ModelBackend, model_backend: str) -> None:
 
 
     # Called unconditionally (no "if __name__ == '__main__':" guard) — this
-    # module is only ever reached via the root app.py's FRONTEND-driven
+    # module is only ever reached via app.py's FRONTEND-driven
     # dispatch (see frontends/__init__.py), which imports it as
     # frontends.nicegui rather than running it as a script, so __name__ here is
     # never "__main__" to begin with. Same reasoning as gradio_ui.py's own

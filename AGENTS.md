@@ -34,6 +34,12 @@ Rules for any AI coding agent working in this repository.
 
 ## Project conventions
 
+- **Package layout**: the app is the `ai_image_edit` package under
+  `src/` (`app.py`, `core/`, `frontends/`, `models/`), started with
+  `python -m ai_image_edit`. Imports are absolute (`from ai_image_edit.core
+  import …`). Dependencies live in `pyproject.toml`: `numpy` and `pillow`
+  as core, the rest as extras named `<name>_backend` / `<name>_frontend`.
+  Adding a backend or frontend means adding its extra there.
 - **Frontend contract**: each module under `frontends/` exposes a single
   entry point, `run(model: ModelBackend, model_backend: str) -> None`.
   Model and backend name are passed as plain arguments — no shared
@@ -53,9 +59,9 @@ Rules for any AI coding agent working in this repository.
 - **Qwen-licensed code**: the Qwen-Image-2.1 pipeline and AOTI kernels live
   in the separate `ai_image_edit_qwen` package
   (https://github.com/pulb/ai_image_edit_qwen) under the Qwen Research
-  License, not the GPL. `models/qwen_image/model.py` only imports it.
+  License, not the GPL. `src/ai_image_edit/models/qwen_image/model.py` only imports it.
   Never copy Qwen-licensed or Space-derived code into this repo.
-- **Default backend**: `app.py` defaults `MODEL_BACKEND` to
+- **Default backend**: `src/ai_image_edit/app.py` defaults `MODEL_BACKEND` to
   `qwen_image_edit_comfy`; `deployments/docker/Dockerfile.qwen_image` sets
   `MODEL_BACKEND=qwen_image` explicitly.
 - **Masking**: masked generation (crop → infer → composite/color-correct)

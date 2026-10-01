@@ -14,7 +14,7 @@ from typing import Callable, List, Optional, Tuple
 import numpy as np
 from PIL import Image, ImageFilter
 
-from core.paths import WORK_DIR
+from ai_image_edit.core.paths import WORK_DIR
 
 # Minimum standard deviation (0-255 scale, matching PIL's LAB representation)
 # a channel needs before we trust it enough to rescale by a std-dev ratio.
