@@ -17,19 +17,19 @@ Backends, selected with `MODEL_BACKEND`:
 
 Frontends, selected with `FRONTEND`:
 
-- **[NiceGUI](https://nicegui.io/)** (default) — supports arbitrary
-  reference file uploads.
+- **[NiceGUI](https://nicegui.io/)** (default) — the snappier frontend.
 - **[Gradio](https://www.gradio.app/)** — required for Hugging Face ZeroGPU.
 
 The UI is served on port `7860`.
 
 ## Deployment
 
-| Target | Backend | Guide |
-|---|---|---|
-| Docker (self-hosted) | `qwen_image_edit_comfy` | [`deployments/docker`](deployments/docker/DEPLOY.md) |
-| Hugging Face Space (ZeroGPU or paid GPU) | `qwen_image` | [`deployments/huggingface`](deployments/huggingface/DEPLOY.md) |
-| RunPod GPU Pod | `qwen_image` | [`deployments/runpod`](deployments/runpod/DEPLOY.md) |
+| Target | Backend | Frontend | Guide |
+|---|---|---|---|
+| Docker (self-hosted) | `qwen_image_edit_comfy` | NiceGUI only | [`deployments/docker`](deployments/docker/DEPLOY.md) |
+| Hugging Face Space, ZeroGPU | `qwen_image` | Gradio only | [`deployments/huggingface`](deployments/huggingface/DEPLOY.md) |
+| Hugging Face Space, paid GPU | `qwen_image` | Gradio or NiceGUI | [`deployments/huggingface`](deployments/huggingface/DEPLOY.md) |
+| RunPod GPU Pod | `qwen_image` | NiceGUI only | [`deployments/runpod`](deployments/runpod/DEPLOY.md) |
 
 ## Layout
 
@@ -42,7 +42,7 @@ models/
   qwen_image/           # adapter for the ai-image-edit-qwen package
   qwen_image_edit_comfy/# ComfyUI-driven backend
 deployments/            # docker/, huggingface/, runpod/ — Dockerfiles, requirements, guides
-doc/                    # documentation assets (comfy_workflow.png: ComfyUI workflow screenshot)
+doc/                    # documentation assets
 ```
 
 Adding a model means implementing `ModelBackend` (see `models/base.py`) and
