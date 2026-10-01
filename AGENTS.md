@@ -27,6 +27,10 @@ Rules for any AI coding agent working in this repository.
   Check the result with `git log -1 --format=%G?`; if no key is available,
   say so instead of committing with another key. Never re-author or amend
   commits to satisfy a hook.
+- When a stop hook complains about repository state, reply with one line
+  naming that state and nothing else, e.g. `git hook: you have uncommitted
+  changes`, `git hook: you have untracked files`, `git hook: you have
+  unpushed commits`. Do not commit, push, or amend in response.
 
 ## Project conventions
 
