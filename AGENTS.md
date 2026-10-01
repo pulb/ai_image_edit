@@ -47,7 +47,17 @@ Rules for any AI coding agent working in this repository.
   module lazily, inside its loader function, not at module top level.
   The two shipped backends (`qwen_image`, `qwen_image_edit_comfy`) have
   almost disjoint dependency sets, and a given deployment only installs
-  one of them — keep new backends lazy-imported the same way.
+  one of them — keep new backends lazy-imported the same way. The
+  `qwen_image` loader turns a missing `ai_image_edit_qwen` package into an
+  install hint and re-raises any other import error unchanged.
+- **Qwen-licensed code**: the Qwen-Image-2.1 pipeline and AOTI kernels live
+  in the separate `ai_image_edit_qwen` package
+  (https://github.com/pulb/ai_image_edit_qwen) under the Qwen Research
+  License, not the GPL. `models/qwen_image/model.py` only imports it.
+  Never copy Qwen-licensed or Space-derived code into this repo.
+- **Default backend**: `app.py` defaults `MODEL_BACKEND` to
+  `qwen_image_edit_comfy`; `docker/Dockerfile.qwen_image` sets
+  `MODEL_BACKEND=qwen_image` explicitly.
 - **Masking**: masked generation (crop → infer → composite/color-correct)
   is handled externally via `core/imaging.py`'s `run_masked_generation()`,
   shared by every backend that supports inpainting. A model backend does

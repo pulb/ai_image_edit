@@ -8,12 +8,14 @@ pluggable image-generation backend.
 
 Two backends currently ship:
 
-- **`qwen_image`** — a direct [diffusers](https://github.com/huggingface/diffusers)
-  pipeline for Qwen-Image-2.1, meant to run in-process on a Hugging Face
-  ZeroGPU worker.
-- **`qwen_image_edit_comfy`** — the same UI driven through a
+- **`qwen_image_edit_comfy`** (default) — the UI driven through a
   [ComfyUI](https://github.com/comfyanonymous/ComfyUI) backend (Qwen-Image-Edit
   plus a curated set of LoRAs), for a self-hosted/Docker deployment.
+- **`qwen_image`** — a direct [diffusers](https://github.com/huggingface/diffusers)
+  pipeline for Qwen-Image-2.1, meant to run in-process on a Hugging Face
+  ZeroGPU worker or a GPU pod. It needs the separately licensed
+  [`ai-image-edit-qwen`](https://github.com/pulb/ai_image_edit_qwen)
+  package (see [License](#license)).
 
 Two frontends currently ship as well, selectable independently of the
 backend:
@@ -38,7 +40,7 @@ frontends/
   gradio_ui.py          # Gradio UI — exposes run(model, model_backend)
 models/
   base.py               # ModelBackend interface every backend implements
-  qwen_image/           # direct diffusers pipeline (ZeroGPU)
+  qwen_image/           # backend adapter for the ai-image-edit-qwen package (ZeroGPU)
   qwen_image_edit_comfy/# ComfyUI-driven backend
 ```
 
@@ -56,11 +58,12 @@ Select the model backend and frontend via environment variables:
 ```bash
 pip install -r requirements.txt
 
-# Defaults: MODEL_BACKEND=qwen_image, FRONTEND=nicegui
+# Defaults: MODEL_BACKEND=qwen_image_edit_comfy, FRONTEND=nicegui
 python app.py
 
-# Or explicitly:
-MODEL_BACKEND=qwen_image_edit_comfy FRONTEND=gradio python app.py
+# Or explicitly (qwen_image needs the ai-image-edit-qwen package,
+# which requirements.txt installs):
+MODEL_BACKEND=qwen_image FRONTEND=gradio python app.py
 ```
 
 The UI is served on port `7860`.
@@ -79,9 +82,9 @@ docker run -p 7860:7860 --gpus all ai-image-edit
 
 ### Hugging Face ZeroGPU Space (diffusers backend)
 
-Deploy with the top-level `requirements.txt` and set `FRONTEND=gradio` in
-the Space's own settings; `MODEL_BACKEND` defaults to `qwen_image`, which
-is the backend this deployment path is for.
+Deploy with the top-level `requirements.txt` and set `MODEL_BACKEND=qwen_image`
+and `FRONTEND=gradio` in the Space's own settings; `MODEL_BACKEND`
+otherwise defaults to `qwen_image_edit_comfy`.
 
 ### Docker (qwen_image + NiceGUI, RunPod / Hugging Face Docker Space)
 
@@ -89,12 +92,17 @@ is the backend this deployment path is for.
 `qwen_image` + NiceGUI combination only — no ComfyUI, no gradio; weights
 are pulled from the Hugging Face Hub at startup rather than baked into
 the image. Suited to a RunPod GPU pod or a Dockerfile-type Hugging Face
-Space, both of which expect the app on port `7860`.
+Space, both of which expect the app on port `7860`. The image installs
+the `ai-image-edit-qwen` package from GitHub, so it combines GPL and
+Qwen-licensed code: keep it private (see [License](#license)).
 
 ```bash
 docker build -f docker/Dockerfile.qwen_image -t ai-image-edit-qwen .
 docker run -p 7860:7860 --gpus all ai-image-edit-qwen
 ```
+
+Pass `--build-arg QWEN_LIB_REF=<branch|tag|commit>` to pin the package
+version (default `main`).
 
 Baking the weights into the image would speed up container start, but
 Qwen-Image-2.1's weights are tens of GB — that trades a slow first start
@@ -108,7 +116,10 @@ so the download only happens once, without growing the image itself.
 `.github/workflows/docker-qwen-image.yml` builds `docker/Dockerfile.qwen_image`
 on every push to `main` (when relevant files change) and pushes it to
 GHCR as `ghcr.io/<owner>/<repo>-qwen-image`, tagged `latest`, the git tag
-(on a `v*` tag push), and the short commit SHA. It only builds and
+(on a `v*` tag push), and the short commit SHA. Each build installs the
+newest commit of the `ai-image-edit-qwen` package, resolved when the
+build starts. Pushes to the package's own repo don't start a build:
+run the workflow manually (or push here) to pick them up. It only builds and
 pushes — RunPod has no API to swap a running Pod's image in place, so
 rolling out a new build means terminating and recreating the Pod on the
 new tag yourself (console or `runpodctl`), once you're ready.
@@ -122,5 +133,12 @@ the package public from its GitHub package settings to skip that step.
 
 Licensed under the GNU General Public License v3.0 or later
 (GPL-3.0-or-later). See [`LICENSE`](LICENSE) for the full text.
+
+The `qwen_image` backend depends on a separate package,
+[`ai-image-edit-qwen`](https://github.com/pulb/ai_image_edit_qwen), which
+is under the Qwen RESEARCH LICENSE AGREEMENT rather than the GPL, as are
+the Qwen-Image-2.1 weights it loads. That agreement allows non-commercial
+use (research or evaluation) only. This repository contains no code under
+that license.
 
 Copyright (C) 2026 AI Image Edit authors
