@@ -7,9 +7,9 @@ AOTI (ahead-of-time-compiled) inference kernels for Qwen-Image-2.1's
 transformer blocks and VAE decoder — swaps eager PyTorch modules for
 pre-compiled ones loaded from a Hugging Face repo, when available.
 
-Copied unchanged from the reference implementation; this file never
-touched gradio/NCII/prompt-enhancement in the first place, so there was
-nothing to strip. Used by models/qwen_image/pipeline.py's load().
+Copied unchanged from `qwen21_aoti.py` in the reference Space,
+https://huggingface.co/spaces/hugging-apps/qwen-image-2-1 (declared
+license: qwen-research). Used by models/qwen_image/pipeline.py's load().
 """
 import json
 from pathlib import Path
