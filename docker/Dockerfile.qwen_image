@@ -1,10 +1,11 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # This file is GPL like the rest of this repo's own code; it only builds
 # and runs it. The actual model weights it downloads at runtime
-# (Qwen/Qwen-Image-2.1) are licensed separately under Alibaba's Qwen
-# RESEARCH LICENSE AGREEMENT (non-open-source; see
-# https://huggingface.co/Qwen/Qwen-Image-2.1/blob/main/LICENSE) — see the
-# SPDX headers in models/qwen_image/ itself.
+# (Qwen/Qwen-Image-2.1) and the ai-image-edit-qwen package it installs are
+# licensed separately under Alibaba's Qwen RESEARCH LICENSE AGREEMENT
+# (non-open-source, non-commercial; see
+# https://huggingface.co/Qwen/Qwen-Image-2.1/blob/main/LICENSE). The
+# resulting image combines both, so keep it private.
 #
 # Builds an image for the NiceGUI frontend + qwen_image backend only (the
 # direct diffusers pipeline, no ComfyUI). Meant for RunPod (a GPU pod
@@ -12,12 +13,13 @@
 # also expects port 7860). Unlike the sibling Dockerfile (which deploys
 # qwen_image_edit_comfy), this installs no ComfyUI, no gradio, and no
 # aria2-fetched checkpoints/LoRAs — qwen_image loads its weights from the
-# Hugging Face Hub at startup instead (see models/qwen_image/pipeline.py's
-# load()), so nothing needs to be baked into the image beyond Python deps.
+# Hugging Face Hub at startup instead (see ai_image_edit_qwen's
+# pipeline.load()), so nothing needs to be baked into the image beyond
+# Python deps.
 FROM python:3.11-slim
 
-# git: needed for the `pip install git+https://...` diffusers install
-# below. libgl1/libglib2.0-0: defensive — some image-codec paths in
+# git: needed for the `pip install git+https://...` installs below.
+# libgl1/libglib2.0-0: defensive — some image-codec paths in
 # torchvision/Pillow's optional backends expect them present.
 RUN apt-get update && apt-get install -y git libgl1 libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
@@ -42,16 +44,15 @@ ENV FRONTEND=nicegui
 RUN pip install --no-cache-dir --user torch==2.11.0 torchvision==0.26.0 \
     --index-url https://download.pytorch.org/whl/cu126
 
-# qwen_image's own dependencies (mirrors the top-level requirements.txt's
-# qwen_image section — same diffusers commit pin, since QwenImage21Pipeline
-# isn't in a released diffusers version yet) plus nicegui for the frontend.
-# No gradio: this image only ever runs FRONTEND=nicegui.
+# The qwen_image backend's inference package (it brings the pinned
+# diffusers commit, transformers, accelerate and `spaces`; override
+# QWEN_LIB_REF with a branch, tag or commit to pin a version) plus nicegui
+# for the frontend and the core's own numpy/pillow. No gradio: this image
+# only ever runs FRONTEND=nicegui.
+ARG QWEN_LIB_REF=main
 RUN pip install --no-cache-dir --user \
-    git+https://github.com/huggingface/diffusers@80c7ed262aeffbeb43ef13ae04baeb9b84515a69 \
-    "transformers>=5.17.0" \
-    accelerate \
+    "ai-image-edit-qwen @ git+https://github.com/pulb/ai_image_edit_qwen@${QWEN_LIB_REF}" \
     pillow \
-    spaces \
     numpy \
     nicegui
 

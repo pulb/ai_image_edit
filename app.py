@@ -4,10 +4,10 @@
 Entry point
 ================================================================================
 
-Builds the model backend (MODEL_BACKEND, defaulting to qwen_image — same
-env var and default models/__init__.py's get_model() has always used) and
-picks a UI frontend (FRONTEND, defaulting to nicegui) — the two choices
-this app makes, in the one place that makes both of them.
+Builds the model backend (MODEL_BACKEND, defaulting to
+qwen_image_edit_comfy) and picks a UI frontend (FRONTEND, defaulting to
+nicegui) — the two choices this app makes, in the one place that makes
+both of them.
 
 All the actual UI code lives under frontends/ (frontends/nicegui.py,
 frontends/gradio_ui.py); all the actual model code lives under models/.
@@ -22,7 +22,7 @@ import os
 from frontends import run_frontend
 from models import get_model
 
-MODEL_BACKEND = os.environ.get("MODEL_BACKEND", "qwen_image")
+MODEL_BACKEND = os.environ.get("MODEL_BACKEND", "qwen_image_edit_comfy")
 model = get_model(MODEL_BACKEND)
 print(f"Starting model backend '{MODEL_BACKEND}' in the background...", flush=True)
 model.start()
