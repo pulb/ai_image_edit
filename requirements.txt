@@ -1,0 +1,44 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
+# Requirements for running this app as a ZeroGPU Space with
+# MODEL_BACKEND=qwen_image (the app's default — see app.py). A ZeroGPU
+# Space installs a top-level requirements.txt automatically; it does NOT
+# go through the Dockerfile in this repo, which is a separate deployment
+# path for the qwen_image_edit_comfy backend specifically (that Dockerfile
+# installs its own dependencies directly, itself).
+#
+# Both frontends' own dependencies are listed here — nicegui runs fine on
+# an ordinary Hugging Face Space, just not on ZeroGPU specifically: ZeroGPU
+# (spaces.GPU) is tied to the Gradio SDK Space type, so a Space actually
+# using ZeroGPU needs FRONTEND=gradio set as an env var in the Space's own
+# settings (app.py's own frontend selector otherwise defaults to nicegui —
+# see frontends/__init__.py) — the same way MODEL_BACKEND is set for the
+# Dockerfile deployment path, just configured on the Space itself rather
+# than baked into an image here. A non-ZeroGPU Space can leave FRONTEND
+# unset and get nicegui, same as running this locally.
+#
+# Not needed by, and not installed alongside, qwen_image_edit_comfy's
+# ComfyUI stack when that backend is deployed via the Dockerfile instead
+# — see models/__init__.py's docstring for why the two backends' imports
+# are kept lazy/separate regardless of which requirements file was used to
+# install them.
+gradio
+nicegui
+
+# Copied from the qwen_image reference Space's own requirements.txt, plus
+# `spaces` (Hugging Face's ZeroGPU integration package): that Space's base
+# image installs it automatically as part of the ZeroGPU runtime, so its
+# own requirements.txt didn't need to list it — a deployment outside that
+# exact base image will need it explicit. `torch` itself is likewise
+# assumed to already be present (as it is on a ZeroGPU Space).
+git+https://github.com/huggingface/diffusers@80c7ed262aeffbeb43ef13ae04baeb9b84515a69
+transformers>=5.17.0
+accelerate
+torchvision
+pillow
+spaces
+
+# core/imaging.py's LAB color-space math (shared by both models' masking)
+# imports numpy directly. Almost certainly already present transitively
+# via torch/diffusers, but declaring it explicitly matches how the rest of
+# this file is written — every direct import gets its own line.
+numpy

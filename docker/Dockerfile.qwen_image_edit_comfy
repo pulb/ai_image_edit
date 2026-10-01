@@ -1,0 +1,130 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
+# Basis-Image: plain Python (Debian slim), no bundled CUDA/PyTorch — torch
+# is installed manually below via pip, which pulls its own bundled CUDA
+# runtime libs (cuDNN, cuBLAS, NCCL, etc.) from the cu126 wheel index. No
+# system CUDA toolkit is needed since nothing here compiles CUDA code.
+FROM python:3.11-slim
+
+# Install system dependencies 
+RUN apt-get update && apt-get install -y git wget libgl1 libglib2.0-0 build-essential aria2 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Add  HF user
+RUN useradd -m -u 1000 user
+USER user
+ENV MKL_THREADING_LAYER=GNU
+
+ENV HOME=/home/user \
+    PATH=/home/user/.local/bin:$PATH
+WORKDIR $HOME/app
+
+# This image is built for the ComfyUI-based model specifically (it clones
+# ComfyUI and downloads its checkpoint/LoRAs below) — pin the backend
+# explicitly rather than relying on app.py's own default, which may not
+# always be this one (it currently defaults to qwen_image).
+ENV MODEL_BACKEND=qwen_image_edit_comfy
+
+# Clone ComfyUI
+RUN git clone https://github.com/Comfy-Org/ComfyUI.git .
+
+# Install PyTorch (CUDA 12.6 wheels) manually — this base image has no
+# CUDA/PyTorch preinstalled, unlike the pytorch/pytorch image. --user
+# installs into $HOME/.local since /usr/local is root-owned here.
+RUN pip install --no-cache-dir --user torch==2.11.0 torchvision==0.26.0 torchaudio==2.11.0 \
+    --index-url https://download.pytorch.org/whl/cu126
+    
+# Install Python dependencies (including packages for Custom Nodes).
+# requirements.txt here is ComfyUI's own, from the git clone above — not
+# this repo's top-level requirements.txt (that one is for the qwen_image
+# ZeroGPU Space deployment path, which doesn't go through this Dockerfile
+# at all; see that file's header comment). nicegui is installed explicitly
+# below since app.py needs it regardless of backend, and this Dockerfile
+# is this backend's own deployment path for getting it installed.
+RUN pip install --no-cache-dir --user -r requirements.txt
+RUN pip install --user nicegui requests websocket-client sentencepiece transformers
+
+# Download the Qwen Model (16 concurrent connections)
+RUN aria2c -x 16 -s 16 -k 1M \
+    -d models/checkpoints/Qwen \
+    -o Qwen-Rapid-AIO-v1.safetensors \
+    "https://huggingface.co/Phr00t/Qwen-Image-Edit-Rapid-AIO/resolve/main/v19/Qwen-Rapid-AIO-NSFW-v19.safetensors?download=true"
+
+# Download LoRAs. Each goes into its own models/loras/<Name> subfolder —
+# QwenImageEditComfyModel.list_loras() (models/qwen_image_edit_comfy/model.py)
+# uses the subfolder name as the display name and loads every
+# .safetensors/.pt file inside it together, which is why AnyPose (two
+# weight files) gets two -o'd downloads into the same folder.
+# Filenames with spaces or non-ASCII characters are percent-encoded in the
+# URL (required by the resolve endpoint) but kept as their original,
+# human-readable form in -o, since that's the actual filename saved to disk.
+RUN aria2c -x 16 -s 16 -k 1M \
+    -d models/loras/Multiple-Angles \
+    -o "镜头转换.safetensors" \
+    "https://huggingface.co/dx8152/Qwen-Edit-2509-Multiple-angles/resolve/main/%E9%95%9C%E5%A4%B4%E8%BD%AC%E6%8D%A2.safetensors?download=true"
+
+RUN aria2c -x 16 -s 16 -k 1M \
+    -d models/loras/Style-Transfer \
+    -o "Style Transfer-Alpha-V0.1.safetensors" \
+    "https://huggingface.co/zooeyy/Style-Transfer/resolve/main/Style%20Transfer-Alpha-V0.1.safetensors?download=true"
+
+RUN aria2c -x 16 -s 16 -k 1M \
+    -d models/loras/Anything2Real \
+    -o "anything2real_2601.safetensors" \
+    "https://huggingface.co/lrzjason/Anything2Real_2601/resolve/main/anything2real_2601.safetensors?download=true"
+
+RUN aria2c -x 16 -s 16 -k 1M \
+    -d models/loras/Polaroid-Photo \
+    -o "Qwen-Image-Edit-2511-Polaroid-Photo.safetensors" \
+    "https://huggingface.co/prithivMLmods/Qwen-Image-Edit-2511-Polaroid-Photo/resolve/main/Qwen-Image-Edit-2511-Polaroid-Photo.safetensors?download=true"
+
+RUN aria2c -x 16 -s 16 -k 1M \
+    -d models/loras/Unblur-Anything \
+    -o "Qwen-Image-Edit-Unblur-Upscale_15.safetensors" \
+    "https://huggingface.co/prithivMLmods/Qwen-Image-Edit-2511-Unblur-Upscale/resolve/main/Qwen-Image-Edit-Unblur-Upscale_15.safetensors?download=true"
+
+RUN aria2c -x 16 -s 16 -k 1M \
+    -d models/loras/Pixar-Inspired-3D \
+    -o "PI3_20.safetensors" \
+    "https://huggingface.co/prithivMLmods/Qwen-Image-Edit-2511-Pixar-Inspired-3D/resolve/main/PI3_20.safetensors?download=true"
+
+RUN aria2c -x 16 -s 16 -k 1M \
+    -d models/loras/Noir-Comic-Book \
+    -o "Noir-Comic-Book-Panel_20.safetensors" \
+    "https://huggingface.co/prithivMLmods/Qwen-Image-Edit-2511-Noir-Comic-Book-Panel/resolve/main/Noir-Comic-Book-Panel_20.safetensors?download=true"
+
+RUN aria2c -x 16 -s 16 -k 1M \
+    -d models/loras/AnyPose \
+    -o "2511-AnyPose-base-000006250.safetensors" \
+    "https://huggingface.co/lilylilith/AnyPose/resolve/main/2511-AnyPose-base-000006250.safetensors?download=true"
+
+RUN aria2c -x 16 -s 16 -k 1M \
+    -d models/loras/AnyPose \
+    -o "2511-AnyPose-helper-00006000.safetensors" \
+    "https://huggingface.co/lilylilith/AnyPose/resolve/main/2511-AnyPose-helper-00006000.safetensors?download=true"
+
+# Custom node
+RUN GIT_LFS_SKIP_SMUDGE=1 git clone https://huggingface.co/Phr00t/Qwen-Image-Edit-Rapid-AIO /tmp/qwen_repo && \
+    mv /tmp/qwen_repo/fixed-textencode-node custom_nodes/ && \
+    rm -rf /tmp/qwen_repo
+
+# Inject own files into the container.
+# app.py is now a thin entry point that picks a UI frontend via the
+# FRONTEND env var (see frontends/__init__.py) — the actual UI code lives
+# under frontends/ (frontends/nicegui.py, frontends/gradio_ui.py; this
+# image doesn't set FRONTEND, so it defaults to nicegui, matching this
+# backend's original single-frontend app.py). core/ holds shared data
+# contracts and path helpers; models/ holds the model backends (including
+# models/qwen_image_edit_comfy/workflow_api.json, which replaces the old
+# top-level workflow_api.json COPY). Note this deliberately does NOT copy
+# this repo's own top-level requirements.txt — that file is for the
+# qwen_image ZeroGPU Space deployment path, not this one.
+COPY --chown=user app.py $HOME/app/app.py
+COPY --chown=user frontends $HOME/app/frontends
+COPY --chown=user core $HOME/app/core
+COPY --chown=user models $HOME/app/models
+
+# Enable port 
+EXPOSE 7860
+
+# Start App
+CMD ["python", "app.py"]

@@ -1,0 +1,126 @@
+# AI Image Edit
+
+A small, model-agnostic web app for AI-assisted image editing and
+generation. It provides a browser UI — prompt, reference images, an
+optional inpainting mask, and generation controls (aspect ratio,
+resolution, steps, CFG, sampler/scheduler, seed, LoRAs) — in front of a
+pluggable image-generation backend.
+
+Two backends currently ship:
+
+- **`qwen_image`** — a direct [diffusers](https://github.com/huggingface/diffusers)
+  pipeline for Qwen-Image-2.1, meant to run in-process on a Hugging Face
+  ZeroGPU worker.
+- **`qwen_image_edit_comfy`** — the same UI driven through a
+  [ComfyUI](https://github.com/comfyanonymous/ComfyUI) backend (Qwen-Image-Edit
+  plus a curated set of LoRAs), for a self-hosted/Docker deployment.
+
+Two frontends currently ship as well, selectable independently of the
+backend:
+
+- **[NiceGUI](https://nicegui.io/)** (default) — supports arbitrary
+  reference file uploads.
+- **[Gradio](https://www.gradio.app/)** — required if you want to run on
+  Hugging Face ZeroGPU, since ZeroGPU (`spaces.GPU`) is tied to the Gradio
+  SDK Space type.
+
+## Architecture
+
+```
+app.py                 # entry point: builds a model backend, hands it to a frontend
+core/                   # shared data contracts (GenerationParams/Result, ModelCapabilities)
+                        # and path/masking helpers used by every backend
+docker/
+  Dockerfile.qwen_image_edit_comfy # ComfyUI backend image
+  Dockerfile.qwen_image            # qwen_image + NiceGUI image
+frontends/
+  nicegui.py            # NiceGUI UI — exposes run(model, model_backend)
+  gradio_ui.py          # Gradio UI — exposes run(model, model_backend)
+models/
+  base.py               # ModelBackend interface every backend implements
+  qwen_image/           # direct diffusers pipeline (ZeroGPU)
+  qwen_image_edit_comfy/# ComfyUI-driven backend
+```
+
+Adding a new model means implementing `ModelBackend` (see
+`models/base.py`) and registering one loader function in
+`models/__init__.py` — nothing else in the app needs to change. Adding a
+new frontend means writing a module that exposes
+`run(model: ModelBackend, model_backend: str) -> None:` and registering
+it in `frontends/__init__.py`.
+
+## Running it
+
+Select the model backend and frontend via environment variables:
+
+```bash
+pip install -r requirements.txt
+
+# Defaults: MODEL_BACKEND=qwen_image, FRONTEND=nicegui
+python app.py
+
+# Or explicitly:
+MODEL_BACKEND=qwen_image_edit_comfy FRONTEND=gradio python app.py
+```
+
+The UI is served on port `7860`.
+
+### Docker (ComfyUI backend)
+
+`docker/Dockerfile.qwen_image_edit_comfy` builds a self-contained image
+for the `qwen_image_edit_comfy` backend: it clones ComfyUI, installs
+PyTorch, downloads the model checkpoint and a set of LoRAs, and starts the
+app with `MODEL_BACKEND=qwen_image_edit_comfy`.
+
+```bash
+docker build -f docker/Dockerfile.qwen_image_edit_comfy -t ai-image-edit .
+docker run -p 7860:7860 --gpus all ai-image-edit
+```
+
+### Hugging Face ZeroGPU Space (diffusers backend)
+
+Deploy with the top-level `requirements.txt` and set `FRONTEND=gradio` in
+the Space's own settings; `MODEL_BACKEND` defaults to `qwen_image`, which
+is the backend this deployment path is for.
+
+### Docker (qwen_image + NiceGUI, RunPod / Hugging Face Docker Space)
+
+`docker/Dockerfile.qwen_image` builds a minimal image for the
+`qwen_image` + NiceGUI combination only — no ComfyUI, no gradio; weights
+are pulled from the Hugging Face Hub at startup rather than baked into
+the image. Suited to a RunPod GPU pod or a Dockerfile-type Hugging Face
+Space, both of which expect the app on port `7860`.
+
+```bash
+docker build -f docker/Dockerfile.qwen_image -t ai-image-edit-qwen .
+docker run -p 7860:7860 --gpus all ai-image-edit-qwen
+```
+
+Baking the weights into the image would speed up container start, but
+Qwen-Image-2.1's weights are tens of GB — that trades a slow first start
+for a much larger image to build and push on every change. On a RunPod
+pod that persists across restarts, mount a network volume and set
+`HF_HUB_CACHE` to a path on it (e.g. `-e HF_HUB_CACHE=/runpod-volume/hf-cache`)
+so the download only happens once, without growing the image itself.
+
+### CI: building the RunPod image
+
+`.github/workflows/docker-qwen-image.yml` builds `docker/Dockerfile.qwen_image`
+on every push to `main` (when relevant files change) and pushes it to
+GHCR as `ghcr.io/<owner>/<repo>-qwen-image`, tagged `latest`, the git tag
+(on a `v*` tag push), and the short commit SHA. It only builds and
+pushes — RunPod has no API to swap a running Pod's image in place, so
+rolling out a new build means terminating and recreating the Pod on the
+new tag yourself (console or `runpodctl`), once you're ready.
+
+If the GHCR package is private (the default), give the RunPod Pod a
+container registry credential (Settings → Container Registry Auth in the
+RunPod console) using a GitHub PAT with `read:packages` scope — or make
+the package public from its GitHub package settings to skip that step.
+
+## License
+
+Licensed under the GNU General Public License v2.0 or later
+(GPL-2.0-or-later). See [`LICENSE`](LICENSE) for the full text.
+
+Copyright (C) 2026 AI Image Edit authors

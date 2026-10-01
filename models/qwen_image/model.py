@@ -1,0 +1,245 @@
+# SPDX-License-Identifier: LicenseRef-Qwen-Research-License-Agreement
+# This file integrates with Qwen-Image-2.1, whose weights are distributed
+# under Alibaba's Qwen RESEARCH LICENSE AGREEMENT (non-open-source; see
+# https://huggingface.co/Qwen/Qwen-Image-2.1/blob/main/LICENSE), not GPL.
+"""
+ModelBackend implementation for Qwen-Image-2.1: a direct diffusers
+pipeline (no ComfyUI), running on a Hugging Face ZeroGPU worker.
+
+All of the actual pipeline loading, AOTI-kernel loading, and the
+@spaces.GPU-wrapped diffusion call live in pipeline.py. This module plays
+the same role for this model that qwen_image_edit_comfy/model.py plays
+for its own: capability declaration, dimension resolution, and
+orchestrating one generate() call — nothing here touches CUDA directly.
+
+Masking is handled externally, via core/imaging.py's
+run_masked_generation() — the same crop/composite/color-correct sequence
+qwen_image_edit_comfy uses. QwenImage21Pipeline itself has no mask_image
+parameter or other inpainting-specific mechanism (confirmed against its
+actual __call__ signature), so there was never a model-internal masking
+option to use instead.
+"""
+import math
+import os
+import random
+import uuid
+from typing import Dict, Optional, Tuple
+
+from PIL import Image
+
+from core import imaging
+from core.errors import GenerationError
+from core.paths import WORK_DIR
+from core.types import GenerationParams, GenerationResult, ModelCapabilities, RangeSpec
+from models.base import ModelBackend
+from models.qwen_image import pipeline
+
+MAX_INPUT_IMAGES = 10
+MAX_SEED = 2 ** 31 - 1
+
+DEFAULT_AOTI_REPO = "hugging-apps/qwen-image-2-1-aoti"
+
+# The aspect ratios the model card lists, at its 2048-base resolution.
+BASE_RESOLUTION = 2048
+ASPECT_RATIOS: Dict[str, Tuple[int, int]] = {
+    "1:1": (2048, 2048),
+    "4:3": (2400, 1792),
+    "3:4": (1792, 2400),
+    "3:2": (2528, 1696),
+    "2:3": (1696, 2528),
+    "16:9": (2752, 1536),
+    "9:16": (1536, 2752),
+}
+
+# This project's usual sentinel for "derive dimensions from context rather
+# than force a fixed ratio" is "Original". For this model that's the
+# reference Space's own "Auto" — the pipeline follows the input images'
+# own aspect ratio, or squares up for pure text-to-image — same idea,
+# renamed to the one sentinel string the rest of the app already
+# recognizes (e.g. frontends/nicegui.py locks the aspect-ratio dropdown to
+# "Original" while a mask is drawn).
+AUTO_ASPECT_RATIO = "Original"
+
+# Resolution tiers, reusing the "megapixels" field every model's
+# capabilities expose for its resolution choices. Here it's actually this
+# model's own resolution tier — the reference Space labeled these
+# "1K"/"1.5K"/"2K", i.e. target side length 1024/1536/2048 — rather than a
+# literal computed pixel area. See _resolve_dimensions(), which turns the
+# chosen value back into that side length before calling _resolve_size().
+SUPPORTED_MEGAPIXELS = [1.0, 1.5, 2.0]
+DEFAULT_MEGAPIXELS = 1.0
+
+DEFAULT_STEPS, MIN_STEPS, MAX_STEPS = 40, 8, 60
+DEFAULT_CFG, MIN_CFG, MAX_CFG = 1.0, 1.0, 10.0
+
+
+def _round32(v: float) -> int:
+    """Rounds to the nearest multiple of 32, minimum 32."""
+    return max(32, int(round(v / 32)) * 32)
+
+
+def _resolve_size(resolution: int, aspect_ratio: str) -> Tuple[Optional[int], Optional[int]]:
+    """
+    Maps a resolution tier + aspect ratio onto the model card's width/height
+    pairs. Returns (None, None) for AUTO_ASPECT_RATIO — the pipeline then
+    infers dimensions itself (from the input images, or a square default
+    for pure text-to-image) rather than being told a fixed size. Only used
+    when there's no mask — see _dimensions_from_source() for the masked
+    case, which needs concrete numbers regardless of aspect_ratio.
+    """
+    if not aspect_ratio or aspect_ratio == AUTO_ASPECT_RATIO or aspect_ratio not in ASPECT_RATIOS:
+        return None, None
+    base_w, base_h = ASPECT_RATIOS[aspect_ratio]
+    scale = resolution / BASE_RESOLUTION
+    return _round32(base_w * scale), _round32(base_h * scale)
+
+
+def _dimensions_from_source(source_image_path: str, resolution: int) -> Tuple[int, int]:
+    """
+    Derives concrete (width, height) from the source image's own aspect
+    ratio at the given resolution tier. Used whenever _resolve_size left
+    width/height unset (AUTO_ASPECT_RATIO, i.e. "Original") — not just while
+    a mask is drawn: imaging.run_masked_generation needs real numbers up
+    front to crop the source to before inference, and passing width=height=
+    None straight through to the pipeline instead doesn't reliably keep the
+    source's own aspect ratio either. Area scales with resolution the same
+    way ASPECT_RATIOS' entries do (area ~ resolution^2), just computed
+    directly from the source's own ratio instead of one of the model card's
+    named presets — there's no precomputed table entry for an arbitrary
+    uploaded image's ratio.
+    """
+    with Image.open(source_image_path) as img:
+        src_w, src_h = img.size
+    target_area = float(resolution) ** 2
+    ratio = src_w / src_h
+    w = math.sqrt(target_area * ratio)
+    h = w / ratio
+    return _round32(w), _round32(h)
+
+
+class QwenImageModel(ModelBackend):
+    """Qwen-Image-2.1, run as a direct diffusers pipeline on a ZeroGPU worker."""
+
+    @property
+    def capabilities(self) -> ModelCapabilities:
+        return ModelCapabilities(
+            max_reference_images=MAX_INPUT_IMAGES,
+            supports_loras=False,
+            supports_inpainting=True,
+            supported_aspect_ratios=[AUTO_ASPECT_RATIO] + list(ASPECT_RATIOS.keys()),
+            default_aspect_ratio=AUTO_ASPECT_RATIO,
+            supported_megapixels=SUPPORTED_MEGAPIXELS,
+            default_megapixels=DEFAULT_MEGAPIXELS,
+            sampler_choices=None,
+            default_sampler=None,
+            scheduler_choices=None,
+            default_scheduler=None,
+            supports_cfg=True,
+            supports_denoise=False,
+            supports_seed=True,
+            supports_negative_prompt=True,  # only meaningful together with supports_cfg — see pipeline._diffuse
+            step_range=RangeSpec(MIN_STEPS, MAX_STEPS, DEFAULT_STEPS, step=1),
+            cfg_range=RangeSpec(MIN_CFG, MAX_CFG, DEFAULT_CFG, step=0.1),
+        )
+
+    def start(self) -> None:
+        aoti_repo = os.environ.get("QWEN21_AOTI_REPO", DEFAULT_AOTI_REPO)
+        use_aoti = os.environ.get("QWEN21_AOTI", "1") != "0"
+        pipeline.load(aoti_repo=aoti_repo, aoti_token=os.environ.get("HF_TOKEN"), use_aoti=use_aoti)
+
+    def shutdown(self) -> None:
+        # Nothing to explicitly tear down — the pipeline lives for the
+        # lifetime of the worker process, and ZeroGPU itself owns the CUDA
+        # allocation lifecycle around each @spaces.GPU call.
+        pass
+
+    def _resolve_dimensions(self, aspect_ratio: str, target_megapixels: float) -> Tuple[int, Optional[int], Optional[int]]:
+        """
+        Returns (resolution_tier, width, height). resolution_tier is this
+        model's own side-length tier (1024/1536/2048-ish, from
+        target_megapixels — see SUPPORTED_MEGAPIXELS' comment); width/height
+        are None, None for AUTO_ASPECT_RATIO.
+        """
+        resolution = int(round(target_megapixels * 1024))
+        width, height = _resolve_size(resolution, aspect_ratio)
+        return resolution, width, height
+
+    def generate(self, params: GenerationParams) -> GenerationResult:
+        """
+        Runs one generation. Every image handed to the pipeline — the
+        (possibly mask-cropped) source and any reference images — is a
+        whole reference/condition image; the prompt describes the edit in
+        words (model card convention: <image1>…<image10> in upload order).
+        Masking is external, via imaging.run_masked_generation; this
+        model's own contribution is _infer(), calling the diffusers
+        pipeline for a given (possibly cropped) source path.
+
+        params.source_image_path is always non-empty today, since both
+        frontends require an image upload before Generate is enabled — a
+        UI limitation, not one of this backend, which does support
+        text-to-image.
+        """
+        prompt = (params.prompt or "").strip()
+        if not prompt:
+            raise GenerationError("Please enter a prompt.")
+
+        if 1 + len(params.reference_images) > MAX_INPUT_IMAGES:
+            raise GenerationError(f"Up to {MAX_INPUT_IMAGES} input images are supported.")
+
+        resolved_seed = random.randint(0, MAX_SEED) if params.randomize_seed else int(params.seed) % (MAX_SEED + 1)
+
+        # A mask's coordinates are only meaningful relative to the source
+        # image's own framing, so dimensions must come from the source
+        # itself whenever a mask is present — mirrors
+        # qwen_image_edit_comfy/model.py's identical override (see that
+        # file's generate() docstring for the full reasoning). Frontends
+        # already lock the Aspect ratio control to "Original" while a mask
+        # is drawn, but this doesn't rely solely on that: enforcing it here
+        # too means a mask always gets correctly-aligned dimensions even if
+        # that UI-level invariant is ever bypassed.
+        effective_aspect_ratio = AUTO_ASPECT_RATIO if params.mask_path else params.aspect_ratio
+        resolution, gen_width, gen_height = self._resolve_dimensions(effective_aspect_ratio, params.target_megapixels)
+
+        if gen_width is None or gen_height is None:
+            # _resolve_size returns (None, None) for AUTO_ASPECT_RATIO
+            # ("Original"), e.g. whenever a mask is being drawn — derive
+            # concrete dimensions from the source image instead.
+            gen_width, gen_height = _dimensions_from_source(params.source_image_path, resolution)
+
+        def _infer(model_input_path: str) -> str:
+            image_paths = [p for p in [model_input_path, *params.reference_images] if p]
+            print(
+                f"[qwen_image] images={len(image_paths)} resolution_tier={resolution} "
+                f"size={(gen_width, gen_height)} steps={params.steps} cfg={params.cfg}",
+                flush=True,
+            )
+            image = pipeline.generate(
+                prompt=prompt,
+                image_paths=image_paths,
+                negative_prompt=params.negative_prompt,
+                true_cfg_scale=params.cfg,
+                num_inference_steps=params.steps,
+                seed=resolved_seed,
+                resolution=resolution,
+                width=gen_width,
+                height=gen_height,
+            )
+            out_path = WORK_DIR / f"qwen_image_{uuid.uuid4().hex}.png"
+            image.save(out_path)
+            return str(out_path)
+
+        final_output_path = imaging.run_masked_generation(
+            params.source_image_path,
+            params.mask_path,
+            gen_width,
+            gen_height,
+            params.feather_amount,
+            params.apply_color_correction_enabled,
+            _infer,
+        )
+
+        return GenerationResult(
+            before_path=params.source_image_path,
+            after_path=final_output_path,
+            actual_seed=resolved_seed,
+        )
