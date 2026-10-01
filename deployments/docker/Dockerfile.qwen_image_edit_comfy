@@ -35,9 +35,8 @@ RUN pip install --no-cache-dir --user torch==2.11.0 torchvision==0.26.0 torchaud
     
 # Install Python dependencies (including packages for Custom Nodes).
 # requirements.txt here is ComfyUI's own, from the git clone above — not
-# this repo's top-level requirements.txt (that one is for the qwen_image
-# ZeroGPU Space deployment path, which doesn't go through this Dockerfile
-# at all; see that file's header comment). nicegui is installed explicitly
+# deployments/huggingface/requirements.txt (that one is for Hugging Face
+# Spaces and isn't used by this Dockerfile). nicegui is installed explicitly
 # below since app.py needs it regardless of backend, and this Dockerfile
 # is this backend's own deployment path for getting it installed.
 RUN pip install --no-cache-dir --user -r requirements.txt
@@ -116,8 +115,8 @@ RUN GIT_LFS_SKIP_SMUDGE=1 git clone https://huggingface.co/Phr00t/Qwen-Image-Edi
 # contracts and path helpers; models/ holds the model backends (including
 # models/qwen_image_edit_comfy/workflow_api.json, which replaces the old
 # top-level workflow_api.json COPY). Note this deliberately does NOT copy
-# this repo's own top-level requirements.txt — that file is for the
-# qwen_image ZeroGPU Space deployment path, not this one.
+# deployments/huggingface/requirements.txt — that file is for Hugging Face
+# Spaces, not this image.
 COPY --chown=user app.py $HOME/app/app.py
 COPY --chown=user frontends $HOME/app/frontends
 COPY --chown=user core $HOME/app/core

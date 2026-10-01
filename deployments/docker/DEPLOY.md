@@ -1,0 +1,28 @@
+# Docker
+
+Two images, both built from the repo root. The app serves on port `7860`.
+
+| Dockerfile | Backend | Frontend | Use |
+|---|---|---|---|
+| `Dockerfile.qwen_image_edit_comfy` | `qwen_image_edit_comfy` | `nicegui` | self-hosted ComfyUI backend |
+| `Dockerfile.qwen_image` | `qwen_image` | `nicegui` | see [RunPod](../runpod/DEPLOY.md) |
+
+## Backend and frontend
+
+Each image sets its own `MODEL_BACKEND` and uses the NiceGUI frontend
+(`FRONTEND=nicegui`). No configuration is needed.
+
+## ComfyUI image
+
+Clones ComfyUI, installs PyTorch, downloads the model checkpoint and a set of
+LoRAs, then starts the app.
+
+```bash
+docker build -f deployments/docker/Dockerfile.qwen_image_edit_comfy -t ai-image-edit .
+docker run -p 7860:7860 --gpus all ai-image-edit
+```
+
+## qwen_image image
+
+Build and run steps, the Pod setup and the CI build are in
+[`../runpod/DEPLOY.md`](../runpod/DEPLOY.md).

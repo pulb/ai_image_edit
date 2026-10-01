@@ -56,7 +56,7 @@ Rules for any AI coding agent working in this repository.
   License, not the GPL. `models/qwen_image/model.py` only imports it.
   Never copy Qwen-licensed or Space-derived code into this repo.
 - **Default backend**: `app.py` defaults `MODEL_BACKEND` to
-  `qwen_image_edit_comfy`; `docker/Dockerfile.qwen_image` sets
+  `qwen_image_edit_comfy`; `deployments/docker/Dockerfile.qwen_image` sets
   `MODEL_BACKEND=qwen_image` explicitly.
 - **Masking**: masked generation (crop → infer → composite/color-correct)
   is handled externally via `core/imaging.py`'s `run_masked_generation()`,
