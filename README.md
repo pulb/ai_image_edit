@@ -30,25 +30,6 @@ The UI is served on port `7860`.
 | Hugging Face Space | `qwen_image` | Gradio (ZeroGPU), Gradio or NiceGUI (paid GPU) | [`deployments/huggingface`](deployments/huggingface/DEPLOY.md) |
 | RunPod GPU Pod | `qwen_image_edit_comfy`, `qwen_image` (one image each) | NiceGUI only | [`deployments/runpod`](deployments/runpod/DEPLOY.md) |
 
-## Layout
-
-```
-app.py                  # entry point: builds a model backend, hands it to a frontend
-core/                   # shared data contracts and path/masking helpers
-frontends/              # nicegui.py, gradio_ui.py — each exposes run(model, model_backend)
-models/
-  base.py               # ModelBackend interface every backend implements
-  qwen_image/           # adapter for the ai-image-edit-qwen package
-  qwen_image_edit_comfy/# ComfyUI-driven backend
-deployments/            # docker/, huggingface/, runpod/ — Dockerfiles, requirements, guides
-doc/                    # documentation assets
-```
-
-Adding a model means implementing `ModelBackend` (see `models/base.py`) and
-registering one loader in `models/__init__.py`. Adding a frontend means
-writing a module that exposes `run(model, model_backend)` and registering it
-in `frontends/__init__.py`.
-
 ## License
 
 Licensed under the GNU General Public License v3.0 or later
