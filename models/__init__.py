@@ -5,7 +5,8 @@ Registry + factory for model backends.
 Each model's module is imported lazily, inside its loader function, rather
 than at the top of this file. That matters concretely here:
 qwen_image_edit_comfy and qwen_image have almost disjoint dependency sets
-(ComfyUI's own stack vs. torch/diffusers/spaces for ZeroGPU), and a given
+(ComfyUI's own stack vs. the separately installed ai-image-edit-qwen
+package with torch/diffusers/spaces for ZeroGPU), and a given
 deployment only ever runs one of them. Importing both eagerly at package
 load would mean a comfy-only deployment breaks at startup unless it *also*
 installs diffusers/spaces/torch, and vice versa — with lazy imports, each
@@ -27,7 +28,15 @@ def _load_qwen_image_edit_comfy() -> ModelBackend:
 
 
 def _load_qwen_image() -> ModelBackend:
-    from models.qwen_image import QwenImageModel
+    try:
+        from models.qwen_image import QwenImageModel
+    except ModuleNotFoundError as exc:
+        if (exc.name or "").split(".")[0] != "ai_image_edit_qwen":
+            raise
+        raise RuntimeError(
+            "Backend 'qwen_image' needs the ai-image-edit-qwen package: "
+            "pip install git+https://github.com/pulb/ai_image_edit_qwen"
+        ) from exc
 
     return QwenImageModel()
 

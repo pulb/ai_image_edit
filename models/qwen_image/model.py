@@ -1,13 +1,11 @@
-# SPDX-License-Identifier: LicenseRef-Qwen-Research-License-Agreement
-# This file integrates with Qwen-Image-2.1, whose weights are distributed
-# under Alibaba's Qwen RESEARCH LICENSE AGREEMENT (non-open-source; see
-# https://huggingface.co/Qwen/Qwen-Image-2.1/blob/main/LICENSE), not GPL.
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 ModelBackend implementation for Qwen-Image-2.1: a direct diffusers
 pipeline (no ComfyUI), running on a Hugging Face ZeroGPU worker.
 
 All of the actual pipeline loading, AOTI-kernel loading, and the
-@spaces.GPU-wrapped diffusion call live in pipeline.py. This module plays
+@spaces.GPU-wrapped diffusion call live in the separately licensed
+ai_image_edit_qwen package (its pipeline module). This module plays
 the same role for this model that qwen_image_edit_comfy/model.py plays
 for its own: capability declaration, dimension resolution, and
 orchestrating one generate() call — nothing here touches CUDA directly.
@@ -25,6 +23,7 @@ import random
 import uuid
 from typing import Dict, Optional, Tuple
 
+from ai_image_edit_qwen import pipeline
 from PIL import Image
 
 from core import imaging
@@ -32,7 +31,6 @@ from core.errors import GenerationError
 from core.paths import WORK_DIR
 from core.types import GenerationParams, GenerationResult, ModelCapabilities, RangeSpec
 from models.base import ModelBackend
-from models.qwen_image import pipeline
 
 MAX_INPUT_IMAGES = 10
 MAX_SEED = 2 ** 31 - 1
@@ -51,21 +49,19 @@ ASPECT_RATIOS: Dict[str, Tuple[int, int]] = {
     "9:16": (1536, 2752),
 }
 
-# This project's usual sentinel for "derive dimensions from context rather
-# than force a fixed ratio" is "Original". For this model that's the
-# reference Space's own "Auto" — the pipeline follows the input images'
-# own aspect ratio, or squares up for pure text-to-image — same idea,
-# renamed to the one sentinel string the rest of the app already
-# recognizes (e.g. frontends/nicegui.py locks the aspect-ratio dropdown to
-# "Original" while a mask is drawn).
+# This project's sentinel for "derive dimensions from context rather than
+# force a fixed ratio" is "Original" (e.g. frontends/nicegui.py locks the
+# aspect-ratio dropdown to it while a mask is drawn). For this model it
+# means the pipeline follows the input images' own aspect ratio, or squares
+# up for pure text-to-image.
 AUTO_ASPECT_RATIO = "Original"
 
 # Resolution tiers, reusing the "megapixels" field every model's
 # capabilities expose for its resolution choices. Here it's actually this
-# model's own resolution tier — the reference Space labeled these
-# "1K"/"1.5K"/"2K", i.e. target side length 1024/1536/2048 — rather than a
-# literal computed pixel area. See _resolve_dimensions(), which turns the
-# chosen value back into that side length before calling _resolve_size().
+# model's own tier (1K/1.5K/2K, i.e. target side length 1024/1536/2048)
+# rather than a literal computed pixel area. See _resolve_dimensions(),
+# which turns the chosen value back into that side length before calling
+# _resolve_size().
 SUPPORTED_MEGAPIXELS = [1.0, 1.5, 2.0]
 DEFAULT_MEGAPIXELS = 1.0
 
@@ -80,12 +76,13 @@ def _round32(v: float) -> int:
 
 def _resolve_size(resolution: int, aspect_ratio: str) -> Tuple[Optional[int], Optional[int]]:
     """
-    Maps a resolution tier + aspect ratio onto the model card's width/height
-    pairs. Returns (None, None) for AUTO_ASPECT_RATIO — the pipeline then
-    infers dimensions itself (from the input images, or a square default
-    for pure text-to-image) rather than being told a fixed size. Only used
-    when there's no mask — see _dimensions_from_source() for the masked
-    case, which needs concrete numbers regardless of aspect_ratio.
+    Width/height for a resolution tier and a named aspect ratio: the model
+    card's size for that ratio, scaled by resolution / BASE_RESOLUTION.
+    Returns (None, None) for AUTO_ASPECT_RATIO — the pipeline then infers
+    dimensions itself (from the input images, or a square default for pure
+    text-to-image) rather than being told a fixed size. Only used when
+    there's no mask — see _dimensions_from_source() for the masked case,
+    which needs concrete numbers regardless of aspect_ratio.
     """
     if not aspect_ratio or aspect_ratio == AUTO_ASPECT_RATIO or aspect_ratio not in ASPECT_RATIOS:
         return None, None
