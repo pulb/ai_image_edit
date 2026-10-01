@@ -26,10 +26,9 @@ The UI is served on port `7860`.
 
 | Target | Backend | Frontend | Guide |
 |---|---|---|---|
-| Docker (self-hosted) | `qwen_image_edit_comfy` | NiceGUI only | [`deployments/docker`](deployments/docker/DEPLOY.md) |
-| Hugging Face Space, ZeroGPU | `qwen_image` | Gradio only | [`deployments/huggingface`](deployments/huggingface/DEPLOY.md) |
-| Hugging Face Space, paid GPU | `qwen_image` | Gradio or NiceGUI | [`deployments/huggingface`](deployments/huggingface/DEPLOY.md) |
-| RunPod GPU Pod | `qwen_image` | NiceGUI only | [`deployments/runpod`](deployments/runpod/DEPLOY.md) |
+| Docker (self-hosted) | `qwen_image_edit_comfy`, `qwen_image` (one image each) | NiceGUI only | [`deployments/docker`](deployments/docker/DEPLOY.md) |
+| Hugging Face Space | `qwen_image` | Gradio (ZeroGPU), Gradio or NiceGUI (paid GPU) | [`deployments/huggingface`](deployments/huggingface/DEPLOY.md) |
+| RunPod GPU Pod | `qwen_image_edit_comfy`, `qwen_image` (one image each) | NiceGUI only | [`deployments/runpod`](deployments/runpod/DEPLOY.md) |
 
 ## Layout
 
