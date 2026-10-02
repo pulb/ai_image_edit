@@ -31,6 +31,10 @@ Rules for any AI coding agent working in this repository.
   naming that state and nothing else, e.g. `git hook: you have uncommitted
   changes`, `git hook: you have untracked files`, `git hook: you have
   unpushed commits`. Do not commit, push, or amend in response.
+- When making any change, check whether it also applies to the qwen_image
+  backend repository (`ai_image_edit_qwen`,
+  https://github.com/pulb/ai_image_edit_qwen) — interface, naming,
+  packaging, docs or workflow changes may need a matching change there.
 
 ## Project conventions
 
