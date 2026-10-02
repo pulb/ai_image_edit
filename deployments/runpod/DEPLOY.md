@@ -71,6 +71,7 @@ a registry RunPod can pull from. It has not been tried on RunPod.
 
 1. Create a Pod from the image (for `qwen_image`:
    `ghcr.io/<owner>/<repo>-qwen-image:<tag>`), exposing HTTP port `7860`.
+   Recommended GPUs: A100 or L40S.
 2. If the registry package is private (GHCR packages are by default), add a
    registry credential under **Settings → Container Registry Auth** in the
    RunPod console. For GHCR that is your GitHub username and a PAT with

@@ -44,7 +44,7 @@ Optional variables: `HF_TOKEN` (gated weights or a private AOTI repo),
 
 ### Paid GPU
 
-- Pick a GPU under **Settings → Space hardware**.
+- Pick a GPU under **Settings → Space hardware**. Recommended: A100 or L40S.
 - `FRONTEND` can be `gradio` or `nicegui`. `nicegui` is the snappier
   frontend and also runs under the Gradio SDK, because the Space just runs
   `app.py` on port `7860`.
