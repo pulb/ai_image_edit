@@ -1,10 +1,17 @@
 # AI Image Edit
 
-A small, model-agnostic web app for AI-assisted image editing and
-generation. It provides a browser UI — prompt, reference images, an
-optional inpainting mask, and generation controls (aspect ratio,
-resolution, steps, CFG, sampler/scheduler, seed, LoRAs) — in front of a
-pluggable image-generation backend.
+A comfortable, responsive, model-agnostic app for AI-assisted image editing
+and generation. It provides a web based UI optimized for mobile devices —
+prompt, reference images, an optional inpainting mask, and generation
+controls (aspect ratio, resolution, steps, CFG, sampler/scheduler, seed,
+LoRAs) — in front of a pluggable image-generation backend.
+
+| Feature | Description |
+|---|---|
+| Inpainting | Advanced inpainting and mask functionality with seamless soft blending |
+| Before/after comparison | Interactive slider to compare generated outputs with the source |
+| Aspect ratios | Presets for common, widely used aspect ratios |
+| LoRAs | Optional LoRA support, auto-detected from a local loras folder |
 
 Backends, selected with `MODEL_BACKEND`:
 
