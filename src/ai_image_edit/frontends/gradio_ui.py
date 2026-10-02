@@ -13,6 +13,7 @@ wants plain local paths.
 """
 
 import atexit
+import hmac
 import os
 import uuid
 from typing import Dict, List, Optional, Tuple
@@ -512,8 +513,18 @@ def run(model: ModelBackend, model_backend: str) -> None:
     atexit.register(model.shutdown)
 
 
+    # APP_PASSWORD turns the login on; without it the app is open. Any
+    # username is accepted, only the password is checked. app.py refuses to
+    # start when REQUIRE_PASSWORD is set but APP_PASSWORD is not.
+    password = os.environ.get("APP_PASSWORD", "")
+    auth = None
+    if password:
+        def auth(username: str, entered: str) -> bool:
+            return hmac.compare_digest(entered.encode(), password.encode())
+
     demo.queue().launch(
         server_name="0.0.0.0",
         server_port=7860,
         allowed_paths=[str(WORK_DIR)],
+        auth=auth,
     )

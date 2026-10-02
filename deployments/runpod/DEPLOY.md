@@ -30,11 +30,14 @@ the Pod URL can use the app. Set the Pod environment variable
 behind a password login page. Both images set `REQUIRE_PASSWORD=1` and
 refuse to start without `APP_PASSWORD`.
 
-Logins survive restarts as long as the password stays the same; changing it
-logs everyone out. Set `APP_STORAGE_SECRET` to a long random value to keep
-sessions independent of the password. This is a single shared password with
-no rate limit beyond a one-second delay per wrong attempt. For stronger
-protection, don't expose the port and use an SSH tunnel or Tailscale.
+With NiceGUI (the images' frontend), logins survive restarts as long as the
+password stays the same; changing it logs everyone out. Set
+`APP_STORAGE_SECRET` to a long random value to keep sessions independent of
+the password. A wrong password is delayed by one second. The Gradio frontend
+also honors `APP_PASSWORD` (any username, shared password), but every restart
+logs everyone out. Either way this is a single shared password without real rate
+limiting. For stronger protection, don't expose the port and use an
+SSH tunnel or Tailscale.
 
 ## Build
 

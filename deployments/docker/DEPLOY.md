@@ -14,7 +14,7 @@ Each image sets its own `MODEL_BACKEND` and uses the NiceGUI frontend
 
 ## Password login
 
-The NiceGUI frontend sits behind a password login when `APP_PASSWORD` is
+The app sits behind a password login when `APP_PASSWORD` is
 set (for example `-e APP_PASSWORD=...`). Both images set
 `REQUIRE_PASSWORD=1` and refuse to start without it. Details are in
 [`../runpod/DEPLOY.md`](../runpod/DEPLOY.md).
