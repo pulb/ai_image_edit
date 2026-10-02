@@ -23,7 +23,8 @@ Backends, selected with `MODEL_BACKEND`:
 Frontends, selected with `FRONTEND`:
 
 - **[NiceGUI](https://nicegui.io/)** (default) — the snappier frontend.
-- **[Gradio](https://www.gradio.app/)** — required for Hugging Face ZeroGPU.
+- **[Gradio](https://www.gradio.app/)** — fallback frontend, required for
+  Hugging Face ZeroGPU.
 
 The UI is served on port `7860`.
 
