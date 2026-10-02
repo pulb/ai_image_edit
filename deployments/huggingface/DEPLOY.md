@@ -44,7 +44,7 @@ Optional variables: `HF_TOKEN` (gated weights or a private AOTI repo),
 - Pick a GPU under **Settings → Space hardware**.
 - `FRONTEND` can be `gradio` or `nicegui`. `nicegui` is the snappier
   frontend and also runs under the Gradio SDK, because the Space just runs
-  `app.py` on port `7860`. This combination is untested.
+  `app.py` on port `7860`.
 - To run it as a Docker Space instead, see
   [`../runpod/DEPLOY.md`](../runpod/DEPLOY.md): the same image works, with
   `sdk: docker` in the card and the Dockerfile copied to the Space root as
