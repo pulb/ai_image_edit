@@ -6,13 +6,13 @@ Space itself only holds three small files. It serves on port `7860`.
 
 ## Space files
 
-Copy these into the **root** of the Space repo:
+Copy the contents of [`space/`](space/) into the **root** of the Space repo:
 
-| From this repo | To the Space |
+| File | Purpose |
 |---|---|
-| `deployments/huggingface/requirements.txt` | `requirements.txt` |
-| `deployments/huggingface/app.py` | `app.py` |
-| `deployments/huggingface/SPACE_README.md` | `README.md` (the Space card) |
+| `requirements.txt` | installs the app and its dependencies |
+| `app.py` | entry point that sets the defaults |
+| `README.md` | the Space card |
 
 `requirements.txt` installs `ai-image-edit` from GitHub together with the
 separately licensed [`ai-image-edit-qwen`](https://github.com/pulb/ai_image_edit_qwen)
@@ -37,7 +37,7 @@ Optional variables: `HF_TOKEN` (gated weights or a private AOTI repo),
 
 - **Settings → Space hardware → ZeroGPU** (needs a PRO account).
 - Keep `FRONTEND=gradio`. ZeroGPU (`spaces.GPU`) only works with the Gradio
-  SDK Space type, which `SPACE_README.md` already declares.
+  SDK Space type, which the card in `space/README.md` already declares.
 
 ### Paid GPU
 
