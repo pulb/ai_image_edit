@@ -81,6 +81,23 @@ def save_data_url(data_url: str, filename_hint: str = "mask.png") -> str:
     path.write_bytes(raw)
     return str(path)
 
+def create_hidden_uploader() -> ui.upload:
+    """
+    A hidden single-file ui.upload whose file picker a visible box opens via
+    run_method("pickFiles").
+
+    accept="*/*" rather than "image/*": on Android, restricting to images
+    forces a limited gallery-style picker and hides the full file browser
+    (folder navigation, cloud storage sources, etc.), which is often the
+    only practical way to reach a downloaded or shared image file. Nothing
+    downstream validates file type either way; it is only a hint to the OS
+    picker.
+    """
+    uploader = ui.upload(auto_upload=True, max_files=1).props('accept="*/*"')
+    uploader.set_visibility(False)
+    return uploader
+
+
 # --- UI component factories ---
 #
 # Every ui.html(...) call below passes sanitize=False. ui.html() defaults to
@@ -120,14 +137,7 @@ def create_simple_image_upload(label: str) -> dict:
             preview = ui.image().classes("qie-preview")
             preview.set_visibility(False)
 
-        # accept="*/*" rather than "image/*": on Android, restricting to
-        # images forces a limited gallery-style picker and hides the full
-        # file browser (folder navigation, cloud storage sources, etc.),
-        # which is often the only practical way to reach a downloaded or
-        # shared image file. Nothing downstream validates file type either
-        # way — this was never enforcement, just a hint to the OS picker.
-        uploader = ui.upload(auto_upload=True, max_files=1).props('accept="*/*"')
-        uploader.set_visibility(False)
+        uploader = create_hidden_uploader()
 
         async def open_picker() -> None:
             await uploader.run_method("pickFiles", timeout=5.0)
@@ -202,14 +212,7 @@ async def create_mask_editor(
             sanitize=False,
         )
 
-    # accept="*/*" rather than "image/*": on Android, restricting to images
-    # forces a limited gallery-style picker and hides the full file browser
-    # (folder navigation, cloud storage sources, etc.), which is often the
-    # only practical way to reach a downloaded or shared image file.
-    # Nothing downstream validates file type either way — this was never
-    # enforcement, just a hint to the OS picker.
-    uploader = ui.upload(auto_upload=True, max_files=1).props('accept="*/*"')
-    uploader.set_visibility(False)
+    uploader = create_hidden_uploader()
 
     async def open_picker_if_empty() -> None:
         # Once an image is loaded, a click on the box should draw on the
@@ -248,8 +251,7 @@ async def create_mask_editor(
             # js_handler runs entirely in the browser, no server round-trip
             # (see CLIENT_JS's QIE comment for why that matters for a
             # dragged brush size) — 'update:model-value' fires continuously
-            # while dragging, mirroring the old <input>'s oninput; 'change'
-            # fires once on release, mirroring the old onchange/ontouchend.
+            # while dragging; 'change' fires once on release.
             brush_slider.on(
                 "update:model-value",
                 js_handler=f"(value) => {{ QIE.setBrush('{editor_id}', value); QIE.showBrushPreview('{editor_id}', value); }}",
@@ -333,10 +335,9 @@ async def create_compare_slider() -> Tuple[
             f'</div>',
             sanitize=False,
         )
-        # A ui.slider rather than the raw <input type="range"> this replaces
-        # — a bare <input> (even type="range") is enough to pop the Android
-        # software keyboard on some WebViews/browsers just from being
-        # focused. No label (label-always) here: unlike Brush/Feather, this
+        # A ui.slider rather than a raw <input type="range"> — a bare <input>
+        # (even type="range") is enough to pop the Android software keyboard
+        # on some WebViews/browsers just from being focused. No label (label-always) here: unlike Brush/Feather, this
         # overlays directly on the image, where a value bubble would be
         # visual noise rather than useful information. js_handler keeps
         # dragging fully client-side (see CLIENT_JS's QIE comment for why
@@ -1280,9 +1281,7 @@ def run(model: ModelBackend, model_backend: str) -> None:
     app.add_static_files("/files", str(WORK_DIR))
 
     # Make sure whatever the active model started (a ComfyUI subprocess, a
-    # loaded pipeline, ...) gets torn down on shutdown instead of leaking —
-    # the original ComfyUI subprocess was never terminated; this is a
-    # free correctness fix that falls out of giving every model a shutdown().
+    # loaded pipeline, ...) gets torn down on shutdown instead of leaking.
     app.on_shutdown(model.shutdown)
 
 

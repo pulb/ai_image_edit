@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """
 ModelBackend implementation for Qwen-Image-2.1: a direct diffusers
-pipeline (no ComfyUI), running on a Hugging Face ZeroGPU worker.
+pipeline (no ComfyUI), in-process on a ZeroGPU worker or any CUDA GPU.
 
 All of the actual pipeline loading, AOTI-kernel loading, and the
 @spaces.GPU-wrapped diffusion call live in the separately licensed
@@ -14,8 +14,7 @@ Masking is handled externally, via core/imaging.py's
 run_masked_generation() — the same crop/composite/color-correct sequence
 qwen_image_edit_comfy uses. QwenImage21Pipeline itself has no mask_image
 parameter or other inpainting-specific mechanism (confirmed against its
-actual __call__ signature), so there was never a model-internal masking
-option to use instead.
+actual __call__ signature), so masking can only be done externally.
 """
 import math
 import os
@@ -115,7 +114,7 @@ def _dimensions_from_source(source_image_path: str, resolution: int) -> Tuple[in
 
 
 class QwenImageModel(ModelBackend):
-    """Qwen-Image-2.1, run as a direct diffusers pipeline on a ZeroGPU worker."""
+    """Qwen-Image-2.1, run as a direct diffusers pipeline."""
 
     @property
     def capabilities(self) -> ModelCapabilities:
@@ -146,7 +145,7 @@ class QwenImageModel(ModelBackend):
 
     def shutdown(self) -> None:
         # Nothing to explicitly tear down — the pipeline lives for the
-        # lifetime of the worker process, and ZeroGPU itself owns the CUDA
+        # lifetime of the process, and on ZeroGPU the platform owns the CUDA
         # allocation lifecycle around each @spaces.GPU call.
         pass
 

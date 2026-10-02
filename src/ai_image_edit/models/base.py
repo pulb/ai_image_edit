@@ -5,7 +5,7 @@ The interface every model backend implements.
 Kept intentionally small: the UI needs exactly three things from a model —
 what it can do (capabilities), how to start/stop it, and how to run one
 generation. How a model actually gets there (ComfyUI over a websocket, an
-in-process torch/ZeroGPU pipeline, or anything else) is the model's own
+in-process torch pipeline, or anything else) is the model's own
 business and never leaks into this contract — that's what lets a completely
 different execution model (e.g. qwen_image's direct torch pipeline, with no
 ComfyUI involved at all) implement the same interface as

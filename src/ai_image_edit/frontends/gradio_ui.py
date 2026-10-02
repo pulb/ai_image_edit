@@ -130,12 +130,11 @@ def run(model: ModelBackend, model_backend: str) -> None:
     #     ImageEditor/ImageSlider switch to "dashed" for their empty
     #     "drop a file here" state). A plain CSS rule — however correctly
     #     targeted — can never beat an inline style; only `!important` can. This
-    #     is exactly why every earlier attempt here still showed a dashed border
-    #     even once the right class/selector was found: none of them used
-    #     `!important` on border-style itself, only on border-color.
+    #     which is why the rule below puts `!important` on border-style itself,
+    #     not only on border-color.
     # Component-specific class names (upload-container, image-frame, .empty, ...)
-    # carry no border/dashed styling of their own in this version — overriding
-    # those was never going to do anything.
+    # carry no border/dashed styling of their own in this version, so
+    # overriding them has no effect.
     CUSTOM_CSS = f"""
     .qie-page {{ max-width: 720px; margin: 0 auto; }}
 

@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Basis-Image: plain Python (Debian slim), no bundled CUDA/PyTorch — torch
+# Base image: plain Python (Debian slim), no bundled CUDA/PyTorch — torch
 # is installed manually below via pip, which pulls its own bundled CUDA
 # runtime libs (cuDNN, cuBLAS, NCCL, etc.) from the cu126 wheel index. No
 # system CUDA toolkit is needed since nothing here compiles CUDA code.

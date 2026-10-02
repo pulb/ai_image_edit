@@ -58,10 +58,7 @@ SAMPLER_CHOICES = [
 # Fixed negative prompt applied to every generation (node 4 in workflow_api.json).
 NEGATIVE_PROMPT = "worst quality, low quality, bad anatomy, bad hands, text, error, missing fingers, extra digit, fewer digits, cropped, jpeg artifacts, signature, watermark, username, blurry"
 
-# workflow_api.json lives next to this file. If you're migrating from the
-# old flat layout, move it into models/qwen_image_edit_comfy/ (and update
-# the Dockerfile's COPY line — see the README note shipped alongside this
-# refactor).
+# workflow_api.json lives next to this file (shipped as package data).
 WORKFLOW_PATH = Path(__file__).parent / "workflow_api.json"
 
 # Aspect ratio presets: label -> (w_ratio, h_ratio) fed into the target-area
@@ -83,11 +80,8 @@ _ASPECT_RATIOS: Dict[str, Tuple[int, int]] = {
 # Output resolution choices offered to the UI, in megapixels. The model
 # (this file) is the only place that turns a chosen value into actual pixel
 # dimensions — see _dimensions_for(). Phr00t's Qwen-Image-Edit-Rapid-AIO
-# checkpoint is tuned for ~1MP outputs specifically (matching the original
-# fixed PIPELINE_TARGET_AREA) — 1.5/2.0 MP were an initial guess at what
-# might be offerable, but this checkpoint doesn't actually hold up well
-# above 1MP, so only 1.0 is offered. Revisit if a future checkpoint here
-# supports more.
+# checkpoint is tuned for ~1MP outputs and doesn't hold up well above that,
+# so only 1.0 is offered.
 SUPPORTED_MEGAPIXELS = [1.0]
 DEFAULT_MEGAPIXELS = 1.0
 

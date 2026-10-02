@@ -10,8 +10,7 @@ scheme for.
 from pathlib import Path
 
 # Where uploaded, generated, and composited images live for the lifetime of
-# the process. Shared by both frontends (not just NiceGUI, despite the
-# directory name predating the frontends/ split — see gradio_ui.py's own
+# the process. Shared by both frontends (gradio_ui.py exposes it through
 # allowed_paths=[str(WORK_DIR)]). Served to the browser at /files/<name>
 # (see frontends/nicegui.py's app.add_static_files) so client-side
 # <canvas>/<img> elements can load them by URL. This also doubles as the
