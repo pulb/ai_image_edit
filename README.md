@@ -1,10 +1,8 @@
 # AI Image Edit
 
 A comfortable, responsive, model-agnostic app for AI-assisted image editing
-and generation. It provides a web based UI optimized for mobile devices —
-prompt, reference images, an optional inpainting mask, and generation
-controls (aspect ratio, resolution, steps, CFG, sampler/scheduler, seed,
-LoRAs) — in front of a pluggable image-generation backend.
+and generation. It provides a web based UI optimized for mobile devices in
+front of a pluggable image-generation backend.
 
 | Feature | Description |
 |---|---|
