@@ -23,6 +23,10 @@ WORKDIR $HOME/app
 # explicitly rather than relying on the app's own default.
 ENV MODEL_BACKEND=qwen_image_edit_comfy
 
+# This image is meant for public hosts (RunPod's HTTP proxy has no login of
+# its own), so the app refuses to start unless APP_PASSWORD is set.
+ENV REQUIRE_PASSWORD=1
+
 # Clone ComfyUI
 RUN git clone https://github.com/Comfy-Org/ComfyUI.git .
 

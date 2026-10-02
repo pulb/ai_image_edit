@@ -38,6 +38,10 @@ WORKDIR $HOME/app
 ENV MODEL_BACKEND=qwen_image
 ENV FRONTEND=nicegui
 
+# This image is meant for public hosts (RunPod's HTTP proxy has no login of
+# its own), so the app refuses to start unless APP_PASSWORD is set.
+ENV REQUIRE_PASSWORD=1
+
 # PyTorch (CUDA 12.6 wheels) — this base image has no CUDA/PyTorch
 # preinstalled. --user installs into $HOME/.local since /usr/local is
 # root-owned here. No torchaudio: nothing in this deployment uses audio.

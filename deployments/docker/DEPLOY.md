@@ -10,7 +10,14 @@ Two images, both built from the repo root. The app serves on port `7860`.
 ## Backend and frontend
 
 Each image sets its own `MODEL_BACKEND` and uses the NiceGUI frontend
-(`FRONTEND=nicegui`). No configuration is needed.
+(`FRONTEND=nicegui`), so no backend or frontend configuration is needed.
+
+## Password login
+
+The NiceGUI frontend sits behind a password login when `APP_PASSWORD` is
+set (for example `-e APP_PASSWORD=...`). Both images set
+`REQUIRE_PASSWORD=1` and refuse to start without it. Details are in
+[`../runpod/DEPLOY.md`](../runpod/DEPLOY.md).
 
 ## ComfyUI image
 
@@ -19,7 +26,7 @@ LoRAs, then starts the app.
 
 ```bash
 docker build -f deployments/docker/Dockerfile.qwen_image_edit_comfy -t ai-image-edit .
-docker run -p 7860:7860 --gpus all ai-image-edit
+docker run -p 7860:7860 --gpus all -e APP_PASSWORD=... ai-image-edit
 ```
 
 ## qwen_image image

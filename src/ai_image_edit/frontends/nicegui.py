@@ -9,12 +9,20 @@ slots, LoRA panel, sampler/scheduler/cfg/denoise, aspect-ratio/resolution)
 are shown or hidden based on the active model's declared capabilities.
 """
 
+import asyncio
 import base64
+import hashlib
+import hmac
+import os
 import uuid
 from pathlib import Path
 from typing import Awaitable, Callable, Dict, List, Optional, Tuple
+from urllib.parse import quote
 
+from fastapi import Request
+from fastapi.responses import RedirectResponse
 from nicegui import app, ui
+from starlette.middleware.base import BaseHTTPMiddleware
 from nicegui import run as nicegui_run
 
 from ai_image_edit.core.errors import GenerationError
@@ -80,6 +88,53 @@ def save_data_url(data_url: str, filename_hint: str = "mask.png") -> str:
     path = WORK_DIR / f"{stem}_{uuid.uuid4().hex}{suffix}"
     path.write_bytes(raw)
     return str(path)
+
+def install_password_login(password: str) -> str:
+    """
+    Puts every route behind a password login page and returns the
+    storage_secret ui.run() needs for the session cookie.
+
+    Only /login, /favicon.ico and NiceGUI's own /_nicegui assets are open;
+    /files (uploaded and generated images) is covered like any other route.
+    The secret is derived from the password unless APP_STORAGE_SECRET is
+    set, so logins survive restarts and a changed password logs everyone out.
+    """
+    open_routes = {"/favicon.ico", "/login"}
+
+    @app.add_middleware
+    class AuthMiddleware(BaseHTTPMiddleware):
+        async def dispatch(self, request: Request, call_next):
+            path = request.url.path
+            if app.storage.user.get("authenticated") or path in open_routes or path.startswith("/_nicegui"):
+                return await call_next(request)
+            return RedirectResponse(f"/login?redirect_to={quote(path)}")
+
+    @ui.page("/login")
+    def login_page(redirect_to: str = "/") -> Optional[RedirectResponse]:
+        if app.storage.user.get("authenticated"):
+            return RedirectResponse("/")
+
+        # Only same-site paths: "//host" would redirect off-site.
+        target = redirect_to if redirect_to.startswith("/") and not redirect_to.startswith("//") else "/"
+
+        async def try_login() -> None:
+            if hmac.compare_digest(field.value.encode(), password.encode()):
+                app.storage.user["authenticated"] = True
+                ui.navigate.to(target)
+            else:
+                await asyncio.sleep(1.0)
+                ui.notify("Wrong password", color="negative")
+
+        ui.dark_mode().enable()
+        ui.colors(primary=PRIMARY_COLOR, dark="#111111", dark_page="#000000")
+        with ui.card().classes("absolute-center items-stretch"):
+            field = ui.input("Password", password=True, password_toggle_button=True).props("autofocus")
+            field.on("keydown.enter", try_login)
+            ui.button("Log in", on_click=try_login)
+        return None
+
+    return os.environ.get("APP_STORAGE_SECRET") or hashlib.sha256(f"ai-image-edit-session:{password}".encode()).hexdigest()
+
 
 def create_hidden_uploader() -> ui.upload:
     """
@@ -1284,6 +1339,10 @@ def run(model: ModelBackend, model_backend: str) -> None:
     # loaded pipeline, ...) gets torn down on shutdown instead of leaking.
     app.on_shutdown(model.shutdown)
 
+    # APP_PASSWORD turns the login on; without it the app is open. app.py
+    # refuses to start when REQUIRE_PASSWORD is set but APP_PASSWORD is not.
+    password = os.environ.get("APP_PASSWORD", "")
+    storage_secret = install_password_login(password) if password else None
 
     # Called unconditionally (no "if __name__ == '__main__':" guard) — this
     # module is only ever reached via app.py's FRONTEND-driven
@@ -1316,4 +1375,12 @@ def run(model: ModelBackend, model_backend: str) -> None:
     # tracks a related over-eager reload-on-reconnect case
     # (github.com/zauberzeug/nicegui/issues/6018) — worth an upgrade if this
     # keeps happening even for quick tab switches.
-    ui.run(host="0.0.0.0", port=7860, title="AI Image Edit", dark=True, reload=False, reconnect_timeout=300)
+    ui.run(
+        host="0.0.0.0",
+        port=7860,
+        title="AI Image Edit",
+        dark=True,
+        reload=False,
+        reconnect_timeout=300,
+        storage_secret=storage_secret,
+    )

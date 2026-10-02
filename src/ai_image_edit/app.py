@@ -4,7 +4,7 @@ Entry point: builds the model backend and hands it to a UI frontend.
 
 MODEL_BACKEND (default qwen_image_edit_comfy) and FRONTEND (default
 nicegui) are read when main() is called, not at import time, so a launcher
-can set them first. The UI code lives under frontends/, the model code
+can set them first. APP_PASSWORD adds a login to the nicegui frontend. The UI code lives under frontends/, the model code
 under models/; run_frontend() passes the built model straight to the chosen
 frontend's run(model, model_backend).
 """
@@ -15,10 +15,19 @@ from ai_image_edit.models import get_model
 
 
 def main() -> None:
+    frontend = os.environ.get("FRONTEND", "nicegui")
+
+    # Checked before the model starts, which can take minutes. The password
+    # login only exists in the NiceGUI frontend, so refuse rather than ignore it.
+    password = os.environ.get("APP_PASSWORD", "")
+    if os.environ.get("REQUIRE_PASSWORD") and not password:
+        raise SystemExit("REQUIRE_PASSWORD is set but APP_PASSWORD is empty: set APP_PASSWORD to start the app.")
+    if password and frontend != "nicegui":
+        raise SystemExit("APP_PASSWORD is only supported by the nicegui frontend.")
+
     model_backend = os.environ.get("MODEL_BACKEND", "qwen_image_edit_comfy")
     model = get_model(model_backend)
     print(f"Starting model backend '{model_backend}' in the background...", flush=True)
     model.start()
 
-    frontend = os.environ.get("FRONTEND", "nicegui")
     run_frontend(frontend, model, model_backend)

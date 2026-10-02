@@ -15,11 +15,26 @@ so it combines GPL and Qwen-licensed code: keep it private (see the
 
 ## Backend and frontend
 
-Each image sets its own `MODEL_BACKEND` and uses `FRONTEND=nicegui`. No
-configuration is needed. Pick the backend by choosing the image.
+Each image sets its own `MODEL_BACKEND` and uses `FRONTEND=nicegui`, so
+no backend or frontend configuration is needed. Pick the backend by
+choosing the image.
 
 Optional Pod environment variables for `qwen_image`: `HF_TOKEN`,
 `QWEN21_AOTI`, `QWEN21_AOTI_REPO`, `HF_HUB_CACHE`.
+
+## Access protection
+
+RunPod's HTTP proxy is public and has no login of its own, so anyone with
+the Pod URL can use the app. Set the Pod environment variable
+`APP_PASSWORD` to put the whole app, including the image files it serves,
+behind a password login page. Both images set `REQUIRE_PASSWORD=1` and
+refuse to start without `APP_PASSWORD`.
+
+Logins survive restarts as long as the password stays the same; changing it
+logs everyone out. Set `APP_STORAGE_SECRET` to a long random value to keep
+sessions independent of the password. This is a single shared password with
+no rate limit beyond a one-second delay per wrong attempt. For stronger
+protection, don't expose the port and use an SSH tunnel or Tailscale.
 
 ## Build
 
