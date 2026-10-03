@@ -1161,9 +1161,10 @@ def run(model: ModelBackend, model_backend: str) -> None:
                         megapixels.disable()
 
                 previous_aspect_ratio = aspect_ratio.value
+                previous_megapixels = megapixels.value
 
                 def handle_mask_change(has_mask: bool) -> None:
-                    nonlocal previous_aspect_ratio
+                    nonlocal previous_aspect_ratio, previous_megapixels
                     if "Original" not in caps.supported_aspect_ratios:
                         return
                     if has_mask:
@@ -1171,10 +1172,16 @@ def run(model: ModelBackend, model_backend: str) -> None:
                             previous_aspect_ratio = aspect_ratio.value
                         aspect_ratio.value = "Original"
                         aspect_ratio.disable()
+                        # Shows the tier the model will use: it follows the image.
+                        source_mp = model.megapixels_for_source(editor_holder["path"]) if editor_holder["path"] else None
+                        if source_mp is not None:
+                            previous_megapixels = megapixels.value
+                            megapixels.value = source_mp
                         megapixels.disable()
                     else:
                         aspect_ratio.enable()
                         aspect_ratio.value = previous_aspect_ratio
+                        megapixels.value = previous_megapixels
                         if len(caps.supported_megapixels) > 1:
                             # Otherwise it was already permanently disabled above
                             # (nothing to choose), independent of any mask.

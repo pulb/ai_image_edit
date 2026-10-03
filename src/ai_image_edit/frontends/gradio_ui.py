@@ -399,7 +399,10 @@ def run(model: ModelBackend, model_backend: str) -> None:
                     # actually sent to the model.
                     has_mask = _quick_has_edit(editor_value)
                     if has_mask:
-                        return gr.update(value="Original", interactive=False), gr.update(interactive=False)
+                        # Shows the tier the model will use: it follows the image.
+                        source_mp = model.megapixels_for_source(editor_value["background"])
+                        mp_update = gr.update(interactive=False) if source_mp is None else gr.update(value=source_mp, interactive=False)
+                        return gr.update(value="Original", interactive=False), mp_update
                     return gr.update(interactive=True), gr.update(interactive=len(caps.supported_megapixels) > 1)
 
                 edit_image.change(fn=on_editor_change, inputs=edit_image, outputs=[aspect_ratio, megapixels])

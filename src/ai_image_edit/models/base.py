@@ -12,7 +12,7 @@ ComfyUI involved at all) implement the same interface as
 qwen_image_edit_comfy without either one needing to know about the other.
 """
 from abc import ABC, abstractmethod
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from ai_image_edit.core.types import GenerationParams, GenerationResult, ModelCapabilities
 
@@ -43,6 +43,14 @@ class ModelBackend(ABC):
         calls this when supports_loras is False.
         """
         return {}
+
+    def megapixels_for_source(self, source_image_path: str) -> Optional[float]:
+        """
+        The supported_megapixels value that fits the given image, or None if
+        the model has no such notion. Used while a mask is drawn, where the
+        output keeps the image's own resolution instead of the selected one.
+        """
+        return None
 
     @abstractmethod
     def generate(self, params: GenerationParams) -> GenerationResult:

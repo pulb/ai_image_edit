@@ -152,6 +152,12 @@ class QwenImageModel(ModelBackend):
         # allocation lifecycle around each @spaces.GPU call.
         pass
 
+    def megapixels_for_source(self, source_image_path: str) -> Optional[float]:
+        """The tier whose area is closest to the source image's own."""
+        with Image.open(source_image_path) as img:
+            area = img.width * img.height
+        return min(SUPPORTED_MEGAPIXELS, key=lambda mp: abs(math.log(area / (mp * 1024) ** 2)))
+
     def _resolve_dimensions(self, aspect_ratio: str, target_megapixels: float) -> Tuple[int, Optional[int], Optional[int]]:
         """
         Returns (resolution_tier, width, height). resolution_tier is this
@@ -196,8 +202,11 @@ class QwenImageModel(ModelBackend):
         # is drawn, but this doesn't rely solely on that: enforcing it here
         # too means a mask always gets correctly-aligned dimensions even if
         # that UI-level invariant is ever bypassed.
+        # Likewise the tier: with a mask the output keeps the source's own
+        # resolution, so the compositing doesn't resample the whole image.
         effective_aspect_ratio = AUTO_ASPECT_RATIO if params.mask_path else params.aspect_ratio
-        resolution, gen_width, gen_height = self._resolve_dimensions(effective_aspect_ratio, params.target_megapixels)
+        target_megapixels = self.megapixels_for_source(params.source_image_path) if params.mask_path else params.target_megapixels
+        resolution, gen_width, gen_height = self._resolve_dimensions(effective_aspect_ratio, target_megapixels)
 
         if gen_width is None or gen_height is None:
             # _resolve_size returns (None, None) for AUTO_ASPECT_RATIO
