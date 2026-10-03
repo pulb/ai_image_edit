@@ -261,6 +261,7 @@ async def create_mask_editor(
         ui.html(
             f'<div id="{editor_id}_zoomwrap" class="qie-zoomwrap">'
             f'<canvas id="{editor_id}_canvas" class="qie-canvas"></canvas>'
+            f'<canvas id="{editor_id}_overlay" class="qie-overlay"></canvas>'
             f'<div id="{editor_id}_placeholder" class="qie-placeholder">Click to upload an image</div>'
             f'</div>'
             f'<div id="{editor_id}_brushpreview" class="qie-brush-preview"></div>',
@@ -508,6 +509,17 @@ WIDGET_CSS = """
     border-radius: 8px;
 }
 
+.qie-overlay {
+    position: absolute;
+    inset: 0;
+    box-sizing: border-box;
+    width: 100%;
+    height: 100%;
+    border: 1px solid transparent;
+    opacity: 0.5;
+    pointer-events: none;
+}
+
 .qie-brush-preview {
     position: absolute;
     top: 50%;
@@ -615,7 +627,10 @@ window.QIE = window.QIE || {};
 QIE.init = function (id) {
     const canvas = document.getElementById(id + '_canvas');
     const ctx = canvas.getContext('2d');
-    const maskCanvas = document.createElement('canvas');
+    // The mask canvas is also the on-screen overlay: opaque white strokes,
+    // shown at 50% by CSS (.qie-overlay), so repeated strokes don't build up
+    // and the exported mask is unaffected by the display opacity.
+    const maskCanvas = document.getElementById(id + '_overlay');
     const maskCtx = maskCanvas.getContext('2d');
     const zoomwrap = document.getElementById(id + '_zoomwrap');
 
@@ -654,17 +669,12 @@ QIE.init = function (id) {
 
     function dot(x, y) {
         const r = (state.brush * getScale()) / 2;
-        ctx.beginPath(); ctx.fillStyle = 'rgba(255,255,255,0.5)';
-        ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
         maskCtx.beginPath(); maskCtx.fillStyle = '#ffffff';
         maskCtx.arc(x, y, r, 0, Math.PI * 2); maskCtx.fill();
     }
 
     function lineTo(x0, y0, x1, y1) {
         const w = state.brush * getScale();
-        ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = w;
-        ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-        ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
         maskCtx.strokeStyle = '#ffffff'; maskCtx.lineWidth = w;
         maskCtx.lineCap = 'round'; maskCtx.lineJoin = 'round';
         maskCtx.beginPath(); maskCtx.moveTo(x0, y0); maskCtx.lineTo(x1, y1); maskCtx.stroke();
@@ -830,8 +840,6 @@ QIE.clearMask = function (id) {
     const state = QIE[id];
     if (!state || !state.img) return;
     state.maskCtx.clearRect(0, 0, state.maskCanvas.width, state.maskCanvas.height);
-    state.ctx.clearRect(0, 0, state.canvas.width, state.canvas.height);
-    state.ctx.drawImage(state.img, 0, 0);
     if (state.hasMask) {
         state.hasMask = false;
         emitEvent('qie_mask_state', id, false);
