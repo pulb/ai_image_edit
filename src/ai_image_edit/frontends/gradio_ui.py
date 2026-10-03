@@ -381,7 +381,9 @@ def run(model: ModelBackend, model_backend: str) -> None:
             # As soon as a mask is drawn on a model that supports inpainting, the
             # output must derive its dimensions from the source image's own
             # framing, so both Aspect ratio and Resolution are disabled while a
-            # mask exists — Aspect ratio additionally forced to "Original" — only
+            # mask exists — Aspect ratio additionally forced to "Original",
+            # Resolution set to the tier the model will use for the image
+            # (model.megapixels_for_source) — only
             # when "Original" is actually one of the model's
             # supported_aspect_ratios — mirroring handle_mask_change() in the
             # NiceGUI app (simplified: it doesn't restore the exact prior

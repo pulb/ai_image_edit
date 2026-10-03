@@ -49,7 +49,7 @@ ASPECT_RATIOS: Dict[str, Tuple[int, int]] = {
 }
 
 # This project's sentinel for "derive dimensions from context rather than
-# force a fixed ratio" is "Original" (e.g. frontends/nicegui.py locks the
+# force a fixed ratio" is "Original" (e.g. the frontends lock the
 # aspect-ratio dropdown to it while a mask is drawn). For this model it
 # means the pipeline follows the input images' own aspect ratio, or squares
 # up for pure text-to-image.
@@ -196,8 +196,8 @@ class QwenImageModel(ModelBackend):
         # A mask's coordinates are only meaningful relative to the source
         # image's own framing, so dimensions must come from the source
         # itself whenever a mask is present — mirrors
-        # qwen_image_edit_comfy/model.py's identical override (see that
-        # file's generate() docstring for the full reasoning). Frontends
+        # qwen_image_edit_comfy/model.py's identical override (see the
+        # comment in that file's generate()). Frontends
         # already lock the Aspect ratio control to "Original" while a mask
         # is drawn, but this doesn't rely solely on that: enforcing it here
         # too means a mask always gets correctly-aligned dimensions even if

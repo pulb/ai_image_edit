@@ -615,12 +615,12 @@ WIDGET_CSS = """
 #         event via emitEvent(...) — the documented pattern for a
 #         browser-side state change to reach Python without being tied to
 #         one specific DOM event (see the "Custom events" section of the
-#         Generic Events docs) — which main_page listens for with
-#         ui.on(...) to keep Aspect ratio in sync (see create_mask_editor's
-#         on_mask_change).
+#         Generic Events docs) — which create_mask_editor listens for with
+#         ui.on(...) and passes on to its on_mask_change callback, used to
+#         keep Aspect ratio and Resolution in sync.
 #
-#   QIS — the before/after comparison: a CSS clip-path dragged by a native
-#         range input, entirely client-side.
+#   QIS — the before/after comparison: a CSS clip-path dragged by a
+#         ui.slider (via js_handler), entirely client-side.
 CLIENT_JS = r"""
 window.QIE = window.QIE || {};
 
@@ -804,9 +804,9 @@ QIE.init = function (id) {
 };
 
 QIE.setLocked = function (id, locked) {
-    // Brush/Feather sliders are real NiceGUI ui.slider widgets now, so
-    // their enabled state is toggled from Python (see toggle_lock in
-    // create_mask_editor) instead of by reaching into the DOM here.
+    // Brush/Feather sliders are NiceGUI ui.slider widgets, so their enabled
+    // state is toggled from Python (see toggle_lock in create_mask_editor)
+    // rather than by reaching into the DOM here.
     const state = QIE[id];
     if (state) state.locked = locked;
 };
@@ -987,8 +987,8 @@ QIS.applyClip = function (id, val) {
     const before = document.getElementById(id + '_before');
     const handle = document.getElementById(id + '_handle');
     // Tracked here (rather than read back from the slider's own DOM) since
-    // range_slider is a Quasar-rendered ui.slider now, not a raw <input>
-    // with a plain .value property — QIS.setCompare reads this instead of
+    // range_slider is a Quasar-rendered ui.slider, not a raw <input> with a
+    // plain .value property — QIS.setCompare reads this instead of
     // reaching into the slider element directly.
     if (!QIS[id]) QIS[id] = {};
     QIS[id].sliderValue = val;
@@ -1141,9 +1141,11 @@ def run(model: ModelBackend, model_backend: str) -> None:
             # must come from the source image's own aspect ratio (a mask's
             # coordinates are only meaningful relative to the source's own
             # framing), so both Aspect ratio and Resolution are disabled while a
-            # mask exists — Aspect ratio additionally force-set to "Original" —
-            # only when the model actually offers "Original" as a choice, and
-            # restored the moment the mask is removed.
+            # mask exists — Aspect ratio additionally force-set to "Original",
+            # Resolution set to the tier the model will use for the image
+            # (model.megapixels_for_source) — only when the model actually
+            # offers "Original" as a choice, and restored the moment the mask
+            # is removed.
             with ui.card().classes(CARD_CLASSES):
                 with ui.row().classes("w-full items-center gap-4"):
                     aspect_ratio = ui.select(
@@ -1373,16 +1375,9 @@ def run(model: ModelBackend, model_backend: str) -> None:
     password = os.environ.get("APP_PASSWORD", "")
     storage_secret = install_password_login(password) if password else None
 
-    # Called unconditionally (no "if __name__ == '__main__':" guard) — this
-    # module is only ever reached via app.py's FRONTEND-driven
-    # dispatch (see frontends/__init__.py), which imports it as
-    # frontends.nicegui rather than running it as a script, so __name__ here is
-    # never "__main__" to begin with. Same reasoning as gradio_ui.py's own
-    # unconditional demo.queue().launch().
-    #
-    # reload=False is important here: model.start() already launched whatever
-    # the active model needs (e.g. ComfyUI) once, above — NiceGUI's
-    # auto-reloader re-executes this module in a subprocess, which would
+    # reload=False is important here: app.main() already started whatever the
+    # active model needs (e.g. ComfyUI) once, before this — NiceGUI's
+    # auto-reloader re-executes the app in a subprocess, which would
     # launch a second instance on the same port if left on.
     #
     # reconnect_timeout is optional — NiceGUI works fine without it,

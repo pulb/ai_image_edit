@@ -285,8 +285,8 @@ class QwenImageEditComfyModel(ModelBackend):
 
         # A mask's coordinates are only meaningful relative to the source
         # image's own framing, so dimensions must come from the source
-        # itself whenever a mask is present — frontends/nicegui.py already
-        # forces aspect_ratio to "Original" while a mask is drawn, but this
+        # itself whenever a mask is present — the frontends already
+        # force aspect_ratio to "Original" while a mask is drawn, but this
         # doesn't rely solely on that: reusing the "Original" branch here
         # too (rather than whatever aspect_ratio string was actually
         # passed) means a mask always gets correctly-aligned dimensions
