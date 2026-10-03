@@ -627,11 +627,13 @@ window.QIE = window.QIE || {};
 QIE.init = function (id) {
     const canvas = document.getElementById(id + '_canvas');
     const ctx = canvas.getContext('2d');
-    // The mask canvas is also the on-screen overlay: opaque white strokes,
-    // shown at 50% by CSS (.qie-overlay), so repeated strokes don't build up
-    // and the exported mask is unaffected by the display opacity.
-    const maskCanvas = document.getElementById(id + '_overlay');
+    const maskCanvas = document.createElement('canvas');
     const maskCtx = maskCanvas.getContext('2d');
+    // On-screen overlay: the same strokes as the mask, in the tint colour and
+    // opaque on the canvas, shown at 50% by CSS (.qie-overlay), so repeated
+    // strokes don't build up. The exported mask stays opaque white.
+    const overlayCanvas = document.getElementById(id + '_overlay');
+    const overlayCtx = overlayCanvas.getContext('2d');
     const zoomwrap = document.getElementById(id + '_zoomwrap');
 
     // brush is stored in on-screen CSS pixels (what the slider and preview
@@ -649,6 +651,7 @@ QIE.init = function (id) {
     };
     state.canvas = canvas; state.ctx = ctx;
     state.maskCanvas = maskCanvas; state.maskCtx = maskCtx;
+    state.overlayCanvas = overlayCanvas; state.overlayCtx = overlayCtx;
     QIE[id] = state;
 
     function getScale() {
@@ -671,6 +674,8 @@ QIE.init = function (id) {
         const r = (state.brush * getScale()) / 2;
         maskCtx.beginPath(); maskCtx.fillStyle = '#ffffff';
         maskCtx.arc(x, y, r, 0, Math.PI * 2); maskCtx.fill();
+        overlayCtx.beginPath(); overlayCtx.fillStyle = '__MASK_TINT__';
+        overlayCtx.arc(x, y, r, 0, Math.PI * 2); overlayCtx.fill();
     }
 
     function lineTo(x0, y0, x1, y1) {
@@ -678,6 +683,9 @@ QIE.init = function (id) {
         maskCtx.strokeStyle = '#ffffff'; maskCtx.lineWidth = w;
         maskCtx.lineCap = 'round'; maskCtx.lineJoin = 'round';
         maskCtx.beginPath(); maskCtx.moveTo(x0, y0); maskCtx.lineTo(x1, y1); maskCtx.stroke();
+        overlayCtx.strokeStyle = '__MASK_TINT__'; overlayCtx.lineWidth = w;
+        overlayCtx.lineCap = 'round'; overlayCtx.lineJoin = 'round';
+        overlayCtx.beginPath(); overlayCtx.moveTo(x0, y0); overlayCtx.lineTo(x1, y1); overlayCtx.stroke();
     }
 
     function markMask() {
@@ -823,8 +831,11 @@ QIE.loadImage = function (id, url) {
         state.canvas.height = img.naturalHeight;
         state.maskCanvas.width = img.naturalWidth;
         state.maskCanvas.height = img.naturalHeight;
+        state.overlayCanvas.width = img.naturalWidth;
+        state.overlayCanvas.height = img.naturalHeight;
         state.ctx.drawImage(img, 0, 0);
         state.maskCtx.clearRect(0, 0, state.maskCanvas.width, state.maskCanvas.height);
+        state.overlayCtx.clearRect(0, 0, state.overlayCanvas.width, state.overlayCanvas.height);
         QIE.resetZoom(id);
         if (state.hasMask) {
             state.hasMask = false;
@@ -840,6 +851,7 @@ QIE.clearMask = function (id) {
     const state = QIE[id];
     if (!state || !state.img) return;
     state.maskCtx.clearRect(0, 0, state.maskCanvas.width, state.maskCanvas.height);
+    state.overlayCtx.clearRect(0, 0, state.overlayCanvas.width, state.overlayCanvas.height);
     if (state.hasMask) {
         state.hasMask = false;
         emitEvent('qie_mask_state', id, false);
@@ -853,6 +865,7 @@ QIE.clearImage = function (id) {
     state.drawing = false;
     state.ctx.clearRect(0, 0, state.canvas.width, state.canvas.height);
     state.maskCtx.clearRect(0, 0, state.maskCanvas.width, state.maskCanvas.height);
+    state.overlayCtx.clearRect(0, 0, state.overlayCanvas.width, state.overlayCanvas.height);
     QIE.resetZoom(id);
     if (state.hasMask) {
         state.hasMask = false;
@@ -1054,6 +1067,7 @@ QIS.reset = function (id) {
 };
 """
 CLIENT_JS = CLIENT_JS.replace("__DEFAULT_BRUSH_SIZE__", str(DEFAULT_BRUSH_SIZE))
+CLIENT_JS = CLIENT_JS.replace("__MASK_TINT__", PRIMARY_COLOR)
 
 # --- Page ---
 
