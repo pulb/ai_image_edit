@@ -3,6 +3,11 @@
 Runs either backend with the NiceGUI frontend in a GPU Pod. Each backend has
 its own image, built from the repo root. The app serves on port `7860`.
 
+A public [RunPod template](https://console.runpod.io/hub/template/ayt3pyrp7w?ref=e1nr94ls)
+works with either image. You only need to replace its container image with
+your own and, if your registry is private, add registry credentials. Both
+steps are described under [Build](#build) and [Pod setup](#pod-setup) below.
+
 | Backend | Dockerfile | Weights |
 |---|---|---|
 | `qwen_image` | [`Dockerfile.qwen_image`](../docker/Dockerfile.qwen_image) | downloaded from the Hugging Face Hub at startup |
