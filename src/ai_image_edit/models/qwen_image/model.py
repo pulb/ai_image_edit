@@ -102,11 +102,14 @@ def _dimensions_from_source(source_image_path: str, resolution: int) -> Tuple[in
     way ASPECT_RATIOS' entries do (area ~ resolution^2), just computed
     directly from the source's own ratio instead of one of the model card's
     named presets — there's no precomputed table entry for an arbitrary
-    uploaded image's ratio.
+    uploaded image's ratio. A source that is already a valid size for the
+    tier (multiples of 32, area within 10% of the tier's) keeps its own size.
     """
     with Image.open(source_image_path) as img:
         src_w, src_h = img.size
     target_area = float(resolution) ** 2
+    if src_w % 32 == 0 and src_h % 32 == 0 and 0.9 <= src_w * src_h / target_area <= 1.1:
+        return src_w, src_h
     ratio = src_w / src_h
     w = math.sqrt(target_area * ratio)
     h = w / ratio
