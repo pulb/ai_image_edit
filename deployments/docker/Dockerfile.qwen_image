@@ -68,8 +68,8 @@ RUN pip install --no-cache-dir --user \
 # Weights aren't baked into this image (see the top-of-file note) — every
 # fresh container re-downloads Qwen-Image-2.1 from the Hub on startup. On
 # a RunPod pod that persists across restarts, point HF_HUB_CACHE at a
-# mounted network volume (e.g. `-e HF_HUB_CACHE=/runpod-volume/hf-cache`,
-# with that path mounted as the pod's volume) so the download only
+# mounted network volume (e.g. `-e HF_HUB_CACHE=/workspace/hf-cache`,
+# a folder on the volume, which a Pod mounts at /workspace) so the download only
 # happens once, without baking multi-GB weights into the image itself.
 
 EXPOSE 7860

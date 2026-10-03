@@ -76,9 +76,9 @@ a registry RunPod can pull from. It has not been tried on RunPod.
    registry credential under **Settings → Container Registry Auth** in the
    RunPod console. For GHCR that is your GitHub username and a PAT with
    `read:packages`; making the package public skips this.
-3. `qwen_image` only: mount a network volume and set
-   `HF_HUB_CACHE=/runpod-volume/hf-cache`, so the multi-GB weights download
-   once instead of on every fresh container.
+3. `qwen_image` only: attach a network volume (a Pod mounts it at
+   `/workspace`) and set `HF_HUB_CACHE=/workspace/hf-cache`, so the multi-GB
+   weights download once instead of on every fresh container.
 
 ## Updating
 
