@@ -49,3 +49,7 @@ use (research or evaluation) only. This repository contains no code under
 that license.
 
 Copyright (C) 2026 AI Image Edit authors
+
+## Screenshot
+
+<a href="doc/screenshots/app.png"><img src="doc/screenshots/app.png" alt="The app on a phone screen" width="240"></a>
