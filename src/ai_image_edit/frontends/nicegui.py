@@ -166,7 +166,7 @@ def create_hidden_uploader() -> ui.upload:
 def create_simple_image_upload(label: str) -> dict:
     """
     A click-to-upload image box with no editing — used for the reference
-    Image 2 / Image 3 slots. Clicking anywhere in the box calls pickFiles()
+    image slots. Clicking anywhere in the box calls pickFiles()
     on a hidden ui.upload (QUploader's own file-picker method, invoked via
     NiceGUI's documented run_method — the same mechanism NiceGUI's own
     Upload.reset() uses internally for QUploader's reset()); once a file is
@@ -181,11 +181,12 @@ def create_simple_image_upload(label: str) -> dict:
     can be attached to it directly.
 
     Returns holder — holder['path'] always reflects the currently selected
-    file's local path (or None).
+    file's local path (or None). holder['container'] is the slot's element
+    (to show or hide it) and holder['clear'] removes the selected image.
     """
     holder: dict = {"path": None}
 
-    with ui.column().classes("w-full gap-1"):
+    with ui.column().classes("w-full gap-1") as container:
         ui.label(label).classes("text-sm text-gray-400")
         with ui.element("div").classes("qie-upload-box") as box:
             placeholder = ui.label("Click to upload an image").classes("qie-placeholder")
@@ -205,6 +206,9 @@ def create_simple_image_upload(label: str) -> dict:
             placeholder.set_visibility(True)
 
         ui.button("Clear", on_click=clear_image).props("flat dense size=sm").classes("text-xs")
+
+    holder["container"] = container
+    holder["clear"] = clear_image
 
     async def handle_upload(e) -> None:
         path = await save_uploaded_file(e.file)
@@ -1200,6 +1204,42 @@ def run(model: ModelBackend, model_backend: str) -> None:
                         with ui.expansion("Reference images (optional)").props("dense").classes("w-full"):
                             for i in range(caps.max_reference_images - 1):
                                 reference_holders.append(create_simple_image_upload(f"Input image {i + 2}"))
+
+                            # Only the first slot shows; + / - reveal or hide
+                            # the rest. Hiding a slot also clears its image, so
+                            # nothing invisible is sent with the request.
+                            ref_state = {"visible": 1}
+                            for holder in reference_holders[1:]:
+                                holder["container"].set_visibility(False)
+
+                            with ui.row().classes("w-full items-center gap-2"):
+                                ref_remove_btn = ui.button(icon="remove").props("flat dense round size=sm")
+                                ref_add_btn = ui.button(icon="add").props("flat dense round size=sm")
+                                ref_count_label = ui.label().classes("text-xs text-gray-400")
+
+                            def update_reference_slots() -> None:
+                                total = len(reference_holders)
+                                ref_count_label.set_text(f"{ref_state['visible']} of {total}")
+                                ref_remove_btn.set_enabled(ref_state["visible"] > 1)
+                                ref_add_btn.set_enabled(ref_state["visible"] < total)
+
+                            def add_reference_slot() -> None:
+                                if ref_state["visible"] < len(reference_holders):
+                                    reference_holders[ref_state["visible"]]["container"].set_visibility(True)
+                                    ref_state["visible"] += 1
+                                    update_reference_slots()
+
+                            def remove_reference_slot() -> None:
+                                if ref_state["visible"] > 1:
+                                    ref_state["visible"] -= 1
+                                    holder = reference_holders[ref_state["visible"]]
+                                    holder["clear"]()
+                                    holder["container"].set_visibility(False)
+                                    update_reference_slots()
+
+                            ref_add_btn.on_click(add_reference_slot)
+                            ref_remove_btn.on_click(remove_reference_slot)
+                            update_reference_slots()
 
                     available_loras: Dict[str, List[str]] = {}
                     lora_name = None
