@@ -173,7 +173,7 @@ def create_simple_image_upload(label: str) -> dict:
     chosen, its on_upload event hands it to Python, which saves it and
     swaps in the preview.
 
-    Styling (.qie-upload-box etc.) comes from WIDGET_CSS, a small stylesheet
+    Styling (.aie-upload-box etc.) comes from WIDGET_CSS, a small stylesheet
     this app defines itself and injects via ui.add_head_html — see the
     comment above WIDGET_CSS for why that's preferred here over NiceGUI's
     bundled Tailwind classes. The box itself is a real nicegui `ui.element`
@@ -188,9 +188,9 @@ def create_simple_image_upload(label: str) -> dict:
 
     with ui.column().classes("w-full gap-1") as container:
         ui.label(label).classes("text-sm text-gray-400")
-        with ui.element("div").classes("qie-upload-box") as box:
-            placeholder = ui.label("Click to upload an image").classes("qie-placeholder")
-            preview = ui.image().classes("qie-preview")
+        with ui.element("div").classes("aie-upload-box") as box:
+            placeholder = ui.label("Click to upload an image").classes("aie-placeholder")
+            preview = ui.image().classes("aie-preview")
             preview.set_visibility(False)
 
         uploader = create_hidden_uploader()
@@ -240,7 +240,7 @@ async def create_mask_editor(
     applies to the mask edges; 0 falls back to a hard cutout.
 
     If given, on_mask_change(has_mask) fires whenever the mask goes from
-    empty to non-empty or back (via the 'qie_mask_state' custom event).
+    empty to non-empty or back (via the 'aie_mask_state' custom event).
 
     Returns (holder, get_mask_path, set_image, get_feather_amount):
       * holder['path'] is the current source image's local path (or None).
@@ -259,16 +259,16 @@ async def create_mask_editor(
                 return
             on_mask_change(bool(args[1]))
 
-        ui.on("qie_mask_state", handle_mask_event)
+        ui.on("aie_mask_state", handle_mask_event)
 
-    with ui.element("div").classes("qie-editor-box") as editor_box:
+    with ui.element("div").classes("aie-editor-box") as editor_box:
         ui.html(
-            f'<div id="{editor_id}_zoomwrap" class="qie-zoomwrap">'
-            f'<canvas id="{editor_id}_canvas" class="qie-canvas"></canvas>'
-            f'<canvas id="{editor_id}_overlay" class="qie-overlay"></canvas>'
-            f'<div id="{editor_id}_placeholder" class="qie-placeholder">Click to upload an image</div>'
+            f'<div id="{editor_id}_zoomwrap" class="aie-zoomwrap">'
+            f'<canvas id="{editor_id}_canvas" class="aie-canvas"></canvas>'
+            f'<canvas id="{editor_id}_overlay" class="aie-overlay"></canvas>'
+            f'<div id="{editor_id}_placeholder" class="aie-placeholder">Click to upload an image</div>'
             f'</div>'
-            f'<div id="{editor_id}_brushpreview" class="qie-brush-preview"></div>',
+            f'<div id="{editor_id}_brushpreview" class="aie-brush-preview"></div>',
             sanitize=False,
         )
 
@@ -286,20 +286,20 @@ async def create_mask_editor(
     async def handle_upload(e) -> None:
         path = await save_uploaded_file(e.file)
         holder["path"] = path
-        await ui.run_javascript(f"QIE.loadImage('{editor_id}', '{to_url(path)}')", timeout=10.0)
+        await ui.run_javascript(f"AIE.loadImage('{editor_id}', '{to_url(path)}')", timeout=10.0)
         uploader.reset()
 
     uploader.on_upload(handle_upload)
 
     with ui.row().classes("w-full items-center gap-3"):
         async def remove_mask() -> None:
-            await ui.run_javascript(f"QIE.clearMask('{editor_id}')", timeout=5.0)
+            await ui.run_javascript(f"AIE.clearMask('{editor_id}')", timeout=5.0)
 
         ui.button("Remove mask", on_click=remove_mask).props("flat dense size=sm").classes("text-xs")
 
         async def clear_image() -> None:
             holder["path"] = None
-            await ui.run_javascript(f"QIE.clearImage('{editor_id}')", timeout=5.0)
+            await ui.run_javascript(f"AIE.clearImage('{editor_id}')", timeout=5.0)
 
         ui.button("Clear", on_click=clear_image).props("flat dense size=sm").classes("text-xs")
 
@@ -309,14 +309,14 @@ async def create_mask_editor(
             brush_slider = ui.slider(min=5, max=80, step=1, value=DEFAULT_BRUSH_SIZE).props("label-always dense")
             brush_slider.disable()
             # js_handler runs entirely in the browser, no server round-trip
-            # (see CLIENT_JS's QIE comment for why that matters for a
+            # (see CLIENT_JS's AIE comment for why that matters for a
             # dragged brush size) — 'update:model-value' fires continuously
             # while dragging; 'change' fires once on release.
             brush_slider.on(
                 "update:model-value",
-                js_handler=f"(value) => {{ QIE.setBrush('{editor_id}', value); QIE.showBrushPreview('{editor_id}', value); }}",
+                js_handler=f"(value) => {{ AIE.setBrush('{editor_id}', value); AIE.showBrushPreview('{editor_id}', value); }}",
             )
-            brush_slider.on("change", js_handler=f"() => QIE.hideBrushPreview('{editor_id}')")
+            brush_slider.on("change", js_handler=f"() => AIE.hideBrushPreview('{editor_id}')")
 
         with ui.column().classes("flex-1 gap-3"):
             ui.label("Feather").classes("text-xs text-gray-400")
@@ -335,15 +335,15 @@ async def create_mask_editor(
                 brush_slider.enable()
                 feather_slider.enable()
             await ui.run_javascript(
-                f"QIE.setLocked('{editor_id}', {str(lock_state['locked']).lower()})", timeout=5.0
+                f"AIE.setLocked('{editor_id}', {str(lock_state['locked']).lower()})", timeout=5.0
             )
 
         lock_btn = ui.button(icon="lock", on_click=toggle_lock).props("flat dense size=md")
 
     try:
-        await ui.run_javascript(f"QIE.init('{editor_id}')", timeout=10.0)
+        await ui.run_javascript(f"AIE.init('{editor_id}')", timeout=10.0)
     except TimeoutError:
-        print(f"[create_mask_editor] QIE.init('{editor_id}') timed out — the editor may not respond until the page is reloaded.", flush=True)
+        print(f"[create_mask_editor] AIE.init('{editor_id}') timed out — the editor may not respond until the page is reloaded.", flush=True)
 
     def get_feather_amount() -> int:
         return int(feather_slider.value)
@@ -351,7 +351,7 @@ async def create_mask_editor(
     async def get_mask_path() -> Optional[str]:
         if not holder["path"]:
             return None
-        data_url = await ui.run_javascript(f"QIE.getMaskDataUrl('{editor_id}')", timeout=15.0)
+        data_url = await ui.run_javascript(f"AIE.getMaskDataUrl('{editor_id}')", timeout=15.0)
         if not data_url:
             return None
         return save_data_url(data_url, "mask.png")
@@ -359,7 +359,7 @@ async def create_mask_editor(
     async def set_image(path: str) -> None:
         holder["path"] = path
         await ui.run_javascript(
-            f"QIE.loadImage('{editor_id}', '{to_url(path)}')",
+            f"AIE.loadImage('{editor_id}', '{to_url(path)}')",
             timeout=10.0,
         )
 
@@ -386,12 +386,12 @@ async def create_compare_slider() -> Tuple[
     """
     slider_id = f"cmp_{uuid.uuid4().hex}"
 
-    with ui.element("div").classes("qis-container"):
+    with ui.element("div").classes("ais-container"):
         ui.html(
-            f'<div id="{slider_id}_zoomwrap" class="qis-zoomwrap">'
-            f'<img id="{slider_id}_after" class="qis-after">'
-            f'<img id="{slider_id}_before" class="qis-before">'
-            f'<div id="{slider_id}_handle" class="qis-handle"></div>'
+            f'<div id="{slider_id}_zoomwrap" class="ais-zoomwrap">'
+            f'<img id="{slider_id}_after" class="ais-after">'
+            f'<img id="{slider_id}_before" class="ais-before">'
+            f'<div id="{slider_id}_handle" class="ais-handle"></div>'
             f'</div>',
             sanitize=False,
         )
@@ -400,44 +400,44 @@ async def create_compare_slider() -> Tuple[
         # on some WebViews/browsers just from being focused. No label (label-always) here: unlike Brush/Feather, this
         # overlays directly on the image, where a value bubble would be
         # visual noise rather than useful information. js_handler keeps
-        # dragging fully client-side (see CLIENT_JS's QIE comment for why
+        # dragging fully client-side (see CLIENT_JS's AIE comment for why
         # that matters) — 'update:model-value' fires continuously while
-        # dragging, calling QIS.applyClip directly with no server
+        # dragging, calling AIS.applyClip directly with no server
         # round-trip.
-        range_slider = ui.slider(min=0, max=100, step=1, value=50).props("dense").classes("qis-range")
+        range_slider = ui.slider(min=0, max=100, step=1, value=50).props("dense").classes("ais-range")
         range_slider.props(f"id={slider_id}_range")
         range_slider.on(
             "update:model-value",
-            js_handler=f"(value) => QIS.applyClip('{slider_id}', value)",
+            js_handler=f"(value) => AIS.applyClip('{slider_id}', value)",
         )
 
     try:
-        await ui.run_javascript(f"QIS.init('{slider_id}')", timeout=10.0)
+        await ui.run_javascript(f"AIS.init('{slider_id}')", timeout=10.0)
     except TimeoutError:
-        print(f"[create_compare_slider] QIS.init('{slider_id}') timed out — the compare slider may not respond until the page is reloaded.", flush=True)
+        print(f"[create_compare_slider] AIS.init('{slider_id}') timed out — the compare slider may not respond until the page is reloaded.", flush=True)
 
     async def set_images(before_path: str, after_path: str) -> None:
         # The slider position itself is set from Python (NiceGUI's own
         # reliable value-setting API) rather than from JS — programmatic
         # value pushes don't fire the same DOM events a real drag does, so
         # there's no update:model-value for a js_handler to catch here.
-        # QIS.setImages (below) still re-applies the clip/handle position
-        # to match via QIS.applyClip(id, 50), since setting the Python
+        # AIS.setImages (below) still re-applies the clip/handle position
+        # to match via AIS.applyClip(id, 50), since setting the Python
         # value alone doesn't touch the clip-path.
         range_slider.set_value(50)
         await ui.run_javascript(
-            f"QIS.setImages('{slider_id}', '{to_url(before_path)}', '{to_url(after_path)}')",
+            f"AIS.setImages('{slider_id}', '{to_url(before_path)}', '{to_url(after_path)}')",
             timeout=10.0,
         )
 
     async def set_compare(enabled: bool) -> None:
-        await ui.run_javascript(f"QIS.setCompare('{slider_id}', {str(bool(enabled)).lower()})", timeout=5.0)
+        await ui.run_javascript(f"AIS.setCompare('{slider_id}', {str(bool(enabled)).lower()})", timeout=5.0)
 
     async def reset() -> None:
-        await ui.run_javascript(f"QIS.reset('{slider_id}')", timeout=5.0)
+        await ui.run_javascript(f"AIS.reset('{slider_id}')", timeout=5.0)
 
     async def get_after_path() -> Optional[str]:
-        url = await ui.run_javascript(f"QIS.getAfterUrl('{slider_id}')", timeout=5.0)
+        url = await ui.run_javascript(f"AIS.getAfterUrl('{slider_id}')", timeout=5.0)
         return from_url(url) if url else None
 
     return set_images, set_compare, reset, get_after_path
@@ -450,7 +450,7 @@ async def create_compare_slider() -> Tuple[
 # classes, which only cover whatever subset NiceGUI happens to ship — their
 # existence is never in question, and there's exactly one place to look if
 # something needs to change. Values that get overridden dynamically at
-# runtime (QIS's clip-path/left/transform, QIE's brush-preview size) are
+# runtime (AIS's clip-path/left/transform, AIE's brush-preview size) are
 # still set here as sensible defaults; a plain inline style set directly via
 # JS (element.style.foo = ...) always takes precedence over a class
 # regardless, so the two coexist without conflict. These rules also don't
@@ -459,7 +459,7 @@ async def create_compare_slider() -> Tuple[
 # a layer — including this plain <style> block — already outranks layered
 # rules regardless of specificity.
 WIDGET_CSS = """
-.qie-upload-box {
+.aie-upload-box {
     position: relative;
     width: 100%;
     min-height: 160px;
@@ -470,13 +470,13 @@ WIDGET_CSS = """
     overflow: hidden;
 }
 
-.qie-preview {
+.aie-preview {
     display: block;
     width: 100%;
     height: auto;
 }
 
-.qie-placeholder {
+.aie-placeholder {
     position: absolute;
     inset: 0;
     display: flex;
@@ -488,7 +488,7 @@ WIDGET_CSS = """
     pointer-events: none;
 }
 
-.qie-editor-box {
+.aie-editor-box {
     position: relative;
     width: 100%;
     min-height: 120px;
@@ -496,14 +496,14 @@ WIDGET_CSS = """
     overflow: hidden;
 }
 
-.qie-zoomwrap {
+.aie-zoomwrap {
     position: relative;
     width: 100%;
     touch-action: none;
     transform-origin: 50% 50%;
 }
 
-.qie-canvas {
+.aie-canvas {
     display: block;
     width: 100%;
     height: auto;
@@ -513,7 +513,7 @@ WIDGET_CSS = """
     border-radius: 8px;
 }
 
-.qie-overlay {
+.aie-overlay {
     position: absolute;
     inset: 0;
     box-sizing: border-box;
@@ -524,7 +524,7 @@ WIDGET_CSS = """
     pointer-events: none;
 }
 
-.qie-brush-preview {
+.aie-brush-preview {
     position: absolute;
     top: 50%;
     left: 50%;
@@ -536,7 +536,7 @@ WIDGET_CSS = """
     display: none;
 }
 
-.qis-container {
+.ais-container {
     position: relative;
     width: 100%;
     min-height: 200px;
@@ -546,21 +546,21 @@ WIDGET_CSS = """
     overflow: hidden;
 }
 
-.qis-zoomwrap {
+.ais-zoomwrap {
     position: relative;
     width: 100%;
     touch-action: none;
     transform-origin: 50% 50%;
 }
 
-.qis-after {
+.ais-after {
     display: none;
     width: 100%;
     height: auto;
     min-height: 200px;
 }
 
-.qis-before {
+.ais-before {
     position: absolute;
     top: 0;
     left: 0;
@@ -571,7 +571,7 @@ WIDGET_CSS = """
     display: none;
 }
 
-.qis-handle {
+.ais-handle {
     position: absolute;
     top: 0;
     bottom: 0;
@@ -582,7 +582,7 @@ WIDGET_CSS = """
     display: none;
 }
 
-.qis-range {
+.ais-range {
     position: absolute;
     left: 8px;
     right: 8px;
@@ -591,15 +591,15 @@ WIDGET_CSS = """
     display: none;
 }
 
-.qie-page {
+.aie-page {
     max-width: 720px;
     margin: 0 auto;
 }
 """
 
 # --- Client-side JS ---
-# Two small namespaces, defined once as generic functions keyed by an
-# element-id prefix so each widget instance just calls e.g. QIE.init('some_id')
+# Three small namespaces, defined once as generic functions keyed by an
+# element-id prefix so each widget instance just calls e.g. AIE.init('some_id')
 # after creating its own DOM elements with matching ids. Everything that
 # NiceGUI already has a documented element/API for — file pickers (ui.upload
 # + element.run_method('pickFiles'), the same mechanism NiceGUI's own
@@ -607,15 +607,15 @@ WIDGET_CSS = """
 # uses that instead of custom JS. What's left needs custom JS because
 # there's no NiceGUI equivalent:
 #
-#   QIE — the mask/image editor: a <canvas> drawn on with mouse/touch
+#   AIE — the mask/image editor: a <canvas> drawn on with mouse/touch
 #         handlers. NiceGUI's ui.interactive_image can report mouse
 #         coordinates, but it round-trips every single mouse-move event to
 #         the server to do so, which would make drawing feel laggy. A raw
 #         <canvas> keeps every brush stroke fully client-side; the Brush
 #         size slider is a regular ui.slider, but wired up with js_handler
-#         (see create_mask_editor) so it still calls QIE.setBrush directly
+#         (see create_mask_editor) so it still calls AIE.setBrush directly
 #         in the browser, with no server round-trip. When a mask goes from
-#         empty to non-empty or back, QIE pushes that as a 'qie_mask_state'
+#         empty to non-empty or back, AIE pushes that as an 'aie_mask_state'
 #         event via emitEvent(...) — the documented pattern for a
 #         browser-side state change to reach Python without being tied to
 #         one specific DOM event (see the "Custom events" section of the
@@ -623,28 +623,31 @@ WIDGET_CSS = """
 #         ui.on(...) and passes on to its on_mask_change callback, used to
 #         keep Aspect ratio and Resolution in sync.
 #
-#   QIS — the before/after comparison: a CSS clip-path dragged by a
+#   AIS — the before/after comparison: a CSS clip-path dragged by a
 #         ui.slider (via js_handler), entirely client-side.
+#
+#   AIU — helpers shared by the two (pan/zoom, resetting the mask).
 CLIENT_JS = r"""
-(function () {
-window.QIE = window.QIE || {};
-window.QIS = window.QIS || {};
+window.AIU = window.AIU || {};
+window.AIE = window.AIE || {};
+window.AIS = window.AIS || {};
+
+// Shared helpers.
+AIU.applyPanZoom = function (wrap, state) {
+    wrap.style.transform = 'translate(' + state.panX + 'px, ' + state.panY + 'px) scale(' + state.scale + ')';
+};
+
+AIU.resetPanZoom = function (wrap, state) {
+    state.scale = 1;
+    state.panX = 0;
+    state.panY = 0;
+    if (wrap) AIU.applyPanZoom(wrap, state);
+};
 
 // Pan/zoom shared by the editor and the comparison slider: two-finger pinch
 // zooms wrap (clamped 1x-8x), and once zoomed in a single finger pans.
 // state holds scale/panX/panY; enabled() gates the gestures.
-function applyPanZoom(wrap, state) {
-    wrap.style.transform = 'translate(' + state.panX + 'px, ' + state.panY + 'px) scale(' + state.scale + ')';
-}
-
-function resetPanZoom(wrap, state) {
-    state.scale = 1;
-    state.panX = 0;
-    state.panY = 0;
-    if (wrap) applyPanZoom(wrap, state);
-}
-
-function attachPanZoom(wrap, state, enabled) {
+AIU.attachPanZoom = function (wrap, state, enabled) {
     function distance(touches) {
         return Math.hypot(touches[0].clientX - touches[1].clientX, touches[0].clientY - touches[1].clientY);
     }
@@ -687,16 +690,16 @@ function attachPanZoom(wrap, state, enabled) {
         }
         e.preventDefault();
         clampPan();
-        applyPanZoom(wrap, state);
+        AIU.applyPanZoom(wrap, state);
     }, { passive: false });
 
     wrap.addEventListener('touchend', function (e) {
         if (e.touches.length < 2) pinchStartDist = null;
         if (e.touches.length < 1) panStart = null;
     });
-}
+};
 
-QIE.init = function (id) {
+AIE.init = function (id) {
     const canvas = document.getElementById(id + '_canvas');
     const maskCanvas = document.createElement('canvas');
     const overlayCanvas = document.getElementById(id + '_overlay');
@@ -718,13 +721,13 @@ QIE.init = function (id) {
     };
     // Every stroke is painted onto two layers: the exported mask, opaque
     // white, and the on-screen overlay in the tint colour, opaque on the
-    // canvas and shown at 50% by CSS (.qie-overlay), so repeated strokes
+    // canvas and shown at 50% by CSS (.aie-overlay), so repeated strokes
     // don't build up.
     const layers = [
         [maskCanvas.getContext('2d'), '#ffffff'],
         [overlayCanvas.getContext('2d'), '__MASK_TINT__'],
     ];
-    QIE[id] = state;
+    AIE[id] = state;
 
     function getScale() {
         const rect = canvas.getBoundingClientRect();
@@ -770,7 +773,7 @@ QIE.init = function (id) {
         dot(p.x, p.y);
         if (!state.hasMask) {
             state.hasMask = true;
-            emitEvent('qie_mask_state', id, true);
+            emitEvent('aie_mask_state', id, true);
         }
     }
     function move(e) {
@@ -790,40 +793,40 @@ QIE.init = function (id) {
     canvas.addEventListener('touchmove', move, { passive: false });
     canvas.addEventListener('touchend', up);
 
-    if (state.zoomwrap) attachPanZoom(state.zoomwrap, state, function () { return state.locked; });
+    if (state.zoomwrap) AIU.attachPanZoom(state.zoomwrap, state, function () { return state.locked; });
 };
 
 // Empties both mask layers and reports the mask as gone if it wasn't already.
-function resetMask(id, state) {
+AIU.resetMask = function (id, state) {
     for (const c of [state.maskCanvas, state.overlayCanvas]) {
         c.getContext('2d').clearRect(0, 0, c.width, c.height);
     }
     if (state.hasMask) {
         state.hasMask = false;
-        emitEvent('qie_mask_state', id, false);
+        emitEvent('aie_mask_state', id, false);
     }
-}
+};
 
-function showPlaceholder(id, visible) {
+AIU.showPlaceholder = function (id, visible) {
     const ph = document.getElementById(id + '_placeholder');
     if (ph) ph.style.display = visible ? 'flex' : 'none';
-}
+};
 
-QIE.setLocked = function (id, locked) {
+AIE.setLocked = function (id, locked) {
     // Brush/Feather sliders are NiceGUI ui.slider widgets, so their enabled
     // state is toggled from Python (see toggle_lock in create_mask_editor)
     // rather than by reaching into the DOM here.
-    const state = QIE[id];
+    const state = AIE[id];
     if (state) state.locked = locked;
 };
 
-QIE.resetZoom = function (id) {
-    const state = QIE[id];
-    if (state) resetPanZoom(state.zoomwrap, state);
+AIE.resetZoom = function (id) {
+    const state = AIE[id];
+    if (state) AIU.resetPanZoom(state.zoomwrap, state);
 };
 
-QIE.loadImage = function (id, url) {
-    const state = QIE[id];
+AIE.loadImage = function (id, url) {
+    const state = AIE[id];
     if (!state) return;
     const img = new Image();
     img.onload = function () {
@@ -833,34 +836,34 @@ QIE.loadImage = function (id, url) {
             c.height = img.naturalHeight;
         }
         state.ctx.drawImage(img, 0, 0);
-        resetMask(id, state);
-        QIE.resetZoom(id);
-        showPlaceholder(id, false);
+        AIU.resetMask(id, state);
+        AIE.resetZoom(id);
+        AIU.showPlaceholder(id, false);
     };
     img.src = url;
 };
 
-QIE.clearMask = function (id) {
-    const state = QIE[id];
-    if (state && state.img) resetMask(id, state);
+AIE.clearMask = function (id) {
+    const state = AIE[id];
+    if (state && state.img) AIU.resetMask(id, state);
 };
 
-QIE.clearImage = function (id) {
-    const state = QIE[id];
+AIE.clearImage = function (id) {
+    const state = AIE[id];
     if (!state) return;
     state.img = null;
     state.drawing = false;
     state.ctx.clearRect(0, 0, state.canvas.width, state.canvas.height);
-    resetMask(id, state);
-    QIE.resetZoom(id);
-    showPlaceholder(id, true);
+    AIU.resetMask(id, state);
+    AIE.resetZoom(id);
+    AIU.showPlaceholder(id, true);
 };
 
-QIE.setBrush = function (id, size) {
-    if (QIE[id]) QIE[id].brush = Number(size);
+AIE.setBrush = function (id, size) {
+    if (AIE[id]) AIE[id].brush = Number(size);
 };
 
-QIE.showBrushPreview = function (id, size) {
+AIE.showBrushPreview = function (id, size) {
     const el = document.getElementById(id + '_brushpreview');
     if (!el) return;
     el.style.width = size + 'px';
@@ -868,18 +871,18 @@ QIE.showBrushPreview = function (id, size) {
     el.style.display = 'block';
 };
 
-QIE.hideBrushPreview = function (id) {
+AIE.hideBrushPreview = function (id) {
     const el = document.getElementById(id + '_brushpreview');
     if (el) el.style.display = 'none';
 };
 
-QIE.getMaskDataUrl = function (id) {
-    const state = QIE[id];
+AIE.getMaskDataUrl = function (id) {
+    const state = AIE[id];
     if (!state || !state.img || !state.hasMask) return null;
     return state.maskCanvas.toDataURL('image/png');
 };
 
-QIS.init = function (id) {
+AIS.init = function (id) {
     // sliderValue is tracked here (rather than read back from the slider's
     // own DOM) since range_slider is a Quasar-rendered ui.slider, not a raw
     // <input> with a plain .value property.
@@ -887,12 +890,12 @@ QIS.init = function (id) {
         wrap: document.getElementById(id + '_zoomwrap'),
         compare: false, sliderValue: 50, scale: 1, panX: 0, panY: 0,
     };
-    QIS[id] = state;
-    if (state.wrap) attachPanZoom(state.wrap, state, function () { return true; });
+    AIS[id] = state;
+    if (state.wrap) AIU.attachPanZoom(state.wrap, state, function () { return true; });
 };
 
-QIS.applyClip = function (id, val) {
-    const state = QIS[id];
+AIS.applyClip = function (id, val) {
+    const state = AIS[id];
     if (!state) return;
     state.sliderValue = val;
     const before = document.getElementById(id + '_before');
@@ -901,8 +904,8 @@ QIS.applyClip = function (id, val) {
     if (handle) handle.style.left = val + '%';
 };
 
-QIS.setImages = function (id, beforeUrl, afterUrl) {
-    const state = QIS[id];
+AIS.setImages = function (id, beforeUrl, afterUrl) {
+    const state = AIS[id];
     if (!state) return;
     const after = document.getElementById(id + '_after');
     const before = document.getElementById(id + '_before');
@@ -912,13 +915,13 @@ QIS.setImages = function (id, beforeUrl, afterUrl) {
     // create_compare_slider) — this just re-applies the clip/handle
     // position to match, since a Python-side value push alone doesn't
     // touch the clip-path.
-    QIS.applyClip(id, 50);
-    resetPanZoom(state.wrap, state);
-    QIS.setCompare(id, state.compare);
+    AIS.applyClip(id, 50);
+    AIU.resetPanZoom(state.wrap, state);
+    AIS.setCompare(id, state.compare);
 };
 
-QIS.setCompare = function (id, enabled) {
-    const state = QIS[id];
+AIS.setCompare = function (id, enabled) {
+    const state = AIS[id];
     if (!state) return;
     state.compare = enabled;
     const range = document.getElementById(id + '_range');
@@ -933,16 +936,16 @@ QIS.setCompare = function (id, enabled) {
     before.style.display = display;
     handle.style.display = display;
     if (range) range.style.display = display;
-    if (enabled) QIS.applyClip(id, state.sliderValue);
+    if (enabled) AIS.applyClip(id, state.sliderValue);
 };
 
-QIS.getAfterUrl = function (id) {
+AIS.getAfterUrl = function (id) {
     const el = document.getElementById(id + '_after');
     return (el && el.getAttribute('src')) ? el.src : null;
 };
 
-QIS.reset = function (id) {
-    const state = QIS[id];
+AIS.reset = function (id) {
+    const state = AIS[id];
     const after = document.getElementById(id + '_after');
     const before = document.getElementById(id + '_before');
     // removeAttribute('src') alone can leave a visible broken-image icon in
@@ -950,10 +953,9 @@ QIS.reset = function (id) {
     // both elements outright avoids that regardless of browser quirks.
     if (after) { after.removeAttribute('src'); after.style.display = 'none'; }
     if (before) { before.removeAttribute('src'); before.style.display = 'none'; }
-    if (state) resetPanZoom(state.wrap, state);
-    QIS.setCompare(id, false);
+    if (state) AIU.resetPanZoom(state.wrap, state);
+    AIS.setCompare(id, false);
 };
-})();
 """
 CLIENT_JS = CLIENT_JS.replace("__DEFAULT_BRUSH_SIZE__", str(DEFAULT_BRUSH_SIZE))
 CLIENT_JS = CLIENT_JS.replace("__MASK_TINT__", PRIMARY_COLOR)
@@ -966,7 +968,7 @@ CLIENT_JS = CLIENT_JS.replace("__MASK_TINT__", PRIMARY_COLOR)
 # other and none of them indents by a different amount than its neighbors.
 # q-pa-none strips QCard's default padding (Quasar's own utility class, not
 # a NiceGUI quirk) — genuinely needed, not just a style choice: the editor
-# canvas (.qie-editor-box) and the result comparison image (.qis-container)
+# canvas (.aie-editor-box) and the result comparison image (.ais-container)
 # are both width: 100% against their containing card, so the card's default
 # padding would inset them and shrink the actual touch-drawing/viewing area
 # on a small screen. Applied to all cards rather than just those two so
@@ -1013,7 +1015,7 @@ def run(model: ModelBackend, model_backend: str) -> None:
         ui.label("AI Image Edit").classes("text-2xl font-bold text-white w-full text-center")
         ui.label(f"Model: {model_backend}").classes("text-sm q-mb-md w-full text-center").style(f"color: {PRIMARY_COLOR}")
 
-        with ui.column().classes("w-full gap-3 qie-page"):
+        with ui.column().classes("w-full gap-3 aie-page"):
             with ui.card().classes(CARD_CLASSES):
                 prompt = ui.textarea(label="Prompt").props("rows=6 outlined dark").classes("w-full")
 

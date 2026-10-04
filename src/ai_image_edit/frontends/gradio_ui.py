@@ -137,7 +137,7 @@ def run(model: ModelBackend, model_backend: str) -> None:
     # carry no border/dashed styling of their own in this version, so
     # overriding them has no effect.
     CUSTOM_CSS = f"""
-    .qie-page {{ max-width: 720px; margin: 0 auto; }}
+    .aie-page {{ max-width: 720px; margin: 0 auto; }}
 
     /* Explicit sizes rather than relying on gr.Markdown's own "prose" heading/
        paragraph scale: that scale renders noticeably smaller than the NiceGUI
@@ -148,13 +148,13 @@ def run(model: ModelBackend, model_backend: str) -> None:
        heading/paragraph elements directly (not the zero-specificity :where(...)
        selectors gr.Markdown's own "prose" styling uses) is enough to win the
        cascade without needing !important here. */
-    .qie-title, .qie-title h1, .qie-title h2, .qie-title h3 {{
+    .aie-title, .aie-title h1, .aie-title h2, .aie-title h3 {{
         text-align: center;
         font-size: 1.5rem;
         font-weight: 700;
         margin: 0 0 0.25rem;
     }}
-    .qie-subtitle, .qie-subtitle p {{
+    .aie-subtitle, .aie-subtitle p {{
         text-align: center;
         color: {PRIMARY_COLOR} !important;
         font-size: 1rem;
@@ -174,7 +174,7 @@ def run(model: ModelBackend, model_backend: str) -> None:
        !important side-steps that ordering question entirely, on both the
        variables and the literal border-* properties, so it can't lose to a
        same-specificity rule regardless of source order. */
-    .qie-image-border {{
+    .aie-image-border {{
         --block-border-color: {PRIMARY_COLOR} !important;
         --block-border-width: 2px !important;
         border-color: {PRIMARY_COLOR} !important;
@@ -238,9 +238,9 @@ def run(model: ModelBackend, model_backend: str) -> None:
             css=CUSTOM_CSS,
             js=LOAD_JS,
         ) as demo:
-            with gr.Column(elem_classes="qie-page"):
-                gr.Markdown("## AI Image Edit", elem_classes="qie-title")
-                gr.Markdown(f"Model: {model_backend}", elem_classes="qie-subtitle")
+            with gr.Column(elem_classes="aie-page"):
+                gr.Markdown("## AI Image Edit", elem_classes="aie-title")
+                gr.Markdown(f"Model: {model_backend}", elem_classes="aie-subtitle")
 
                 # --- Prompt / Seed ---
                 with gr.Group():
@@ -280,7 +280,7 @@ def run(model: ModelBackend, model_backend: str) -> None:
                             layers=False,
                             brush=gr.Brush(colors=["#FFFFFF"], color_mode="fixed"),
                             height=600,
-                            elem_classes="qie-image-border",
+                            elem_classes="aie-image-border",
                         )
                         feather_slider = gr.Slider(
                             minimum=0, maximum=16, step=1, value=6, label="Feather",
@@ -288,7 +288,7 @@ def run(model: ModelBackend, model_backend: str) -> None:
                     else:
                         edit_image = gr.Image(
                             label="Input Image", type="filepath", format="png", sources=["upload"], height=600,
-                            elem_classes="qie-image-border",
+                            elem_classes="aie-image-border",
                         )
                         feather_slider = gr.Slider(
                             minimum=0, maximum=16, step=1, value=6, label="Feather", visible=False,
@@ -304,7 +304,7 @@ def run(model: ModelBackend, model_backend: str) -> None:
                                     gr.Image(
                                         label=f"Input image {i + 2}", type="filepath",
                                         format="png", sources=["upload"],
-                                        elem_classes="qie-image-border",
+                                        elem_classes="aie-image-border",
                                     )
                                 )
 
@@ -368,7 +368,7 @@ def run(model: ModelBackend, model_backend: str) -> None:
                     # there's no separate "Compare input/output" control here.
                     result_slider = gr.ImageSlider(
                         format="png", label="Result", show_label=False, interactive=False, type="filepath",
-                        elem_classes="qie-image-border",
+                        elem_classes="aie-image-border",
                     )
 
                     with gr.Row():
