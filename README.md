@@ -13,8 +13,9 @@ front of a pluggable image-generation backend.
 
 Backends, selected with `MODEL_BACKEND`:
 
-- **`qwen_image_edit_comfy`** (default) — Qwen-Image-Edit plus a curated set
-  of LoRAs, driven through [ComfyUI](https://github.com/comfyanonymous/ComfyUI).
+- **`qwen_image_edit_comfy`** (default) — Qwen-Image-Edit
+  ([Phr00t's AIO merge](https://huggingface.co/Phr00t/Qwen-Image-Edit-Rapid-AIO))
+  plus a curated set of LoRAs, driven through [ComfyUI](https://github.com/comfyanonymous/ComfyUI).
 - **`qwen_image`** — a direct [diffusers](https://github.com/huggingface/diffusers)
   pipeline for Qwen-Image-2.1. Needs the separately licensed
   [`ai-image-edit-qwen`](https://github.com/pulb/ai_image_edit_qwen)
