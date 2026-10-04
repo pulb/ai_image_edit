@@ -359,7 +359,7 @@ async def create_mask_editor(
     async def set_image(path: str) -> None:
         holder["path"] = path
         await ui.run_javascript(
-            f"QIE.loadImage('{editor_id}', '{to_url(path)}'); QIE.clearMask('{editor_id}');",
+            f"QIE.loadImage('{editor_id}', '{to_url(path)}')",
             timeout=10.0,
         )
 
@@ -626,36 +626,104 @@ WIDGET_CSS = """
 #   QIS — the before/after comparison: a CSS clip-path dragged by a
 #         ui.slider (via js_handler), entirely client-side.
 CLIENT_JS = r"""
+(function () {
 window.QIE = window.QIE || {};
+window.QIS = window.QIS || {};
+
+// Pan/zoom shared by the editor and the comparison slider: two-finger pinch
+// zooms wrap (clamped 1x-8x), and once zoomed in a single finger pans.
+// state holds scale/panX/panY; enabled() gates the gestures.
+function applyPanZoom(wrap, state) {
+    wrap.style.transform = 'translate(' + state.panX + 'px, ' + state.panY + 'px) scale(' + state.scale + ')';
+}
+
+function resetPanZoom(wrap, state) {
+    state.scale = 1;
+    state.panX = 0;
+    state.panY = 0;
+    if (wrap) applyPanZoom(wrap, state);
+}
+
+function attachPanZoom(wrap, state, enabled) {
+    function distance(touches) {
+        return Math.hypot(touches[0].clientX - touches[1].clientX, touches[0].clientY - touches[1].clientY);
+    }
+    function clampPan() {
+        // offsetWidth/offsetHeight are the element's own layout size, which
+        // a transform on that same element never affects — using
+        // getBoundingClientRect() here instead would read back (possibly
+        // stale) post-transform geometry, since this runs before the new
+        // scale has actually been applied to the DOM.
+        const maxX = wrap.offsetWidth * (state.scale - 1) / 2;
+        const maxY = wrap.offsetHeight * (state.scale - 1) / 2;
+        state.panX = Math.min(maxX, Math.max(-maxX, state.panX));
+        state.panY = Math.min(maxY, Math.max(-maxY, state.panY));
+    }
+
+    let pinchStartDist = null;
+    let pinchStartScale = 1;
+    let panStart = null;
+
+    wrap.addEventListener('touchstart', function (e) {
+        if (!enabled()) return;
+        if (e.touches.length === 2) {
+            pinchStartDist = distance(e.touches);
+            pinchStartScale = state.scale;
+            panStart = null;
+        } else if (e.touches.length === 1 && state.scale > 1) {
+            panStart = { x: state.panX, y: state.panY, tx: e.touches[0].clientX, ty: e.touches[0].clientY };
+        }
+    }, { passive: true });
+
+    wrap.addEventListener('touchmove', function (e) {
+        if (!enabled()) return;
+        if (e.touches.length === 2 && pinchStartDist) {
+            state.scale = Math.min(Math.max(pinchStartScale * distance(e.touches) / pinchStartDist, 1), 8);
+        } else if (e.touches.length === 1 && panStart) {
+            state.panX = panStart.x + (e.touches[0].clientX - panStart.tx);
+            state.panY = panStart.y + (e.touches[0].clientY - panStart.ty);
+        } else {
+            return;
+        }
+        e.preventDefault();
+        clampPan();
+        applyPanZoom(wrap, state);
+    }, { passive: false });
+
+    wrap.addEventListener('touchend', function (e) {
+        if (e.touches.length < 2) pinchStartDist = null;
+        if (e.touches.length < 1) panStart = null;
+    });
+}
 
 QIE.init = function (id) {
     const canvas = document.getElementById(id + '_canvas');
-    const ctx = canvas.getContext('2d');
     const maskCanvas = document.createElement('canvas');
-    const maskCtx = maskCanvas.getContext('2d');
-    // On-screen overlay: the same strokes as the mask, in the tint colour and
-    // opaque on the canvas, shown at 50% by CSS (.qie-overlay), so repeated
-    // strokes don't build up. The exported mask stays opaque white.
     const overlayCanvas = document.getElementById(id + '_overlay');
-    const overlayCtx = overlayCanvas.getContext('2d');
-    const zoomwrap = document.getElementById(id + '_zoomwrap');
 
     // brush is stored in on-screen CSS pixels (what the slider and preview
     // circle actually show) — getScale() converts it to canvas coordinate
     // space at draw time, since the canvas's internal resolution (the
     // image's native size) is usually far larger than its rendered size.
-    // locked starts true: pan/zoom (mirroring QIS) is the default mode;
-    // the lock button switches to mask drawing. The two are mutually
-    // exclusive, so there's no ambiguity between a stroke and a pan to
-    // resolve — unlike QIS, a single finger can safely mean "pan" here
-    // too, since drawing is only ever active while unlocked.
+    // locked starts true: pan/zoom is the default mode; the lock button
+    // switches to mask drawing. The two are mutually exclusive, so a single
+    // finger can safely mean "pan" here, since drawing is only ever active
+    // while unlocked.
     const state = {
+        canvas: canvas, ctx: canvas.getContext('2d'),
+        maskCanvas: maskCanvas, overlayCanvas: overlayCanvas,
+        zoomwrap: document.getElementById(id + '_zoomwrap'),
         img: null, drawing: false, brush: __DEFAULT_BRUSH_SIZE__, lastX: 0, lastY: 0, hasMask: false,
-        locked: true, zoomScale: 1, panX: 0, panY: 0,
+        locked: true, scale: 1, panX: 0, panY: 0,
     };
-    state.canvas = canvas; state.ctx = ctx;
-    state.maskCanvas = maskCanvas; state.maskCtx = maskCtx;
-    state.overlayCanvas = overlayCanvas; state.overlayCtx = overlayCtx;
+    // Every stroke is painted onto two layers: the exported mask, opaque
+    // white, and the on-screen overlay in the tint colour, opaque on the
+    // canvas and shown at 50% by CSS (.qie-overlay), so repeated strokes
+    // don't build up.
+    const layers = [
+        [maskCanvas.getContext('2d'), '#ffffff'],
+        [overlayCanvas.getContext('2d'), '__MASK_TINT__'],
+    ];
     QIE[id] = state;
 
     function getScale() {
@@ -669,50 +737,44 @@ QIE.init = function (id) {
     function getPos(e) {
         const rect = canvas.getBoundingClientRect();
         const t = e.touches && e.touches.length ? e.touches[0] : e;
-        const scaleX = canvas.width / rect.width;
-        const scaleY = canvas.height / rect.height;
-        return { x: (t.clientX - rect.left) * scaleX, y: (t.clientY - rect.top) * scaleY };
+        return {
+            x: (t.clientX - rect.left) * canvas.width / rect.width,
+            y: (t.clientY - rect.top) * canvas.height / rect.height,
+        };
     }
 
     function dot(x, y) {
         const r = (state.brush * getScale()) / 2;
-        maskCtx.beginPath(); maskCtx.fillStyle = '#ffffff';
-        maskCtx.arc(x, y, r, 0, Math.PI * 2); maskCtx.fill();
-        overlayCtx.beginPath(); overlayCtx.fillStyle = '__MASK_TINT__';
-        overlayCtx.arc(x, y, r, 0, Math.PI * 2); overlayCtx.fill();
+        for (const [c, color] of layers) {
+            c.beginPath(); c.fillStyle = color;
+            c.arc(x, y, r, 0, Math.PI * 2); c.fill();
+        }
     }
 
     function lineTo(x0, y0, x1, y1) {
         const w = state.brush * getScale();
-        maskCtx.strokeStyle = '#ffffff'; maskCtx.lineWidth = w;
-        maskCtx.lineCap = 'round'; maskCtx.lineJoin = 'round';
-        maskCtx.beginPath(); maskCtx.moveTo(x0, y0); maskCtx.lineTo(x1, y1); maskCtx.stroke();
-        overlayCtx.strokeStyle = '__MASK_TINT__'; overlayCtx.lineWidth = w;
-        overlayCtx.lineCap = 'round'; overlayCtx.lineJoin = 'round';
-        overlayCtx.beginPath(); overlayCtx.moveTo(x0, y0); overlayCtx.lineTo(x1, y1); overlayCtx.stroke();
-    }
-
-    function markMask() {
-        if (!state.hasMask) {
-            state.hasMask = true;
-            emitEvent('qie_mask_state', id, true);
+        for (const [c, color] of layers) {
+            c.strokeStyle = color; c.lineWidth = w;
+            c.lineCap = 'round'; c.lineJoin = 'round';
+            c.beginPath(); c.moveTo(x0, y0); c.lineTo(x1, y1); c.stroke();
         }
     }
 
     function down(e) {
-        if (state.locked) return;
-        if (!state.img) return;
+        if (state.locked || !state.img) return;
         if (e.touches && e.touches.length !== 1) return;
         e.preventDefault();
         state.drawing = true;
         const p = getPos(e);
         state.lastX = p.x; state.lastY = p.y;
         dot(p.x, p.y);
-        markMask();
+        if (!state.hasMask) {
+            state.hasMask = true;
+            emitEvent('qie_mask_state', id, true);
+        }
     }
     function move(e) {
-        if (state.locked) return;
-        if (!state.drawing) return;
+        if (state.locked || !state.drawing) return;
         if (e.touches && e.touches.length !== 1) return;
         e.preventDefault();
         const p = getPos(e);
@@ -728,84 +790,24 @@ QIE.init = function (id) {
     canvas.addEventListener('touchmove', move, { passive: false });
     canvas.addEventListener('touchend', up);
 
-    // Pan/zoom — mirrors QIS's implementation exactly (single-finger pan
-    // once zoomed in, two-finger pinch to zoom), active only while locked.
-    if (zoomwrap) {
-        function distance(touches) {
-            const dx = touches[0].clientX - touches[1].clientX;
-            const dy = touches[0].clientY - touches[1].clientY;
-            return Math.sqrt(dx * dx + dy * dy);
-        }
-        function clampPan() {
-            if (state.zoomScale <= 1) {
-                state.panX = 0;
-                state.panY = 0;
-                return;
-            }
-            // offsetWidth/offsetHeight are the element's own layout size,
-            // which a transform on that same element never affects — using
-            // getBoundingClientRect() here instead would read back
-            // (possibly stale) post-transform geometry, since this runs
-            // before the new scale has actually been applied to the DOM.
-            const maxX = zoomwrap.offsetWidth * (state.zoomScale - 1) / 2;
-            const maxY = zoomwrap.offsetHeight * (state.zoomScale - 1) / 2;
-            state.panX = Math.min(maxX, Math.max(-maxX, state.panX));
-            state.panY = Math.min(maxY, Math.max(-maxY, state.panY));
-        }
-        function applyZoomTransform() {
-            zoomwrap.style.transform = 'translate(' + state.panX + 'px, ' + state.panY + 'px) scale(' + state.zoomScale + ')';
-        }
-
-        let pinchStartDist = null;
-        let pinchStartScale = 1;
-        let panning = false;
-        let panStartX = 0;
-        let panStartY = 0;
-        let panStartTouchX = 0;
-        let panStartTouchY = 0;
-
-        zoomwrap.addEventListener('touchstart', function (e) {
-            if (!state.locked) return;
-            if (e.touches.length === 2) {
-                pinchStartDist = distance(e.touches);
-                pinchStartScale = state.zoomScale;
-                panning = false;
-            } else if (e.touches.length === 1 && state.zoomScale > 1) {
-                panning = true;
-                panStartX = state.panX;
-                panStartY = state.panY;
-                panStartTouchX = e.touches[0].clientX;
-                panStartTouchY = e.touches[0].clientY;
-            }
-        }, { passive: true });
-
-        zoomwrap.addEventListener('touchmove', function (e) {
-            if (!state.locked) return;
-            if (e.touches.length === 2 && pinchStartDist) {
-                e.preventDefault();
-                const factor = distance(e.touches) / pinchStartDist;
-                state.zoomScale = Math.min(Math.max(pinchStartScale * factor, 1), 8);
-                clampPan();
-                applyZoomTransform();
-            } else if (e.touches.length === 1 && panning) {
-                e.preventDefault();
-                state.panX = panStartX + (e.touches[0].clientX - panStartTouchX);
-                state.panY = panStartY + (e.touches[0].clientY - panStartTouchY);
-                clampPan();
-                applyZoomTransform();
-            }
-        }, { passive: false });
-
-        zoomwrap.addEventListener('touchend', function (e) {
-            if (e.touches.length < 2) {
-                pinchStartDist = null;
-            }
-            if (e.touches.length < 1) {
-                panning = false;
-            }
-        });
-    }
+    if (state.zoomwrap) attachPanZoom(state.zoomwrap, state, function () { return state.locked; });
 };
+
+// Empties both mask layers and reports the mask as gone if it wasn't already.
+function resetMask(id, state) {
+    for (const c of [state.maskCanvas, state.overlayCanvas]) {
+        c.getContext('2d').clearRect(0, 0, c.width, c.height);
+    }
+    if (state.hasMask) {
+        state.hasMask = false;
+        emitEvent('qie_mask_state', id, false);
+    }
+}
+
+function showPlaceholder(id, visible) {
+    const ph = document.getElementById(id + '_placeholder');
+    if (ph) ph.style.display = visible ? 'flex' : 'none';
+}
 
 QIE.setLocked = function (id, locked) {
     // Brush/Feather sliders are NiceGUI ui.slider widgets, so their enabled
@@ -817,12 +819,7 @@ QIE.setLocked = function (id, locked) {
 
 QIE.resetZoom = function (id) {
     const state = QIE[id];
-    if (!state) return;
-    state.zoomScale = 1;
-    state.panX = 0;
-    state.panY = 0;
-    const zoomwrap = document.getElementById(id + '_zoomwrap');
-    if (zoomwrap) zoomwrap.style.transform = 'translate(0px, 0px) scale(1)';
+    if (state) resetPanZoom(state.zoomwrap, state);
 };
 
 QIE.loadImage = function (id, url) {
@@ -831,35 +828,21 @@ QIE.loadImage = function (id, url) {
     const img = new Image();
     img.onload = function () {
         state.img = img;
-        state.canvas.width = img.naturalWidth;
-        state.canvas.height = img.naturalHeight;
-        state.maskCanvas.width = img.naturalWidth;
-        state.maskCanvas.height = img.naturalHeight;
-        state.overlayCanvas.width = img.naturalWidth;
-        state.overlayCanvas.height = img.naturalHeight;
-        state.ctx.drawImage(img, 0, 0);
-        state.maskCtx.clearRect(0, 0, state.maskCanvas.width, state.maskCanvas.height);
-        state.overlayCtx.clearRect(0, 0, state.overlayCanvas.width, state.overlayCanvas.height);
-        QIE.resetZoom(id);
-        if (state.hasMask) {
-            state.hasMask = false;
-            emitEvent('qie_mask_state', id, false);
+        for (const c of [state.canvas, state.maskCanvas, state.overlayCanvas]) {
+            c.width = img.naturalWidth;
+            c.height = img.naturalHeight;
         }
-        const ph = document.getElementById(id + '_placeholder');
-        if (ph) ph.style.display = 'none';
+        state.ctx.drawImage(img, 0, 0);
+        resetMask(id, state);
+        QIE.resetZoom(id);
+        showPlaceholder(id, false);
     };
     img.src = url;
 };
 
 QIE.clearMask = function (id) {
     const state = QIE[id];
-    if (!state || !state.img) return;
-    state.maskCtx.clearRect(0, 0, state.maskCanvas.width, state.maskCanvas.height);
-    state.overlayCtx.clearRect(0, 0, state.overlayCanvas.width, state.overlayCanvas.height);
-    if (state.hasMask) {
-        state.hasMask = false;
-        emitEvent('qie_mask_state', id, false);
-    }
+    if (state && state.img) resetMask(id, state);
 };
 
 QIE.clearImage = function (id) {
@@ -868,15 +851,9 @@ QIE.clearImage = function (id) {
     state.img = null;
     state.drawing = false;
     state.ctx.clearRect(0, 0, state.canvas.width, state.canvas.height);
-    state.maskCtx.clearRect(0, 0, state.maskCanvas.width, state.maskCanvas.height);
-    state.overlayCtx.clearRect(0, 0, state.overlayCanvas.width, state.overlayCanvas.height);
+    resetMask(id, state);
     QIE.resetZoom(id);
-    if (state.hasMask) {
-        state.hasMask = false;
-        emitEvent('qie_mask_state', id, false);
-    }
-    const ph = document.getElementById(id + '_placeholder');
-    if (ph) ph.style.display = 'flex';
+    showPlaceholder(id, true);
 };
 
 QIE.setBrush = function (id, size) {
@@ -902,109 +879,33 @@ QIE.getMaskDataUrl = function (id) {
     return state.maskCanvas.toDataURL('image/png');
 };
 
-window.QIS = window.QIS || {};
-
 QIS.init = function (id) {
-    QIS[id] = { compare: false, scale: 1, panX: 0, panY: 0 };
-
-    const wrap = document.getElementById(id + '_zoomwrap');
-    if (!wrap) return;
-
-    function distance(touches) {
-        const dx = touches[0].clientX - touches[1].clientX;
-        const dy = touches[0].clientY - touches[1].clientY;
-        return Math.sqrt(dx * dx + dy * dy);
-    }
-
-    function clampPan() {
-        const s = QIS[id];
-        if (s.scale <= 1) {
-            s.panX = 0;
-            s.panY = 0;
-            return;
-        }
-        // offsetWidth/offsetHeight are the element's own layout size, which
-        // a transform on that same element never affects — using
-        // getBoundingClientRect() here instead would read back (possibly
-        // stale) post-transform geometry, since this runs before the new
-        // scale has actually been applied to the DOM.
-        const maxX = wrap.offsetWidth * (s.scale - 1) / 2;
-        const maxY = wrap.offsetHeight * (s.scale - 1) / 2;
-        s.panX = Math.min(maxX, Math.max(-maxX, s.panX));
-        s.panY = Math.min(maxY, Math.max(-maxY, s.panY));
-    }
-
-    function applyTransform() {
-        const s = QIS[id];
-        wrap.style.transform = 'translate(' + s.panX + 'px, ' + s.panY + 'px) scale(' + s.scale + ')';
-    }
-
-    let pinchStartDist = null;
-    let pinchStartScale = 1;
-    let panning = false;
-    let panStartX = 0;
-    let panStartY = 0;
-    let panStartTouchX = 0;
-    let panStartTouchY = 0;
-
-    wrap.addEventListener('touchstart', function (e) {
-        if (e.touches.length === 2) {
-            pinchStartDist = distance(e.touches);
-            pinchStartScale = QIS[id].scale;
-            panning = false;
-        } else if (e.touches.length === 1 && QIS[id].scale > 1) {
-            panning = true;
-            panStartX = QIS[id].panX;
-            panStartY = QIS[id].panY;
-            panStartTouchX = e.touches[0].clientX;
-            panStartTouchY = e.touches[0].clientY;
-        }
-    }, { passive: true });
-
-    wrap.addEventListener('touchmove', function (e) {
-        if (e.touches.length === 2 && pinchStartDist) {
-            e.preventDefault();
-            const factor = distance(e.touches) / pinchStartDist;
-            QIS[id].scale = Math.min(Math.max(pinchStartScale * factor, 1), 8);
-            clampPan();
-            applyTransform();
-        } else if (e.touches.length === 1 && panning) {
-            e.preventDefault();
-            QIS[id].panX = panStartX + (e.touches[0].clientX - panStartTouchX);
-            QIS[id].panY = panStartY + (e.touches[0].clientY - panStartTouchY);
-            clampPan();
-            applyTransform();
-        }
-    }, { passive: false });
-
-    wrap.addEventListener('touchend', function (e) {
-        if (e.touches.length < 2) {
-            pinchStartDist = null;
-        }
-        if (e.touches.length < 1) {
-            panning = false;
-        }
-    });
+    // sliderValue is tracked here (rather than read back from the slider's
+    // own DOM) since range_slider is a Quasar-rendered ui.slider, not a raw
+    // <input> with a plain .value property.
+    const state = {
+        wrap: document.getElementById(id + '_zoomwrap'),
+        compare: false, sliderValue: 50, scale: 1, panX: 0, panY: 0,
+    };
+    QIS[id] = state;
+    if (state.wrap) attachPanZoom(state.wrap, state, function () { return true; });
 };
 
 QIS.applyClip = function (id, val) {
+    const state = QIS[id];
+    if (!state) return;
+    state.sliderValue = val;
     const before = document.getElementById(id + '_before');
     const handle = document.getElementById(id + '_handle');
-    // Tracked here (rather than read back from the slider's own DOM) since
-    // range_slider is a Quasar-rendered ui.slider, not a raw <input> with a
-    // plain .value property — QIS.setCompare reads this instead of
-    // reaching into the slider element directly.
-    if (!QIS[id]) QIS[id] = {};
-    QIS[id].sliderValue = val;
-    if (!before) return;
-    before.style.clipPath = 'inset(0 ' + (100 - val) + '% 0 0)';
+    if (before) before.style.clipPath = 'inset(0 ' + (100 - val) + '% 0 0)';
     if (handle) handle.style.left = val + '%';
 };
 
 QIS.setImages = function (id, beforeUrl, afterUrl) {
+    const state = QIS[id];
+    if (!state) return;
     const after = document.getElementById(id + '_after');
     const before = document.getElementById(id + '_before');
-    const wrap = document.getElementById(id + '_zoomwrap');
     if (after) { after.src = afterUrl; after.style.display = 'block'; }
     if (before) { before.src = beforeUrl; before.style.display = 'block'; }
     // The slider's own value is reset from Python (see set_images in
@@ -1012,39 +913,27 @@ QIS.setImages = function (id, beforeUrl, afterUrl) {
     // position to match, since a Python-side value push alone doesn't
     // touch the clip-path.
     QIS.applyClip(id, 50);
-    if (wrap) wrap.style.transform = 'translate(0px, 0px) scale(1)';
-    if (!QIS[id]) QIS[id] = { compare: false };
-    QIS[id].scale = 1;
-    QIS[id].panX = 0;
-    QIS[id].panY = 0;
-    QIS.setCompare(id, QIS[id].compare);
+    resetPanZoom(state.wrap, state);
+    QIS.setCompare(id, state.compare);
 };
 
 QIS.setCompare = function (id, enabled) {
-    if (!QIS[id]) QIS[id] = {};
-    QIS[id].compare = enabled;
+    const state = QIS[id];
+    if (!state) return;
+    state.compare = enabled;
     const range = document.getElementById(id + '_range');
     const handle = document.getElementById(id + '_handle');
     const before = document.getElementById(id + '_before');
     if (!handle || !before) return;
-    if (enabled) {
-        before.style.display = 'block';
-        if (range) range.style.display = 'block';
-        handle.style.display = 'block';
-        QIS.applyClip(id, QIS[id].sliderValue !== undefined ? QIS[id].sliderValue : 50);
-    } else {
-        // clip-path alone can leave a sub-pixel sliver of "before" visible
-        // at the bottom/right edge — its box is computed independently
-        // from "after"'s (different aspect ratio, one from object-fit:
-        // cover, one from the zoomwrap's auto height), so a clip boundary
-        // at exactly 100% can miss by a fraction of a CSS pixel depending
-        // on the image's exact dimensions. display:none removes it from
-        // rendering entirely, immune to that rounding.
-        before.style.display = 'none';
-        if (range) range.style.display = 'none';
-        handle.style.display = 'none';
-        before.style.clipPath = 'inset(0 100% 0 0)';
-    }
+    // Hiding "before" with display:none rather than a clip at 100%: its box
+    // is computed independently from "after"'s (object-fit: cover vs. the
+    // zoomwrap's auto height), so a clip boundary at exactly 100% can leave
+    // a sub-pixel sliver of it visible at the bottom/right edge.
+    const display = enabled ? 'block' : 'none';
+    before.style.display = display;
+    handle.style.display = display;
+    if (range) range.style.display = display;
+    if (enabled) QIS.applyClip(id, state.sliderValue);
 };
 
 QIS.getAfterUrl = function (id) {
@@ -1053,22 +942,18 @@ QIS.getAfterUrl = function (id) {
 };
 
 QIS.reset = function (id) {
+    const state = QIS[id];
     const after = document.getElementById(id + '_after');
     const before = document.getElementById(id + '_before');
-    const wrap = document.getElementById(id + '_zoomwrap');
     // removeAttribute('src') alone can leave a visible broken-image icon in
     // some browsers once an <img> has previously held a real src — hiding
     // both elements outright avoids that regardless of browser quirks.
     if (after) { after.removeAttribute('src'); after.style.display = 'none'; }
     if (before) { before.removeAttribute('src'); before.style.display = 'none'; }
-    if (wrap) wrap.style.transform = 'translate(0px, 0px) scale(1)';
-    if (QIS[id]) {
-        QIS[id].scale = 1;
-        QIS[id].panX = 0;
-        QIS[id].panY = 0;
-    }
+    if (state) resetPanZoom(state.wrap, state);
     QIS.setCompare(id, false);
 };
+})();
 """
 CLIENT_JS = CLIENT_JS.replace("__DEFAULT_BRUSH_SIZE__", str(DEFAULT_BRUSH_SIZE))
 CLIENT_JS = CLIENT_JS.replace("__MASK_TINT__", PRIMARY_COLOR)
