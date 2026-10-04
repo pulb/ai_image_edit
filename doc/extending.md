@@ -4,7 +4,7 @@ Adding a model means implementing `ModelBackend` (see `src/ai_image_edit/models/
 registering one loader in `src/ai_image_edit/models/__init__.py`.
 
 Adding a frontend means writing a module that exposes
-`run(model: ModelBackend, model_backend: str) -> None` and registering it in
+`run(model: ModelBackend) -> None` and registering it in
 `src/ai_image_edit/frontends/__init__.py`.
 
 Add the new backend's or frontend's dependencies as an extra in

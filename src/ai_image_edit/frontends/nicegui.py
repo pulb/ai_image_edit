@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """
-NiceGUI frontend. Entry point is run(model, model_backend), called by
+NiceGUI frontend. Entry point is run(model), called by
 app.py — importing this module does nothing by itself.
 
 UI-only: renders controls, collects a GenerationParams, and calls
@@ -53,7 +53,7 @@ PRIMARY_COLOR = "#7c3aed"
 
 
 # --- Small file helpers shared by the UI layer ---
-# (model-independent — these don't need `model` or `model_backend`, so
+# (model-independent — these don't need `model`, so
 # they stay at module scope rather than inside run(), below.)
 
 async def save_uploaded_file(file) -> str:
@@ -976,12 +976,11 @@ CLIENT_JS = CLIENT_JS.replace("__MASK_TINT__", PRIMARY_COLOR)
 CARD_CLASSES = "w-full q-pa-none"
 
 
-def run(model: ModelBackend, model_backend: str) -> None:
+def run(model: ModelBackend) -> None:
     # Everything below is model-dependent, so it lives inside run()
     # rather than at module scope: app.py builds the model once and
     # calls this after picking this module via the FRONTEND env var
-    # (see app.py and frontends/__init__.py). model_backend is just
-    # the MODEL_BACKEND name, used below for the UI's own subtitle.
+    # (see app.py and frontends/__init__.py).
 
     @ui.page("/")
     async def main_page() -> None:
@@ -1013,7 +1012,7 @@ def run(model: ModelBackend, model_backend: str) -> None:
         caps = model.capabilities
 
         ui.label("AI Image Edit").classes("text-2xl font-bold text-white w-full text-center")
-        ui.label(f"Model: {model_backend}").classes("text-sm q-mb-md w-full text-center").style(f"color: {PRIMARY_COLOR}")
+        ui.label(f"Model: {model.display_name}").classes("text-sm q-mb-md w-full text-center").style(f"color: {PRIMARY_COLOR}")
 
         with ui.column().classes("w-full gap-3 aie-page"):
             with ui.card().classes(CARD_CLASSES):

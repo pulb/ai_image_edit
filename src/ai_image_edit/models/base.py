@@ -4,7 +4,7 @@ The interface every model backend implements.
 
 Kept intentionally small: the UI needs exactly three things from a model —
 what it can do (capabilities), how to start/stop it, and how to run one
-generation. How a model actually gets there (ComfyUI over a websocket, an
+generation — plus a readable name and version to show. How a model actually gets there (ComfyUI over a websocket, an
 in-process torch pipeline, or anything else) is the model's own
 business and never leaks into this contract — that's what lets a completely
 different execution model (e.g. qwen_image's direct torch pipeline, with no
@@ -22,6 +22,21 @@ class ModelBackend(ABC):
     @abstractmethod
     def capabilities(self) -> ModelCapabilities:
         """Static description of what this model supports. Read once by the UI at startup."""
+
+    @property
+    def model_name(self) -> str:
+        """Human-readable model name shown in the UI. Defaults to the class name."""
+        return type(self).__name__
+
+    @property
+    def model_version(self) -> Optional[str]:
+        """Model version as it should be displayed (e.g. "2.1", "v23"), or None if there is none."""
+        return None
+
+    @property
+    def display_name(self) -> str:
+        """model_name followed by model_version, if any. Not meant to be overridden."""
+        return f"{self.model_name} {self.model_version}" if self.model_version else self.model_name
 
     @abstractmethod
     def start(self) -> None:

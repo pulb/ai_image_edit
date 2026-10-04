@@ -120,6 +120,14 @@ class QwenImageModel(ModelBackend):
     """Qwen-Image-2.1, run as a direct diffusers pipeline."""
 
     @property
+    def model_name(self) -> str:
+        return "Qwen-Image"
+
+    @property
+    def model_version(self) -> str:
+        return "2.1"
+
+    @property
     def capabilities(self) -> ModelCapabilities:
         return ModelCapabilities(
             max_reference_images=MAX_INPUT_IMAGES,

@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """
 Gradio frontend — needed for Hugging Face ZeroGPU Spaces, which require the
-Gradio SDK. Entry point is run(model, model_backend), called by app.py —
+Gradio SDK. Entry point is run(model), called by app.py —
 importing this module does nothing by itself.
 
 UI-only, same contract as the sibling frontends/nicegui.py: renders
@@ -43,10 +43,9 @@ PRIMARY_COLOR = "#7c3aed"
 # Everything below is model-dependent, so it lives inside run() rather
 # than at module scope: app.py builds the model once and calls this
 # after picking this module via the FRONTEND env var (see app.py and
-# frontends/__init__.py). model_backend is just the MODEL_BACKEND name,
-# used below for the UI's own subtitle.
+# frontends/__init__.py).
 
-def run(model: ModelBackend, model_backend: str) -> None:
+def run(model: ModelBackend) -> None:
     # Read once, at process start — every control below is shown/hidden/ranged
     # from this, exactly like main_page() reads it once per page load in the
     # NiceGUI app. Nothing below assumes any one model.
@@ -240,7 +239,7 @@ def run(model: ModelBackend, model_backend: str) -> None:
         ) as demo:
             with gr.Column(elem_classes="aie-page"):
                 gr.Markdown("## AI Image Edit", elem_classes="aie-title")
-                gr.Markdown(f"Model: {model_backend}", elem_classes="aie-subtitle")
+                gr.Markdown(f"Model: {model.display_name}", elem_classes="aie-subtitle")
 
                 # --- Prompt / Seed ---
                 with gr.Group():

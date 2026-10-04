@@ -45,13 +45,14 @@ Rules for any AI coding agent working in this repository.
   as core, the rest as extras named `<name>_backend` / `<name>_frontend`.
   Adding a backend or frontend means adding its extra there.
 - **Frontend contract**: each module under `frontends/` exposes a single
-  entry point, `run(model: ModelBackend, model_backend: str) -> None`.
-  Model and backend name are passed as plain arguments — no shared
-  mutable module state. Register a new frontend in
+  entry point, `run(model: ModelBackend) -> None`. The model is passed
+  as a plain argument — no shared mutable module state. The UI shows
+  `model.display_name`. Register a new frontend in
   `frontends/__init__.py`'s `FRONTEND_LOADERS`.
 - **Model contract**: each backend under `models/` implements the
   `ModelBackend` interface (`models/base.py`): `capabilities`, `start()`,
-  `generate()`, with `shutdown()` and `list_loras()` optional. Register a
+  `generate()`, with `shutdown()`, `list_loras()`, `model_name` and
+  `model_version` optional. Register a
   new backend in `models/__init__.py`'s `MODEL_LOADERS`.
 - **Lazy model imports**: `models/__init__.py` imports each backend's
   module lazily, inside its loader function, not at module top level.

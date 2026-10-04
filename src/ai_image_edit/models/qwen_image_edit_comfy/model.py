@@ -15,6 +15,7 @@ import json
 import math
 import os
 import random
+import re
 import subprocess
 import time
 import uuid
@@ -111,6 +112,18 @@ class QwenImageEditComfyModel(ModelBackend):
 
     def __init__(self) -> None:
         self._process: Optional[subprocess.Popen] = None
+
+    @property
+    def model_name(self) -> str:
+        return "Qwen-Image-Edit Rapid-AIO"
+
+    @property
+    def model_version(self) -> Optional[str]:
+        """The "vNN" part of the workflow's checkpoint filename, e.g. "v23"."""
+        with open(WORKFLOW_PATH, "r", encoding="utf-8") as f:
+            ckpt_name = json.load(f)["1"]["inputs"]["ckpt_name"]
+        match = re.search(r"-(v\d+)(?=\.|-|_|$)", ckpt_name)
+        return match.group(1) if match else None
 
     @property
     def capabilities(self) -> ModelCapabilities:

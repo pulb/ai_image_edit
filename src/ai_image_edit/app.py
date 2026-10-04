@@ -7,7 +7,7 @@ nicegui) are read when main() is called, not at import time, so a launcher
 can set them first. APP_PASSWORD adds a password login to either frontend.
 The UI code lives under frontends/, the model code under models/;
 run_frontend() passes the built model straight to the chosen
-frontend's run(model, model_backend).
+frontend's run(model).
 """
 import os
 
@@ -28,4 +28,4 @@ def main() -> None:
     print(f"Starting model backend '{model_backend}' in the background...", flush=True)
     model.start()
 
-    run_frontend(frontend, model, model_backend)
+    run_frontend(frontend, model)
