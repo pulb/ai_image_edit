@@ -50,6 +50,8 @@ that license.
 
 Copyright (C) 2026 AI Image Edit authors
 
-## Screenshot
+## Screenshots
 
-<a href="doc/screenshots/app.png"><img src="doc/screenshots/app.png" alt="The app on a phone screen" width="240"></a>
+<a href="doc/screenshots/app.png"><img src="doc/screenshots/app.png" alt="Replacing an animal in a masked photo" width="120" align="top"></a>
+<a href="doc/screenshots/app2.png"><img src="doc/screenshots/app2.png" alt="Turning a drawing into an action figure" width="120" align="top"></a>
+<a href="doc/screenshots/app3.png"><img src="doc/screenshots/app3.png" alt="Changing the perspective of a photo" width="120" align="top"></a>
