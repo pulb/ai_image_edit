@@ -45,8 +45,8 @@ RUN pip install --no-cache-dir --user -r requirements.txt
 # Download the Qwen Model (16 concurrent connections)
 RUN aria2c -x 16 -s 16 -k 1M \
     -d models/checkpoints/Qwen \
-    -o Qwen-Rapid-AIO-v1.safetensors \
-    "https://huggingface.co/Phr00t/Qwen-Image-Edit-Rapid-AIO/resolve/main/v19/Qwen-Rapid-AIO-NSFW-v19.safetensors?download=true"
+    -o Qwen-Rapid-AIO-v23.safetensors \
+    "https://huggingface.co/Phr00t/Qwen-Image-Edit-Rapid-AIO/resolve/main/v23/Qwen-Rapid-AIO-NSFW-v23.safetensors?download=true"
 
 # Download LoRAs. Each goes into its own models/loras/<Name> subfolder —
 # QwenImageEditComfyModel.list_loras() (models/qwen_image_edit_comfy/model.py)

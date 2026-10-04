@@ -1,7 +1,7 @@
 {
   "1": {
     "inputs": {
-      "ckpt_name": "Qwen\\Qwen-Rapid-AIO-v1.safetensors"
+      "ckpt_name": "Qwen\\Qwen-Rapid-AIO-v23.safetensors"
     },
     "class_type": "CheckpointLoaderSimple"
   },
