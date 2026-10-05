@@ -42,11 +42,18 @@ RUN pip install --no-cache-dir --user torch==2.11.0 torchvision==0.26.0 torchaud
 # below.
 RUN pip install --no-cache-dir --user -r requirements.txt
 
-# Download the Qwen Model (16 concurrent connections)
+# The checkpoint: where to download it from, and where it is stored relative
+# to models/checkpoints. The app loads whatever COMFY_CHECKPOINT_PATH names
+# and refuses to start if that file is missing. To use other weights, change
+# both values.
+ENV COMFY_CHECKPOINT_URL="https://huggingface.co/Phr00t/Qwen-Image-Edit-Rapid-AIO/resolve/main/v23/Qwen-Rapid-AIO-NSFW-v23.safetensors?download=true" \
+    COMFY_CHECKPOINT_PATH="Qwen/Qwen-Rapid-AIO-v23.safetensors"
+
+# Download the checkpoint (16 concurrent connections)
 RUN aria2c -x 16 -s 16 -k 1M \
-    -d models/checkpoints/Qwen \
-    -o Qwen-Rapid-AIO-v23.safetensors \
-    "https://huggingface.co/Phr00t/Qwen-Image-Edit-Rapid-AIO/resolve/main/v23/Qwen-Rapid-AIO-NSFW-v23.safetensors?download=true"
+    -d "models/checkpoints/$(dirname "$COMFY_CHECKPOINT_PATH")" \
+    -o "$(basename "$COMFY_CHECKPOINT_PATH")" \
+    "$COMFY_CHECKPOINT_URL"
 
 # Download LoRAs. Each goes into its own models/loras/<Name> subfolder —
 # QwenImageEditComfyModel.list_loras() (models/qwen_image_edit_comfy/model.py)

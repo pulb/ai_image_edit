@@ -62,6 +62,23 @@ NEGATIVE_PROMPT = "worst quality, low quality, bad anatomy, bad hands, text, err
 # workflow_api.json lives next to this file (shipped as package data).
 WORKFLOW_PATH = Path(__file__).parent / "workflow_api.json"
 
+# The checkpoint comes from this environment variable (a path relative to
+# ComfyUI's models/checkpoints folder), not from the workflow file, so it is
+# defined in one place only — the Dockerfile.
+CHECKPOINT_ENV = "COMFY_CHECKPOINT_PATH"
+CHECKPOINTS_DIR = Path("models/checkpoints")
+
+
+def _checkpoint_name() -> str:
+    """The configured checkpoint path, with forward slashes. Raises if it is not set."""
+    value = os.environ.get(CHECKPOINT_ENV, "").strip().replace("\\", "/")
+    if not value:
+        raise RuntimeError(
+            f"{CHECKPOINT_ENV} is not set: set it to the checkpoint's path relative to "
+            f"ComfyUI's {CHECKPOINTS_DIR} folder."
+        )
+    return value
+
 # Aspect ratio presets: label -> (w_ratio, h_ratio) fed into the target-area
 # formula below. "Original" is a sentinel meaning "derive dimensions from
 # the source image's own aspect ratio" rather than a fixed ratio.
@@ -119,10 +136,8 @@ class QwenImageEditComfyModel(ModelBackend):
 
     @property
     def model_version(self) -> Optional[str]:
-        """The "vNN" part of the workflow's checkpoint filename, e.g. "v23"."""
-        with open(WORKFLOW_PATH, "r", encoding="utf-8") as f:
-            ckpt_name = json.load(f)["1"]["inputs"]["ckpt_name"]
-        match = re.search(r"-(v\d+)(?=\.|-|_|$)", ckpt_name)
+        """The "vNN" part of the checkpoint filename, e.g. "v23"."""
+        match = re.search(r"-(v\d+)(?=\.|-|_|$)", os.environ.get(CHECKPOINT_ENV, ""))
         return match.group(1) if match else None
 
     @property
@@ -149,6 +164,10 @@ class QwenImageEditComfyModel(ModelBackend):
         )
 
     def start(self) -> None:
+        # Checked before ComfyUI starts, so a missing setting or file fails fast.
+        checkpoint = CHECKPOINTS_DIR / _checkpoint_name()
+        if not checkpoint.is_file():
+            raise RuntimeError(f"Checkpoint file not found: {checkpoint} (set by {CHECKPOINT_ENV}).")
         self._process = comfy_client.launch_comfy_process()
 
     def shutdown(self) -> None:
@@ -218,8 +237,7 @@ class QwenImageEditComfyModel(ModelBackend):
         with open(WORKFLOW_PATH, "r", encoding="utf-8") as f:
             workflow = json.load(f)
 
-        current_path = workflow["1"]["inputs"]["ckpt_name"]
-        workflow["1"]["inputs"]["ckpt_name"] = current_path.replace("\\", "/")
+        workflow["1"]["inputs"]["ckpt_name"] = _checkpoint_name()
 
         workflow["7"]["inputs"]["image"] = comfy_client.upload_image(source_image_path)
 

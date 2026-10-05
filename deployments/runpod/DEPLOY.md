@@ -27,6 +27,10 @@ choosing the image.
 Optional Pod environment variables for `qwen_image`: `HF_TOKEN`,
 `QWEN21_AOTI`, `QWEN21_AOTI_REPO`, `HF_HUB_CACHE`.
 
+For `qwen_image_edit_comfy`, `COMFY_CHECKPOINT_PATH` selects the checkpoint
+(a path under ComfyUI's `models/checkpoints` folder). The image sets it to the
+weights it ships with; override it to use another file that exists in the Pod.
+
 ## Access protection
 
 RunPod's HTTP proxy is public and has no login of its own, so anyone with

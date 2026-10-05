@@ -22,7 +22,11 @@ set (for example `-e APP_PASSWORD=...`). Both images set
 ## ComfyUI image
 
 Clones ComfyUI, installs PyTorch, downloads the model checkpoint and a set of
-LoRAs, then starts the app.
+LoRAs, then starts the app. The checkpoint is set by two variables near the top
+of the Dockerfile: `COMFY_CHECKPOINT_URL` (where it is downloaded from) and
+`COMFY_CHECKPOINT_PATH` (its path under ComfyUI's `models/checkpoints` folder).
+The app loads the file `COMFY_CHECKPOINT_PATH` names and refuses to start if it
+is empty or the file does not exist.
 
 ```bash
 docker build -f deployments/docker/Dockerfile.qwen_image_edit_comfy -t ai-image-edit .
