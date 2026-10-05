@@ -7,6 +7,7 @@ front of a pluggable image-generation backend.
 | Feature | Description |
 |---|---|
 | Inpainting | Advanced inpainting and mask functionality with seamless soft blending |
+| Annotations | Draw thin colored strokes directly on the image to point the model at what to change |
 | Before/after comparison | Interactive slider to compare generated outputs with the source |
 | Aspect ratios | Presets for common, widely used aspect ratios |
 | LoRAs | Optional LoRA support, auto-detected from a local loras folder |
