@@ -6,9 +6,9 @@ front of a pluggable image-generation backend.
 
 | Feature | Description |
 |---|---|
+| Privacy | Runs on your own hardware or in a disposable container, so your images and prompts stay under your control and vanish with it |
 | Inpainting | Advanced inpainting and mask functionality with seamless soft blending |
 | Annotations | Draw thin colored strokes directly on the image to point the model at what to change |
-| Privacy | Runs on your own hardware or in a disposable container, so your images and prompts stay under your control and vanish with it |
 | Incremental edits | Feed any result back in as the next input to refine an image step by step |
 | Before/after comparison | Interactive slider to compare generated outputs with the source |
 | Aspect ratios | Presets for common, widely used aspect ratios |
