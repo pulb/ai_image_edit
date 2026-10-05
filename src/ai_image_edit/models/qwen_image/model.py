@@ -145,6 +145,7 @@ class QwenImageModel(ModelBackend):
             supports_denoise=False,
             supports_seed=True,
             supports_negative_prompt=True,  # only meaningful together with supports_cfg — see pipeline._diffuse
+            num_annotation_colors=3,
             step_range=RangeSpec(MIN_STEPS, MAX_STEPS, DEFAULT_STEPS, step=1),
             cfg_range=RangeSpec(MIN_CFG, MAX_CFG, DEFAULT_CFG, step=0.1),
         )
@@ -252,6 +253,7 @@ class QwenImageModel(ModelBackend):
             params.feather_amount,
             params.apply_color_correction_enabled,
             _infer,
+            params.annotated_image_path,
         )
 
         return GenerationResult(

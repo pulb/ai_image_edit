@@ -157,6 +157,7 @@ class QwenImageEditComfyModel(ModelBackend):
             supports_cfg=True,
             supports_denoise=True,
             supports_seed=True,
+            num_annotation_colors=1,
             step_range=RangeSpec(MIN_STEPS, MAX_STEPS, DEFAULT_STEPS, step=1),
             cfg_range=RangeSpec(MIN_CFG, MAX_CFG, DEFAULT_CFG, step=0.1),
             denoise_range=RangeSpec(MIN_DENOISE, MAX_DENOISE, DEFAULT_DENOISE, step=0.01),
@@ -360,6 +361,7 @@ class QwenImageEditComfyModel(ModelBackend):
             params.feather_amount,
             params.apply_color_correction_enabled,
             _infer,
+            params.annotated_image_path,
         )
 
         return GenerationResult(before_path=params.source_image_path, after_path=final_output_path, actual_seed=actual_seed)

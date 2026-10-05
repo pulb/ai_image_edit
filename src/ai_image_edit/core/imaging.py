@@ -176,6 +176,25 @@ def apply_exif_orientation(image_path: str) -> None:
     upright.save(image_path, format=fmt, **options)
 
 
+def compose_annotations(source_image_path: str, layer_path: str) -> str:
+    """
+    Draws the transparent annotation layer onto the source image and saves
+    the result as a new PNG in WORK_DIR, returning its path. The layer is
+    scaled to the source's size if it differs.
+    """
+    with Image.open(source_image_path) as source, Image.open(layer_path) as layer:
+        base = source.convert("RGBA")
+        layer = layer.convert("RGBA")
+        if layer.size != base.size:
+            layer = layer.resize(base.size, Image.Resampling.BILINEAR)
+        composed = Image.alpha_composite(base, layer)
+        if "A" not in source.getbands():
+            composed = composed.convert("RGB")
+    out_path = WORK_DIR / f"annotated_{uuid.uuid4().hex}.png"
+    composed.save(out_path)
+    return str(out_path)
+
+
 def resize_to_cover_and_crop(image: Image.Image, target_w: int, target_h: int, resample: int) -> Image.Image:
     """
     Fits image to exactly (target_w, target_h) without distorting it: scales
@@ -333,6 +352,7 @@ def run_masked_generation(
     feather_amount: int,
     apply_color_correction_enabled: bool,
     infer: Callable[[str], str],
+    annotated_image_path: Optional[str] = None,
 ) -> str:
     """
     Orchestrates the crop -> infer -> composite/color-correct sequence
@@ -340,20 +360,26 @@ def run_masked_generation(
     model-specific piece: a callback taking the (possibly cropped) source
     path and returning the path to the raw generated image.
 
-    - If mask_path is set: source_image_path is cropped/resized to exactly
-      (gen_width, gen_height) via prepare_inpaint_image before infer(), then
-      composited back into the untouched original via
-      composite_with_soft_transition, feathered by feather_amount.
-      gen_width/gen_height must be real dimensions in this case.
-    - Otherwise: source_image_path is passed to infer() unprepared, and the
-      raw result is returned as-is, or color-corrected as a whole if
+    - If mask_path is set: the model's input image is cropped/resized to
+      exactly (gen_width, gen_height) via prepare_inpaint_image before
+      infer(), then the result is composited back into the untouched
+      original via composite_with_soft_transition, feathered by
+      feather_amount. gen_width/gen_height must be real dimensions in this
+      case.
+    - Otherwise: the model's input image is passed to infer() unprepared,
+      and the raw result is returned as-is, or color-corrected as a whole if
       apply_color_correction_enabled is True. gen_width/gen_height are
       ignored — infer() handles its own dimension needs.
+
+    The model's input image is annotated_image_path if given, else
+    source_image_path. Compositing and color correction always use the clean
+    source_image_path, so annotations never end up in the result.
     """
+    model_source_path = annotated_image_path or source_image_path
     model_input_path = (
-        prepare_inpaint_image(source_image_path, gen_width, gen_height, Image.Resampling.LANCZOS)
+        prepare_inpaint_image(model_source_path, gen_width, gen_height, Image.Resampling.LANCZOS)
         if mask_path
-        else source_image_path
+        else model_source_path
     )
 
     output_path = infer(model_input_path)

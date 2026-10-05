@@ -9,6 +9,11 @@ from dataclasses import dataclass, field
 from typing import List, Optional
 
 
+# The colours a user can annotate an image with, in the order a model uses
+# them: a model with num_annotation_colors = N supports the first N.
+ANNOTATION_COLORS = ("#ff0000", "#00ff00", "#0000ff")
+
+
 @dataclass(frozen=True)
 class RangeSpec:
     """A numeric control's min/max/default/step."""
@@ -72,6 +77,12 @@ class ModelCapabilities:
     # since CFG is what actually uses it) sets this True.
     supports_negative_prompt: bool = False
 
+    # How many annotation colours the model understands (the first N of
+    # ANNOTATION_COLORS); 0 hides the annotate control entirely. Annotations
+    # are strokes drawn on the source image that the model reads as part of
+    # the picture.
+    num_annotation_colors: int = 0
+
     step_range: RangeSpec = field(default_factory=lambda: RangeSpec(1, 50, 20, step=1))
     cfg_range: RangeSpec = field(default_factory=lambda: RangeSpec(0.1, 10.0, 1.0, step=0.1))
     denoise_range: RangeSpec = field(default_factory=lambda: RangeSpec(0.0, 1.0, 1.0, step=0.01))
@@ -95,6 +106,11 @@ class GenerationParams:
     # Extra reference images beyond the primary source, in order. Length
     # is bounded by capabilities.max_reference_images - 1.
     reference_images: List[str] = field(default_factory=list)
+
+    # The source image with the user's annotations drawn in, same size as
+    # source_image_path. What the model sees instead of the source; masking,
+    # compositing and colour correction still use the clean source.
+    annotated_image_path: Optional[str] = None
 
     seed: int = 0
     randomize_seed: bool = True
