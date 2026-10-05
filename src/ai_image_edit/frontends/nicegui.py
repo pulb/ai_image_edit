@@ -346,7 +346,7 @@ async def create_mask_editor(
                 feather_slider = ui.slider(min=0, max=16, step=1, value=DEFAULT_FEATHER_AMOUNT).props("label-always dense")
                 feather_slider.disable()
 
-            ui.button(icon="layers_clear", on_click=remove_mask).props("flat dense size=sm").classes("text-xs").tooltip("Remove mask")
+            ui.button(icon="layers_clear", on_click=remove_mask).props("flat dense size=md").classes("text-xs").tooltip("Remove mask")
 
         annotate_radio = None
         if num_annotation_colors > 0:
@@ -368,7 +368,7 @@ async def create_mask_editor(
                     )
 
                 ui.space()
-                ui.button(icon="format_color_reset", on_click=remove_annotations).props("flat dense size=sm").classes("text-xs").tooltip("Remove annotations")
+                ui.button(icon="layers_clear", on_click=remove_annotations).props("flat dense size=md").classes("text-xs").tooltip("Remove annotations")
 
         async def set_mode(mode: str) -> None:
             for radio in (zoom_radio, mask_radio, annotate_radio):
