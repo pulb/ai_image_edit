@@ -327,9 +327,15 @@ async def create_mask_editor(
         with ui.row().classes("w-full items-center gap-3 no-wrap"):
             mask_radio = ui.element("q-radio").props('val=mask model-value=zoom label="Mask"')
 
-            with ui.column().classes("flex-1 gap-3"):
+            with ui.column().classes("flex-1 gap-1"):
                 ui.label("Brush size").classes("text-xs text-gray-400")
-                brush_slider = ui.slider(min=5, max=80, step=1, value=DEFAULT_BRUSH_SIZE).props("label-always dense")
+                with ui.row().classes("w-full items-center gap-2 no-wrap"):
+                    brush_slider = ui.slider(min=5, max=80, step=1, value=DEFAULT_BRUSH_SIZE).props("dense").classes("flex-1")
+                    # Updated by the slider's js_handler below, in the browser
+                    # (no server round-trip while dragging).
+                    ui.html(f'<span id="{editor_id}_brushvalue">{DEFAULT_BRUSH_SIZE}</span>', sanitize=False).classes(
+                        "text-xs text-gray-400"
+                    ).style("min-width: 1.5em; text-align: right")
                 brush_slider.disable()
                 # js_handler runs entirely in the browser, no server round-trip
                 # (see CLIENT_JS's AIE comment for why that matters for a
@@ -337,13 +343,20 @@ async def create_mask_editor(
                 # while dragging; 'change' fires once on release.
                 brush_slider.on(
                     "update:model-value",
-                    js_handler=f"(value) => {{ AIE.setBrush('{editor_id}', value); AIE.showBrushPreview('{editor_id}', value); }}",
+                    js_handler=(
+                        f"(value) => {{ AIE.setBrush('{editor_id}', value); AIE.showBrushPreview('{editor_id}', value); "
+                        f"document.getElementById('{editor_id}_brushvalue').textContent = value; }}"
+                    ),
                 )
                 brush_slider.on("change", js_handler=f"() => AIE.hideBrushPreview('{editor_id}')")
 
-            with ui.column().classes("flex-1 gap-3"):
+            with ui.column().classes("flex-1 gap-1"):
                 ui.label("Feather").classes("text-xs text-gray-400")
-                feather_slider = ui.slider(min=0, max=16, step=1, value=DEFAULT_FEATHER_AMOUNT).props("label-always dense")
+                with ui.row().classes("w-full items-center gap-2 no-wrap"):
+                    feather_slider = ui.slider(min=0, max=16, step=1, value=DEFAULT_FEATHER_AMOUNT).props("dense").classes("flex-1")
+                    ui.label().classes("text-xs text-gray-400").style("min-width: 1.5em; text-align: right").bind_text_from(
+                        feather_slider, "value"
+                    )
                 feather_slider.disable()
 
             ui.button(icon="layers_clear", on_click=remove_mask).props("flat dense size=md").classes("text-xs").tooltip("Remove mask")
@@ -460,7 +473,7 @@ async def create_compare_slider() -> Tuple[
         )
         # A ui.slider rather than a raw <input type="range"> — a bare <input>
         # (even type="range") is enough to pop the Android software keyboard
-        # on some WebViews/browsers just from being focused. No label (label-always) here: unlike Brush/Feather, this
+        # on some WebViews/browsers just from being focused. No label (label-always) here: this
         # overlays directly on the image, where a value bubble would be
         # visual noise rather than useful information. js_handler keeps
         # dragging fully client-side (see CLIENT_JS's AIE comment for why
