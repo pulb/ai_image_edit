@@ -54,7 +54,7 @@ that license.
 
 Copyright (C) 2026 AI Image Edit authors
 
-## Screenshots
+## Examples
 
 <a href="doc/screenshots/inpainting.png"><img src="doc/screenshots/inpainting.png" alt="Replacing an animal in a masked photo, using a reference image" width="22%" align="top"></a>
 <a href="doc/screenshots/annotations.png"><img src="doc/screenshots/annotations.png" alt="Placing things in a photo with colored annotations" width="22%" align="top"></a>
