@@ -28,7 +28,7 @@ from nicegui import run as nicegui_run
 from ai_image_edit.core import imaging
 from ai_image_edit.core.errors import GenerationError
 from ai_image_edit.core.paths import WORK_DIR, to_url, from_url
-from ai_image_edit.core.types import ANNOTATION_COLORS, GenerationParams
+from ai_image_edit.core.types import ANNOTATION_COLORS, GenerationParams, RangeSpec
 from ai_image_edit.models.base import ModelBackend
 
 
@@ -227,6 +227,19 @@ def create_simple_image_upload(label: str) -> dict:
 
     return holder
 
+def create_value_slider(spec: RangeSpec) -> ui.slider:
+    """
+    A slider with its current value as text to its right. The value is kept
+    in sync with the server, which reads it at Generate time.
+    """
+    with ui.row().classes("w-full items-center gap-1 no-wrap"):
+        slider = ui.slider(min=spec.min, max=spec.max, step=spec.step, value=spec.default).props("dense").classes("flex-1")
+        ui.label().classes("text-xs text-gray-400").style("min-width: 1.5em").bind_text_from(
+            slider, "value", backward=lambda v: f"{v:g}"
+        )
+    return slider
+
+
 class EditorInputs(NamedTuple):
     """What the editor holds at Generate time: saved layer files (None if not drawn) and the Feather amount."""
 
@@ -330,13 +343,13 @@ async def create_mask_editor(
 
             with ui.column().classes("flex-1 gap-1"):
                 ui.label("Brush size").classes("text-xs text-gray-400")
-                with ui.row().classes("w-full items-center gap-2 no-wrap"):
+                with ui.row().classes("w-full items-center gap-1 no-wrap"):
                     brush_slider = ui.slider(min=5, max=80, step=1, value=DEFAULT_BRUSH_SIZE).props("dense").classes("flex-1")
                     # Updated by the slider's js_handler below, in the browser
                     # (no server round-trip while dragging).
                     ui.html(f'<span id="{editor_id}_brushvalue">{DEFAULT_BRUSH_SIZE}</span>', sanitize=False).classes(
                         "text-xs text-gray-400"
-                    ).style("min-width: 1.5em; text-align: right")
+                    ).style("min-width: 1.5em")
                 brush_slider.disable()
                 # js_handler runs entirely in the browser, no server round-trip
                 # (see CLIENT_JS's AIE comment for why that matters for a
@@ -353,11 +366,11 @@ async def create_mask_editor(
 
             with ui.column().classes("flex-1 gap-1"):
                 ui.label("Feather").classes("text-xs text-gray-400")
-                with ui.row().classes("w-full items-center gap-2 no-wrap"):
+                with ui.row().classes("w-full items-center gap-1 no-wrap"):
                     feather_slider = ui.slider(min=0, max=16, step=1, value=DEFAULT_FEATHER_AMOUNT).props("dense").classes("flex-1")
                     ui.html(f'<span id="{editor_id}_feathervalue">{DEFAULT_FEATHER_AMOUNT}</span>', sanitize=False).classes(
                         "text-xs text-gray-400"
-                    ).style("min-width: 1.5em; text-align: right")
+                    ).style("min-width: 1.5em")
                 feather_slider.disable()
                 feather_slider.on(
                     "update:model-value",
@@ -1321,19 +1334,19 @@ def run(model: ModelBackend) -> None:
                             lora_name = ui.select(["None"] + list(available_loras.keys()), value="None", label="Name").props("outlined dark").classes("w-full")
                             ui.label("Strength").classes("text-xs text-gray-400 q-mt-sm")
                             ls = caps.lora_strength_range
-                            lora_strength = ui.slider(min=ls.min, max=ls.max, step=ls.step, value=ls.default).props("label-always")
+                            lora_strength = create_value_slider(ls)
 
             with ui.card().classes(CARD_CLASSES):
                 with ui.expansion("Advanced settings").props("dense").classes("w-full"):
                     sr = caps.step_range
                     ui.label("Inference steps").classes("text-xs text-gray-400")
-                    steps = ui.slider(min=sr.min, max=sr.max, step=sr.step, value=sr.default).props("label-always")
+                    steps = create_value_slider(sr)
 
                     cfg = None
                     if caps.supports_cfg:
                         cr = caps.cfg_range
                         ui.label("CFG scale").classes("text-xs text-gray-400 q-mt-sm")
-                        cfg = ui.slider(min=cr.min, max=cr.max, step=cr.step, value=cr.default).props("label-always")
+                        cfg = create_value_slider(cr)
 
                     negative_prompt = None
                     if caps.supports_negative_prompt:
@@ -1343,7 +1356,7 @@ def run(model: ModelBackend) -> None:
                     if caps.supports_denoise:
                         dr = caps.denoise_range
                         ui.label("Denoise").classes("text-xs text-gray-400 q-mt-sm")
-                        denoise = ui.slider(min=dr.min, max=dr.max, step=dr.step, value=dr.default).props("label-always")
+                        denoise = create_value_slider(dr)
 
                     sampler_name = None
                     if caps.sampler_choices:
