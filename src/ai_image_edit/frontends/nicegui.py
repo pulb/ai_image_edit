@@ -231,30 +231,36 @@ def create_simple_image_upload(label: str) -> dict:
 
 async def create_mask_editor(
     on_mask_change: Optional[Callable[[bool], None]] = None,
+    num_annotation_colors: int = 0,
 ) -> Tuple[
     dict,
     Callable[[], Awaitable[Optional[str]]],
     Callable[[str], Awaitable[None]],
     Callable[[], int],
+    Callable[[], Awaitable[Optional[str]]],
 ]:
     """
     The "Input Image" widget: click-to-upload image + a <canvas> for
     drawing an optional inpainting mask, with a resizable brush. A radio
-    group switches between pinch-to-zoom (default) and mask drawing;
-    drawing a stroke in mask mode makes this an Inpaint Edit,
-    "Remove mask" reverts to a plain Image Edit. The Feather slider (0-16,
+    group switches between pinch-to-zoom (default), mask drawing and,
+    when num_annotation_colors > 0, annotating in one of that many colours
+    (ANNOTATION_COLORS, thin fixed stroke). Drawing a stroke in mask mode
+    makes this an Inpaint Edit, "Remove mask" reverts to a plain Image Edit. The Feather slider (0-16,
     default 6) is the Gaussian blur radius composite_with_soft_transition()
     applies to the mask edges; 0 falls back to a hard cutout.
 
     If given, on_mask_change(has_mask) fires whenever the mask goes from
     empty to non-empty or back (via the 'aie_mask_state' custom event).
 
-    Returns (holder, get_mask_path, set_image, get_feather_amount):
+    Returns (holder, get_mask_path, set_image, get_feather_amount,
+    get_annotation_layer_path):
       * holder['path'] is the current source image's local path (or None).
       * get_mask_path() is async, reads the mask canvas and saves it to
         disk, or returns None if nothing was drawn. Called once, on Generate.
       * set_image(path) loads a new image and clears the mask.
       * get_feather_amount() reads the Feather slider's current value.
+      * get_annotation_layer_path() is async, saves the annotation layer
+        (transparent PNG, annotations only) or returns None if none were drawn.
     """
     editor_id = f"edit_{uuid.uuid4().hex}"
     holder: dict = {"path": None}
@@ -299,17 +305,19 @@ async def create_mask_editor(
 
     uploader.on_upload(handle_upload)
 
-    with ui.row().classes("w-full items-center gap-3"):
-        async def remove_mask() -> None:
-            await ui.run_javascript(f"AIE.clearMask('{editor_id}')", timeout=5.0)
+    async def clear_image() -> None:
+        holder["path"] = None
+        await ui.run_javascript(f"AIE.clearImage('{editor_id}')", timeout=5.0)
 
-        ui.button("Remove mask", on_click=remove_mask).props("flat dense size=sm").classes("text-xs")
+    ui.button("Clear", on_click=clear_image).props("flat dense size=sm").classes("text-xs")
 
-        async def clear_image() -> None:
-            holder["path"] = None
-            await ui.run_javascript(f"AIE.clearImage('{editor_id}')", timeout=5.0)
+    async def remove_mask() -> None:
+        await ui.run_javascript(f"AIE.clearMask('{editor_id}')", timeout=5.0)
 
-        ui.button("Clear", on_click=clear_image).props("flat dense size=sm").classes("text-xs")
+    async def remove_annotations() -> None:
+        await ui.run_javascript(f"AIE.clearAnnotations('{editor_id}')", timeout=5.0)
+
+    swatches: Dict[str, ui.button] = {}
 
     with ui.column().classes("w-full gap-1 p-2 bg-neutral-900 rounded-lg"):
         # One q-radio per row (ui.radio is a single vertical option list and
@@ -338,9 +346,34 @@ async def create_mask_editor(
                 feather_slider = ui.slider(min=0, max=16, step=1, value=DEFAULT_FEATHER_AMOUNT).props("label-always dense")
                 feather_slider.disable()
 
+            ui.button(icon="delete", on_click=remove_mask).props("flat dense size=sm").classes("text-xs").tooltip("Remove mask")
+
+        annotate_radio = None
+        if num_annotation_colors > 0:
+            with ui.row().classes("w-full items-center gap-3 no-wrap"):
+                annotate_radio = ui.element("q-radio").props('val=annotate model-value=zoom label="Annotate"')
+
+                async def select_color(color: str) -> None:
+                    for c, btn in swatches.items():
+                        btn.classes(add="aie-swatch-selected" if c == color else "", remove="" if c == color else "aie-swatch-selected")
+                    await ui.run_javascript(f"AIE.setAnnotationColor('{editor_id}', '{color}')", timeout=5.0)
+                    await set_mode("annotate")
+
+                for color in ANNOTATION_COLORS[:num_annotation_colors]:
+                    swatches[color] = (
+                        ui.button(on_click=lambda color=color: select_color(color))
+                        .props("unelevated dense")
+                        .classes("aie-swatch" + (" aie-swatch-selected" if color == ANNOTATION_COLORS[0] else ""))
+                        .style(f"background: {color} !important")
+                    )
+
+                ui.space()
+                ui.button(icon="delete", on_click=remove_annotations).props("flat dense size=sm").classes("text-xs").tooltip("Remove annotations")
+
         async def set_mode(mode: str) -> None:
-            for radio in (zoom_radio, mask_radio):
-                radio.props(f"model-value={mode}")
+            for radio in (zoom_radio, mask_radio, annotate_radio):
+                if radio is not None:
+                    radio.props(f"model-value={mode}")
             for slider in (brush_slider, feather_slider):
                 if mode == "mask":
                     slider.enable()
@@ -354,8 +387,13 @@ async def create_mask_editor(
         async def select_mask() -> None:
             await set_mode("mask")
 
+        async def select_annotate() -> None:
+            await set_mode("annotate")
+
         zoom_radio.on("update:model-value", select_zoom)
         mask_radio.on("update:model-value", select_mask)
+        if annotate_radio is not None:
+            annotate_radio.on("update:model-value", select_annotate)
 
     try:
         await ui.run_javascript(f"AIE.init('{editor_id}')", timeout=10.0)
@@ -373,6 +411,14 @@ async def create_mask_editor(
             return None
         return save_data_url(data_url, "mask.png")
 
+    async def get_annotation_layer_path() -> Optional[str]:
+        if not holder["path"]:
+            return None
+        data_url = await ui.run_javascript(f"AIE.getAnnotationLayerDataUrl('{editor_id}')", timeout=15.0)
+        if not data_url:
+            return None
+        return save_data_url(data_url, "annotations.png")
+
     async def set_image(path: str) -> None:
         holder["path"] = path
         await ui.run_javascript(
@@ -380,7 +426,7 @@ async def create_mask_editor(
             timeout=10.0,
         )
 
-    return holder, get_mask_path, set_image, get_feather_amount
+    return holder, get_mask_path, set_image, get_feather_amount, get_annotation_layer_path
 
 async def create_compare_slider() -> Tuple[
     Callable[[str, str], Awaitable[None]],
@@ -528,6 +574,21 @@ WIDGET_CSS = """
     background: #000;
     border: 1px solid #333;
     border-radius: 8px;
+}
+
+.aie-swatch {
+    width: 28px;
+    height: 28px;
+    min-width: 28px;
+    min-height: 28px;
+    border-radius: 6px;
+    border: 2px solid transparent;
+    padding: 0;
+}
+
+.aie-swatch-selected {
+    border-color: #ffffff;
+    box-shadow: 0 0 0 2px #7c3aed;
 }
 
 .aie-annot {
@@ -1185,8 +1246,9 @@ def run(model: ModelBackend) -> None:
                             # (nothing to choose), independent of any mask.
                             megapixels.enable()
 
-                editor_holder, get_mask_path, set_editor_image, get_feather_amount = await create_mask_editor(
-                    on_mask_change=handle_mask_change if caps.supports_inpainting else None
+                editor_holder, get_mask_path, set_editor_image, get_feather_amount, get_annotation_layer_path = await create_mask_editor(
+                    on_mask_change=handle_mask_change if caps.supports_inpainting else None,
+                    num_annotation_colors=caps.num_annotation_colors,
                 )
 
             reference_holders: List[dict] = []
@@ -1314,12 +1376,20 @@ def run(model: ModelBackend) -> None:
 
                 source_image_path = editor_holder["path"]
                 mask_path = await get_mask_path() if caps.supports_inpainting else None
+                annotated_image_path = None
+                if caps.num_annotation_colors > 0:
+                    layer_path = await get_annotation_layer_path()
+                    if layer_path:
+                        annotated_image_path = await nicegui_run.io_bound(
+                            imaging.compose_annotations, source_image_path, layer_path
+                        )
                 lora_files = available_loras.get(lora_name.value, []) if lora_name is not None else []
 
                 params = GenerationParams(
                     prompt=prompt.value or "",
                     source_image_path=source_image_path,
                     mask_path=mask_path,
+                    annotated_image_path=annotated_image_path,
                     reference_images=[h["path"] for h in reference_holders if h["path"]],
                     seed=seed_input.value,
                     randomize_seed=randomize_seed.value,
