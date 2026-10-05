@@ -28,7 +28,7 @@ from nicegui import run as nicegui_run
 from ai_image_edit.core import imaging
 from ai_image_edit.core.errors import GenerationError
 from ai_image_edit.core.paths import WORK_DIR, to_url, from_url
-from ai_image_edit.core.types import GenerationParams
+from ai_image_edit.core.types import ANNOTATION_COLORS, GenerationParams
 from ai_image_edit.models.base import ModelBackend
 
 
@@ -46,6 +46,10 @@ DEFAULT_BRUSH_SIZE = 48
 # named for consistency/discoverability rather than to keep two literals
 # from drifting apart.
 DEFAULT_FEATHER_AMOUNT = 6
+
+# Annotation stroke width in on-screen CSS pixels (converted to image pixels
+# at draw time, like the brush). Thin and fixed: there is no slider.
+ANNOTATION_STROKE = 3
 
 # This app's one accent color — the "Model: ..." subtitle's text color and
 # ui.colors()'s primary (buttons, the active-tab/slider color, etc.) both
@@ -268,6 +272,7 @@ async def create_mask_editor(
         ui.html(
             f'<div id="{editor_id}_zoomwrap" class="aie-zoomwrap">'
             f'<canvas id="{editor_id}_canvas" class="aie-canvas"></canvas>'
+            f'<canvas id="{editor_id}_annot" class="aie-annot"></canvas>'
             f'<canvas id="{editor_id}_overlay" class="aie-overlay"></canvas>'
             f'<div id="{editor_id}_placeholder" class="aie-placeholder">Click to upload an image</div>'
             f'</div>'
@@ -525,6 +530,16 @@ WIDGET_CSS = """
     border-radius: 8px;
 }
 
+.aie-annot {
+    position: absolute;
+    inset: 0;
+    box-sizing: border-box;
+    width: 100%;
+    height: 100%;
+    border: 1px solid transparent;
+    pointer-events: none;
+}
+
 .aie-overlay {
     position: absolute;
     inset: 0;
@@ -638,7 +653,7 @@ WIDGET_CSS = """
 #   AIS — the before/after comparison: a CSS clip-path dragged by a
 #         ui.slider (via js_handler), entirely client-side.
 #
-#   AIU — helpers shared by the two (pan/zoom, resetting the mask).
+#   AIU — helpers shared by the two (pan/zoom, resetting the mask and annotations).
 CLIENT_JS = r"""
 window.AIU = window.AIU || {};
 window.AIE = window.AIE || {};
@@ -750,30 +765,44 @@ AIE.init = function (id) {
     const canvas = document.getElementById(id + '_canvas');
     const maskCanvas = document.createElement('canvas');
     const overlayCanvas = document.getElementById(id + '_overlay');
+    const annotCanvas = document.getElementById(id + '_annot');
 
     // brush is stored in on-screen CSS pixels (what the slider and preview
     // circle actually show) — getScale() converts it to canvas coordinate
     // space at draw time, since the canvas's internal resolution (the
     // image's native size) is usually far larger than its rendered size.
-    // mode is 'zoom' (the default) or 'mask'; the radio group in
-    // create_mask_editor switches it. The two are mutually exclusive, so a
+    // mode is 'zoom' (the default), 'mask' or 'annotate'; the radio group
+    // in create_mask_editor switches it. They are mutually exclusive, so a
     // single finger can safely mean "pan" in zoom mode, since drawing is
-    // only ever active in mask mode.
+    // only ever active in the other two. Annotations keep a fixed thin
+    // stroke (annotStroke, CSS pixels) in the selected colour.
     const state = {
         canvas: canvas, ctx: canvas.getContext('2d'),
-        maskCanvas: maskCanvas, overlayCanvas: overlayCanvas,
+        maskCanvas: maskCanvas, overlayCanvas: overlayCanvas, annotCanvas: annotCanvas,
         zoomwrap: document.getElementById(id + '_zoomwrap'),
         img: null, drawing: false, brush: __DEFAULT_BRUSH_SIZE__, lastX: 0, lastY: 0, hasMask: false,
+        hasAnnotation: false, annotColor: '__ANNOTATION_COLOR__', annotStroke: __ANNOTATION_STROKE__,
         mode: 'zoom', scale: 1, panX: 0, panY: 0,
     };
-    // Every stroke is painted onto two layers: the exported mask, opaque
+    // A mask stroke is painted onto two layers: the exported mask, opaque
     // white, and the on-screen overlay in the tint colour, opaque on the
     // canvas and shown at 50% by CSS (.aie-overlay), so repeated strokes
-    // don't build up.
-    const layers = [
+    // don't build up. An annotation stroke goes onto the single opaque
+    // annotation layer, which is exported on its own (transparent
+    // background) and composed onto the source image by the server.
+    const maskLayers = [
         [maskCanvas.getContext('2d'), '#ffffff'],
         [overlayCanvas.getContext('2d'), '__MASK_TINT__'],
     ];
+    const annotCtx = annotCanvas.getContext('2d');
+
+    // The layers and width (canvas pixels) the current mode draws with.
+    function brushSpec() {
+        if (state.mode === 'annotate') {
+            return { layers: [[annotCtx, state.annotColor]], width: state.annotStroke * getScale() };
+        }
+        return { layers: maskLayers, width: state.brush * getScale() };
+    }
     AIE[id] = state;
 
     function getScale() {
@@ -794,37 +823,40 @@ AIE.init = function (id) {
     }
 
     function dot(x, y) {
-        const r = (state.brush * getScale()) / 2;
-        for (const [c, color] of layers) {
+        const spec = brushSpec();
+        const r = spec.width / 2;
+        for (const [c, color] of spec.layers) {
             c.beginPath(); c.fillStyle = color;
             c.arc(x, y, r, 0, Math.PI * 2); c.fill();
         }
     }
 
     function lineTo(x0, y0, x1, y1) {
-        const w = state.brush * getScale();
-        for (const [c, color] of layers) {
-            c.strokeStyle = color; c.lineWidth = w;
+        const spec = brushSpec();
+        for (const [c, color] of spec.layers) {
+            c.strokeStyle = color; c.lineWidth = spec.width;
             c.lineCap = 'round'; c.lineJoin = 'round';
             c.beginPath(); c.moveTo(x0, y0); c.lineTo(x1, y1); c.stroke();
         }
     }
 
     function down(e) {
-        if (state.mode !== 'mask' || !state.img) return;
+        if (state.mode === 'zoom' || !state.img) return;
         if (e.touches && e.touches.length !== 1) return;
         e.preventDefault();
         state.drawing = true;
         const p = getPos(e);
         state.lastX = p.x; state.lastY = p.y;
         dot(p.x, p.y);
-        if (!state.hasMask) {
+        if (state.mode === 'annotate') {
+            state.hasAnnotation = true;
+        } else if (!state.hasMask) {
             state.hasMask = true;
             emitEvent('aie_mask_state', id, true);
         }
     }
     function move(e) {
-        if (state.mode !== 'mask' || !state.drawing) return;
+        if (state.mode === 'zoom' || !state.drawing) return;
         if (e.touches && e.touches.length !== 1) return;
         e.preventDefault();
         const p = getPos(e);
@@ -854,6 +886,11 @@ AIU.resetMask = function (id, state) {
     }
 };
 
+AIU.resetAnnotations = function (state) {
+    state.annotCanvas.getContext('2d').clearRect(0, 0, state.annotCanvas.width, state.annotCanvas.height);
+    state.hasAnnotation = false;
+};
+
 AIU.showPlaceholder = function (id, visible) {
     const ph = document.getElementById(id + '_placeholder');
     if (ph) ph.style.display = visible ? 'flex' : 'none';
@@ -880,12 +917,13 @@ AIE.loadImage = function (id, url) {
     const img = new Image();
     img.onload = function () {
         state.img = img;
-        for (const c of [state.canvas, state.maskCanvas, state.overlayCanvas]) {
+        for (const c of [state.canvas, state.maskCanvas, state.overlayCanvas, state.annotCanvas]) {
             c.width = img.naturalWidth;
             c.height = img.naturalHeight;
         }
         state.ctx.drawImage(img, 0, 0);
         AIU.resetMask(id, state);
+        AIU.resetAnnotations(state);
         AIE.resetZoom(id);
         AIU.showPlaceholder(id, false);
     };
@@ -897,6 +935,11 @@ AIE.clearMask = function (id) {
     if (state && state.img) AIU.resetMask(id, state);
 };
 
+AIE.clearAnnotations = function (id) {
+    const state = AIE[id];
+    if (state && state.img) AIU.resetAnnotations(state);
+};
+
 AIE.clearImage = function (id) {
     const state = AIE[id];
     if (!state) return;
@@ -904,12 +947,17 @@ AIE.clearImage = function (id) {
     state.drawing = false;
     state.ctx.clearRect(0, 0, state.canvas.width, state.canvas.height);
     AIU.resetMask(id, state);
+    AIU.resetAnnotations(state);
     AIE.resetZoom(id);
     AIU.showPlaceholder(id, true);
 };
 
 AIE.setBrush = function (id, size) {
     if (AIE[id]) AIE[id].brush = Number(size);
+};
+
+AIE.setAnnotationColor = function (id, color) {
+    if (AIE[id]) AIE[id].annotColor = color;
 };
 
 AIE.showBrushPreview = function (id, size) {
@@ -929,6 +977,13 @@ AIE.getMaskDataUrl = function (id) {
     const state = AIE[id];
     if (!state || !state.img || !state.hasMask) return null;
     return state.maskCanvas.toDataURL('image/png');
+};
+
+// The annotation layer alone, transparent where nothing was drawn.
+AIE.getAnnotationLayerDataUrl = function (id) {
+    const state = AIE[id];
+    if (!state || !state.img || !state.hasAnnotation) return null;
+    return state.annotCanvas.toDataURL('image/png');
 };
 
 AIS.init = function (id) {
@@ -1008,6 +1063,8 @@ AIS.reset = function (id) {
 """
 CLIENT_JS = CLIENT_JS.replace("__DEFAULT_BRUSH_SIZE__", str(DEFAULT_BRUSH_SIZE))
 CLIENT_JS = CLIENT_JS.replace("__MASK_TINT__", PRIMARY_COLOR)
+CLIENT_JS = CLIENT_JS.replace("__ANNOTATION_COLOR__", ANNOTATION_COLORS[0])
+CLIENT_JS = CLIENT_JS.replace("__ANNOTATION_STROKE__", str(ANNOTATION_STROKE))
 
 # --- Page ---
 
