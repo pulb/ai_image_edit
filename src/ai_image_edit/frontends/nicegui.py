@@ -16,7 +16,7 @@ import hmac
 import os
 import uuid
 from pathlib import Path
-from typing import Awaitable, Callable, Dict, List, Optional, Tuple
+from typing import Awaitable, Callable, Dict, List, NamedTuple, Optional, Tuple
 from urllib.parse import quote
 
 from fastapi import Request
@@ -41,10 +41,8 @@ from ai_image_edit.models.base import ModelBackend
 # the Python-side ui.slider.
 DEFAULT_BRUSH_SIZE = 48
 
-# Same idea, but feather has no JS-side counterpart to keep in sync (it's
-# only ever read server-side via get_feather_amount() at Generate time) —
-# named for consistency/discoverability rather than to keep two literals
-# from drifting apart.
+# Same idea for feather: the default is duplicated into CLIENT_JS's initial
+# state (see the __DEFAULT_FEATHER_AMOUNT__ substitution) and the slider.
 DEFAULT_FEATHER_AMOUNT = 3
 
 # Annotation stroke width in on-screen CSS pixels (converted to image pixels
@@ -229,15 +227,21 @@ def create_simple_image_upload(label: str) -> dict:
 
     return holder
 
+class EditorInputs(NamedTuple):
+    """What the editor holds at Generate time: saved layer files (None if not drawn) and the Feather amount."""
+
+    mask_path: Optional[str]
+    annotation_layer_path: Optional[str]
+    feather_amount: int
+
+
 async def create_mask_editor(
     on_mask_change: Optional[Callable[[bool], None]] = None,
     num_annotation_colors: int = 0,
 ) -> Tuple[
     dict,
-    Callable[[], Awaitable[Optional[str]]],
+    Callable[[], Awaitable[EditorInputs]],
     Callable[[str], Awaitable[None]],
-    Callable[[], int],
-    Callable[[], Awaitable[Optional[str]]],
 ]:
     """
     The "Input Image" widget: click-to-upload image + a <canvas> for
@@ -252,15 +256,12 @@ async def create_mask_editor(
     If given, on_mask_change(has_mask) fires whenever the mask goes from
     empty to non-empty or back (via the 'aie_mask_state' custom event).
 
-    Returns (holder, get_mask_path, set_image, get_feather_amount,
-    get_annotation_layer_path):
+    Returns (holder, get_inputs, set_image):
       * holder['path'] is the current source image's local path (or None).
-      * get_mask_path() is async, reads the mask canvas and saves it to
-        disk, or returns None if nothing was drawn. Called once, on Generate.
-      * set_image(path) loads a new image and clears the mask.
-      * get_feather_amount() reads the Feather slider's current value.
-      * get_annotation_layer_path() is async, saves the annotation layer
-        (transparent PNG, annotations only) or returns None if none were drawn.
+      * get_inputs() is async: one browser call that reads the mask, the
+        annotation layer and the Feather amount, and saves the two layers to
+        disk. Called once, on Generate.
+      * set_image(path) loads a new image and clears the mask and annotations.
     """
     editor_id = f"edit_{uuid.uuid4().hex}"
     holder: dict = {"path": None}
@@ -354,10 +355,17 @@ async def create_mask_editor(
                 ui.label("Feather").classes("text-xs text-gray-400")
                 with ui.row().classes("w-full items-center gap-2 no-wrap"):
                     feather_slider = ui.slider(min=0, max=16, step=1, value=DEFAULT_FEATHER_AMOUNT).props("dense").classes("flex-1")
-                    ui.label().classes("text-xs text-gray-400").style("min-width: 1.5em; text-align: right").bind_text_from(
-                        feather_slider, "value"
-                    )
+                    ui.html(f'<span id="{editor_id}_feathervalue">{DEFAULT_FEATHER_AMOUNT}</span>', sanitize=False).classes(
+                        "text-xs text-gray-400"
+                    ).style("min-width: 1.5em; text-align: right")
                 feather_slider.disable()
+                feather_slider.on(
+                    "update:model-value",
+                    js_handler=(
+                        f"(value) => {{ AIE.setFeather('{editor_id}', value); "
+                        f"document.getElementById('{editor_id}_feathervalue').textContent = value; }}"
+                    ),
+                )
 
             ui.button(icon="layers_clear", on_click=remove_mask).props("flat dense size=md").classes("text-xs").tooltip("Remove mask")
 
@@ -413,24 +421,15 @@ async def create_mask_editor(
     except TimeoutError:
         print(f"[create_mask_editor] AIE.init('{editor_id}') timed out — the editor may not respond until the page is reloaded.", flush=True)
 
-    def get_feather_amount() -> int:
-        return int(feather_slider.value)
-
-    async def get_mask_path() -> Optional[str]:
-        if not holder["path"]:
-            return None
-        data_url = await ui.run_javascript(f"AIE.getMaskDataUrl('{editor_id}')", timeout=15.0)
-        if not data_url:
-            return None
-        return save_data_url(data_url, "mask.png")
-
-    async def get_annotation_layer_path() -> Optional[str]:
-        if not holder["path"]:
-            return None
-        data_url = await ui.run_javascript(f"AIE.getAnnotationLayerDataUrl('{editor_id}')", timeout=15.0)
-        if not data_url:
-            return None
-        return save_data_url(data_url, "annotations.png")
+    async def get_inputs() -> EditorInputs:
+        data = await ui.run_javascript(f"AIE.getInputs('{editor_id}')", timeout=15.0) if holder["path"] else None
+        if not data:
+            return EditorInputs(None, None, DEFAULT_FEATHER_AMOUNT)
+        return EditorInputs(
+            save_data_url(data["mask"], "mask.png") if data["mask"] else None,
+            save_data_url(data["annotations"], "annotations.png") if data["annotations"] else None,
+            int(data["feather"]),
+        )
 
     async def set_image(path: str) -> None:
         holder["path"] = path
@@ -439,7 +438,7 @@ async def create_mask_editor(
             timeout=10.0,
         )
 
-    return holder, get_mask_path, set_image, get_feather_amount, get_annotation_layer_path
+    return holder, get_inputs, set_image
 
 async def create_compare_slider() -> Tuple[
     Callable[[str, str], Awaitable[None]],
@@ -855,7 +854,7 @@ AIE.init = function (id) {
         maskCanvas: maskCanvas, overlayCanvas: overlayCanvas, annotCanvas: annotCanvas,
         zoomwrap: document.getElementById(id + '_zoomwrap'),
         img: null, drawing: false, brush: __DEFAULT_BRUSH_SIZE__, lastX: 0, lastY: 0, hasMask: false,
-        hasAnnotation: false, annotColor: '__ANNOTATION_COLOR__', annotStroke: __ANNOTATION_STROKE__,
+        feather: __DEFAULT_FEATHER_AMOUNT__, hasAnnotation: false, annotColor: '__ANNOTATION_COLOR__', annotStroke: __ANNOTATION_STROKE__,
         mode: 'zoom', scale: 1, panX: 0, panY: 0,
     };
     // A mask stroke is painted onto two layers: the exported mask, opaque
@@ -1047,17 +1046,21 @@ AIE.hideBrushPreview = function (id) {
     if (el) el.style.display = 'none';
 };
 
-AIE.getMaskDataUrl = function (id) {
-    const state = AIE[id];
-    if (!state || !state.img || !state.hasMask) return null;
-    return state.maskCanvas.toDataURL('image/png');
+AIE.setFeather = function (id, value) {
+    if (AIE[id]) AIE[id].feather = Number(value);
 };
 
-// The annotation layer alone, transparent where nothing was drawn.
-AIE.getAnnotationLayerDataUrl = function (id) {
+// Everything the server needs at Generate time, in one call: the mask and
+// the annotation layer (the annotations alone, transparent where nothing was
+// drawn) as PNG data URLs, null when not drawn, and the Feather amount.
+AIE.getInputs = function (id) {
     const state = AIE[id];
-    if (!state || !state.img || !state.hasAnnotation) return null;
-    return state.annotCanvas.toDataURL('image/png');
+    if (!state || !state.img) return null;
+    return {
+        mask: state.hasMask ? state.maskCanvas.toDataURL('image/png') : null,
+        annotations: state.hasAnnotation ? state.annotCanvas.toDataURL('image/png') : null,
+        feather: state.feather,
+    };
 };
 
 AIS.init = function (id) {
@@ -1136,6 +1139,7 @@ AIS.reset = function (id) {
 };
 """
 CLIENT_JS = CLIENT_JS.replace("__DEFAULT_BRUSH_SIZE__", str(DEFAULT_BRUSH_SIZE))
+CLIENT_JS = CLIENT_JS.replace("__DEFAULT_FEATHER_AMOUNT__", str(DEFAULT_FEATHER_AMOUNT))
 CLIENT_JS = CLIENT_JS.replace("__MASK_TINT__", PRIMARY_COLOR)
 CLIENT_JS = CLIENT_JS.replace("__ANNOTATION_COLOR__", ANNOTATION_COLORS[0])
 CLIENT_JS = CLIENT_JS.replace("__ANNOTATION_STROKE__", str(ANNOTATION_STROKE))
@@ -1259,7 +1263,7 @@ def run(model: ModelBackend) -> None:
                             # (nothing to choose), independent of any mask.
                             megapixels.enable()
 
-                editor_holder, get_mask_path, set_editor_image, get_feather_amount, get_annotation_layer_path = await create_mask_editor(
+                editor_holder, get_editor_inputs, set_editor_image = await create_mask_editor(
                     on_mask_change=handle_mask_change if caps.supports_inpainting else None,
                     num_annotation_colors=caps.num_annotation_colors,
                 )
@@ -1388,14 +1392,13 @@ def run(model: ModelBackend) -> None:
                     return
 
                 source_image_path = editor_holder["path"]
-                mask_path = await get_mask_path() if caps.supports_inpainting else None
+                editor_inputs = await get_editor_inputs()
+                mask_path = editor_inputs.mask_path if caps.supports_inpainting else None
                 annotated_image_path = None
-                if caps.num_annotation_colors > 0:
-                    layer_path = await get_annotation_layer_path()
-                    if layer_path:
-                        annotated_image_path = await nicegui_run.io_bound(
-                            imaging.compose_annotations, source_image_path, layer_path
-                        )
+                if caps.num_annotation_colors > 0 and editor_inputs.annotation_layer_path:
+                    annotated_image_path = await nicegui_run.io_bound(
+                        imaging.compose_annotations, source_image_path, editor_inputs.annotation_layer_path
+                    )
                 lora_files = available_loras.get(lora_name.value, []) if lora_name is not None else []
 
                 params = GenerationParams(
@@ -1425,7 +1428,7 @@ def run(model: ModelBackend) -> None:
                     lora_files=lora_files,
                     lora_strength=lora_strength.value if lora_strength is not None else caps.lora_strength_range.default,
                     apply_color_correction_enabled=apply_color_correction_switch.value,
-                    feather_amount=get_feather_amount() if caps.supports_inpainting else 0,
+                    feather_amount=editor_inputs.feather_amount if caps.supports_inpainting else 0,
                 )
                 result = await nicegui_run.io_bound(model.generate, params)
 
