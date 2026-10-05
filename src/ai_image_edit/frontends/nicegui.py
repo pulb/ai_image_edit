@@ -654,7 +654,9 @@ AIU.resetPanZoom = function (wrap, state) {
 };
 
 // Pan/zoom shared by the editor and the comparison slider: two-finger pinch
-// zooms wrap (clamped 1x-8x), and once zoomed in a single finger pans.
+// or Ctrl/Cmd + mouse wheel (which is also what a trackpad pinch sends)
+// zooms wrap (clamped 1x-8x), and once zoomed in a single finger or a mouse
+// drag pans. A plain wheel is left alone so the page still scrolls.
 // state holds scale/panX/panY; enabled() gates the gestures.
 AIU.attachPanZoom = function (wrap, state, enabled) {
     function distance(touches) {
@@ -706,6 +708,39 @@ AIU.attachPanZoom = function (wrap, state, enabled) {
         if (e.touches.length < 2) pinchStartDist = null;
         if (e.touches.length < 1) panStart = null;
     });
+
+    wrap.addEventListener('wheel', function (e) {
+        if (!enabled() || !(e.ctrlKey || e.metaKey)) return;
+        e.preventDefault();
+        // Zoom about the cursor: scaling happens about the element's centre,
+        // which the translation moves by pan, so the cursor is measured from
+        // the untransformed centre.
+        const rect = wrap.getBoundingClientRect();
+        const cx = e.clientX - (rect.left + rect.width / 2) + state.panX;
+        const cy = e.clientY - (rect.top + rect.height / 2) + state.panY;
+        const next = Math.min(Math.max(state.scale * Math.exp(-e.deltaY * 0.002), 1), 8);
+        const ratio = next / state.scale;
+        state.panX = cx - (cx - state.panX) * ratio;
+        state.panY = cy - (cy - state.panY) * ratio;
+        state.scale = next;
+        clampPan();
+        AIU.applyPanZoom(wrap, state);
+    }, { passive: false });
+
+    let dragStart = null;
+    wrap.addEventListener('mousedown', function (e) {
+        if (!enabled() || e.button !== 0 || state.scale <= 1) return;
+        e.preventDefault();
+        dragStart = { x: state.panX, y: state.panY, mx: e.clientX, my: e.clientY };
+    });
+    window.addEventListener('mousemove', function (e) {
+        if (!dragStart) return;
+        state.panX = dragStart.x + (e.clientX - dragStart.mx);
+        state.panY = dragStart.y + (e.clientY - dragStart.my);
+        clampPan();
+        AIU.applyPanZoom(wrap, state);
+    });
+    window.addEventListener('mouseup', function () { dragStart = null; });
 };
 
 AIE.init = function (id) {
