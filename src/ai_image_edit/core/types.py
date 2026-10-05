@@ -130,7 +130,7 @@ class GenerationParams:
     lora_strength: float = 0.7
 
     apply_color_correction_enabled: bool = False
-    feather_amount: int = 6
+    feather_amount: int = 3
 
 
 @dataclass

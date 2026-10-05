@@ -45,7 +45,7 @@ DEFAULT_BRUSH_SIZE = 48
 # only ever read server-side via get_feather_amount() at Generate time) —
 # named for consistency/discoverability rather than to keep two literals
 # from drifting apart.
-DEFAULT_FEATHER_AMOUNT = 6
+DEFAULT_FEATHER_AMOUNT = 3
 
 # Annotation stroke width in on-screen CSS pixels (converted to image pixels
 # at draw time, like the brush). Thin and fixed: there is no slider.
@@ -246,7 +246,7 @@ async def create_mask_editor(
     when num_annotation_colors > 0, annotating in one of that many colours
     (ANNOTATION_COLORS, thin fixed stroke). Drawing a stroke in mask mode
     makes this an Inpaint Edit, "Remove mask" reverts to a plain Image Edit. The Feather slider (0-16,
-    default 6) is the Gaussian blur radius composite_with_soft_transition()
+    default 3) is the Gaussian blur radius composite_with_soft_transition()
     applies to the mask edges; 0 falls back to a hard cutout.
 
     If given, on_mask_change(has_mask) fires whenever the mask goes from

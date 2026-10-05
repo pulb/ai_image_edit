@@ -282,7 +282,7 @@ def run(model: ModelBackend) -> None:
                             elem_classes="aie-image-border",
                         )
                         feather_slider = gr.Slider(
-                            minimum=0, maximum=16, step=1, value=6, label="Feather",
+                            minimum=0, maximum=16, step=1, value=3, label="Feather",
                         )
                     else:
                         edit_image = gr.Image(
@@ -290,7 +290,7 @@ def run(model: ModelBackend) -> None:
                             elem_classes="aie-image-border",
                         )
                         feather_slider = gr.Slider(
-                            minimum=0, maximum=16, step=1, value=6, label="Feather", visible=False,
+                            minimum=0, maximum=16, step=1, value=3, label="Feather", visible=False,
                         )
 
                 # --- Reference images + LoRAs ---
