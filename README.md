@@ -56,6 +56,7 @@ Copyright (C) 2026 AI Image Edit authors
 
 ## Screenshots
 
-<a href="doc/screenshots/app.png"><img src="doc/screenshots/app.png" alt="Replacing an animal in a masked photo" width="96" align="top"></a>
-<a href="doc/screenshots/app2.png"><img src="doc/screenshots/app2.png" alt="Turning a drawing into an action figure" width="96" align="top"></a>
-<a href="doc/screenshots/app3.png"><img src="doc/screenshots/app3.png" alt="Changing the perspective of a photo" width="96" align="top"></a>
+<a href="doc/screenshots/inpainting.png"><img src="doc/screenshots/inpainting.png" alt="Replacing an animal in a masked photo, using a reference image" width="22%" align="top"></a>
+<a href="doc/screenshots/annotations.png"><img src="doc/screenshots/annotations.png" alt="Placing things in a photo with colored annotations" width="22%" align="top"></a>
+<a href="doc/screenshots/sketch_to_figure.png"><img src="doc/screenshots/sketch_to_figure.png" alt="Turning a drawing into an action figure" width="22%" align="top"></a>
+<a href="doc/screenshots/perspective.png"><img src="doc/screenshots/perspective.png" alt="Changing the perspective of a photo" width="22%" align="top"></a>
