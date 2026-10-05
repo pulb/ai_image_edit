@@ -9,3 +9,8 @@ Adding a frontend means writing a module that exposes
 
 Add the new backend's or frontend's dependencies as an extra in
 `pyproject.toml`, named `<name>_backend` or `<name>_frontend`.
+
+A backend that runs `imaging.run_masked_generation` should wrap its infer
+callback with `result_cache.cached_infer(...)`, passing every value that
+affects the output, so a repeated generation (for example after changing only
+the mask) reuses the previous result. The cache is currently single-user.

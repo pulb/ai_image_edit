@@ -26,6 +26,7 @@ from ai_image_edit_qwen import pipeline
 from PIL import Image
 
 from ai_image_edit.core import imaging
+from ai_image_edit.core.result_cache import cached_infer
 from ai_image_edit.core.errors import GenerationError
 from ai_image_edit.core.paths import WORK_DIR
 from ai_image_edit.core.types import GenerationParams, GenerationResult, ModelCapabilities, RangeSpec
@@ -245,6 +246,11 @@ class QwenImageModel(ModelBackend):
             image.save(out_path)
             return str(out_path)
 
+        infer = cached_infer(
+            _infer, self.display_name, params,
+            seed=resolved_seed, resolution=resolution, width=gen_width, height=gen_height,
+        )
+
         final_output_path = imaging.run_masked_generation(
             params.source_image_path,
             params.mask_path,
@@ -252,7 +258,7 @@ class QwenImageModel(ModelBackend):
             gen_height,
             params.feather_amount,
             params.apply_color_correction_enabled,
-            _infer,
+            infer,
             params.annotated_image_path,
         )
 

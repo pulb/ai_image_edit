@@ -26,6 +26,7 @@ from PIL import Image
 
 from ai_image_edit.core import imaging
 from ai_image_edit.core.errors import GenerationError
+from ai_image_edit.core.result_cache import cached_infer
 from ai_image_edit.core.types import GenerationParams, GenerationResult, ModelCapabilities, RangeSpec
 from ai_image_edit.models.base import ModelBackend
 from ai_image_edit.models.qwen_image_edit_comfy import comfy_client
@@ -353,6 +354,8 @@ class QwenImageEditComfyModel(ModelBackend):
             print(f"[qwen_image_edit_comfy] fetch_generated_image took {time.time() - t1:.1f}s", flush=True)
             return output_path
 
+        infer = cached_infer(_infer, self.display_name, params, seed=actual_seed, width=gen_width, height=gen_height)
+
         final_output_path = imaging.run_masked_generation(
             params.source_image_path,
             params.mask_path,
@@ -360,7 +363,7 @@ class QwenImageEditComfyModel(ModelBackend):
             gen_height,
             params.feather_amount,
             params.apply_color_correction_enabled,
-            _infer,
+            infer,
             params.annotated_image_path,
         )
 
