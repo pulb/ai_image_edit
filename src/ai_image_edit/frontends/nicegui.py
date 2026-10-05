@@ -25,6 +25,7 @@ from nicegui import app, ui
 from starlette.middleware.base import BaseHTTPMiddleware
 from nicegui import run as nicegui_run
 
+from ai_image_edit.core import imaging
 from ai_image_edit.core.errors import GenerationError
 from ai_image_edit.core.paths import WORK_DIR, to_url, from_url
 from ai_image_edit.core.types import GenerationParams
@@ -65,12 +66,14 @@ async def save_uploaded_file(file) -> str:
     documented method for this (nicegui.elements.upload_files.FileUpload.save).
     Always writes to a fresh, server-generated name — file.name (already
     sanitized by NiceGUI itself) is only used for its extension, read via
-    pathlib so it can't smuggle in a path.
+    pathlib so it can't smuggle in a path. The saved file is made upright
+    if it carries an EXIF orientation (see imaging.apply_exif_orientation).
     """
     suffix = Path(file.name).suffix or ".png"
     stem = Path(file.name).stem or "upload"
     path = WORK_DIR / f"{stem}_{uuid.uuid4().hex}{suffix}"
     await file.save(path)
+    await nicegui_run.io_bound(imaging.apply_exif_orientation, str(path))
     return str(path)
 
 def save_data_url(data_url: str, filename_hint: str = "mask.png") -> str:

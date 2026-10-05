@@ -12,7 +12,7 @@ import uuid
 from typing import Callable, List, Optional, Tuple
 
 import numpy as np
-from PIL import Image, ImageFilter
+from PIL import Image, ImageFilter, ImageOps
 
 from ai_image_edit.core.paths import WORK_DIR
 
@@ -157,6 +157,23 @@ def apply_color_correction(img: Image.Image, corrections: List[Tuple[float, floa
         arr[:, :, i] = arr[:, :, i] * scale + shift
     rgb = lab_to_rgb(arr)
     return Image.fromarray(rgb.astype(np.uint8), mode="RGB")
+
+
+def apply_exif_orientation(image_path: str) -> None:
+    """
+    Rotates/flips the image file in place if its EXIF orientation says so, so
+    the stored pixels are upright. Browsers show such images upright while
+    PIL (and a model fed raw pixels) sees them sideways, which misaligns
+    anything drawn in the browser, such as the mask. Files without an
+    orientation, or an upright one, are left untouched.
+    """
+    with Image.open(image_path) as img:
+        if img.getexif().get(0x0112, 1) == 1:
+            return
+        fmt = img.format
+        upright = ImageOps.exif_transpose(img)
+    options = {"quality": 95} if fmt in ("JPEG", "WEBP") else {}
+    upright.save(image_path, format=fmt, **options)
 
 
 def resize_to_cover_and_crop(image: Image.Image, target_w: int, target_h: int, resample: int) -> Image.Image:
