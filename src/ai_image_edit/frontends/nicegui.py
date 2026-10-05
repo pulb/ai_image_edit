@@ -232,9 +232,9 @@ async def create_mask_editor(
 ]:
     """
     The "Input Image" widget: click-to-upload image + a <canvas> for
-    drawing an optional inpainting mask, with a resizable brush. The lock
-    button toggles between pan/zoom (locked, default) and mask drawing
-    (unlocked); drawing a stroke while unlocked makes this an Inpaint Edit,
+    drawing an optional inpainting mask, with a resizable brush. A radio
+    group switches between pinch-to-zoom (default) and mask drawing;
+    drawing a stroke in mask mode makes this an Inpaint Edit,
     "Remove mask" reverts to a plain Image Edit. The Feather slider (0-16,
     default 6) is the Gaussian blur radius composite_with_soft_transition()
     applies to the mask edges; 0 falls back to a hard cutout.
@@ -303,42 +303,51 @@ async def create_mask_editor(
 
         ui.button("Clear", on_click=clear_image).props("flat dense size=sm").classes("text-xs")
 
-    with ui.row().classes("w-full items-center gap-3 p-2 bg-neutral-900 rounded-lg"):
-        with ui.column().classes("flex-1 gap-3"):
-            ui.label("Brush size").classes("text-xs text-gray-400")
-            brush_slider = ui.slider(min=5, max=80, step=1, value=DEFAULT_BRUSH_SIZE).props("label-always dense")
-            brush_slider.disable()
-            # js_handler runs entirely in the browser, no server round-trip
-            # (see CLIENT_JS's AIE comment for why that matters for a
-            # dragged brush size) — 'update:model-value' fires continuously
-            # while dragging; 'change' fires once on release.
-            brush_slider.on(
-                "update:model-value",
-                js_handler=f"(value) => {{ AIE.setBrush('{editor_id}', value); AIE.showBrushPreview('{editor_id}', value); }}",
-            )
-            brush_slider.on("change", js_handler=f"() => AIE.hideBrushPreview('{editor_id}')")
+    with ui.column().classes("w-full gap-1 p-2 bg-neutral-900 rounded-lg"):
+        # One q-radio per row (ui.radio is a single vertical option list and
+        # cannot hold the sliders), all showing the same current mode.
+        zoom_radio = ui.element("q-radio").props('val=zoom model-value=zoom label="Pinch to zoom"')
 
-        with ui.column().classes("flex-1 gap-3"):
-            ui.label("Feather").classes("text-xs text-gray-400")
-            feather_slider = ui.slider(min=0, max=16, step=1, value=DEFAULT_FEATHER_AMOUNT).props("label-always dense")
-            feather_slider.disable()
+        with ui.row().classes("w-full items-center gap-3 no-wrap"):
+            mask_radio = ui.element("q-radio").props('val=mask model-value=zoom label="Mask"')
 
-        lock_state = {"locked": True}
-
-        async def toggle_lock() -> None:
-            lock_state["locked"] = not lock_state["locked"]
-            lock_btn.props(f"icon={'lock' if lock_state['locked'] else 'lock_open'}")
-            if lock_state["locked"]:
+            with ui.column().classes("flex-1 gap-3"):
+                ui.label("Brush size").classes("text-xs text-gray-400")
+                brush_slider = ui.slider(min=5, max=80, step=1, value=DEFAULT_BRUSH_SIZE).props("label-always dense")
                 brush_slider.disable()
-                feather_slider.disable()
-            else:
-                brush_slider.enable()
-                feather_slider.enable()
-            await ui.run_javascript(
-                f"AIE.setLocked('{editor_id}', {str(lock_state['locked']).lower()})", timeout=5.0
-            )
+                # js_handler runs entirely in the browser, no server round-trip
+                # (see CLIENT_JS's AIE comment for why that matters for a
+                # dragged brush size) — 'update:model-value' fires continuously
+                # while dragging; 'change' fires once on release.
+                brush_slider.on(
+                    "update:model-value",
+                    js_handler=f"(value) => {{ AIE.setBrush('{editor_id}', value); AIE.showBrushPreview('{editor_id}', value); }}",
+                )
+                brush_slider.on("change", js_handler=f"() => AIE.hideBrushPreview('{editor_id}')")
 
-        lock_btn = ui.button(icon="lock", on_click=toggle_lock).props("flat dense size=md")
+            with ui.column().classes("flex-1 gap-3"):
+                ui.label("Feather").classes("text-xs text-gray-400")
+                feather_slider = ui.slider(min=0, max=16, step=1, value=DEFAULT_FEATHER_AMOUNT).props("label-always dense")
+                feather_slider.disable()
+
+        async def set_mode(mode: str) -> None:
+            for radio in (zoom_radio, mask_radio):
+                radio.props(f"model-value={mode}")
+            for slider in (brush_slider, feather_slider):
+                if mode == "mask":
+                    slider.enable()
+                else:
+                    slider.disable()
+            await ui.run_javascript(f"AIE.setMode('{editor_id}', '{mode}')", timeout=5.0)
+
+        async def select_zoom() -> None:
+            await set_mode("zoom")
+
+        async def select_mask() -> None:
+            await set_mode("mask")
+
+        zoom_radio.on("update:model-value", select_zoom)
+        mask_radio.on("update:model-value", select_mask)
 
     try:
         await ui.run_javascript(f"AIE.init('{editor_id}')", timeout=10.0)
@@ -708,16 +717,16 @@ AIE.init = function (id) {
     // circle actually show) — getScale() converts it to canvas coordinate
     // space at draw time, since the canvas's internal resolution (the
     // image's native size) is usually far larger than its rendered size.
-    // locked starts true: pan/zoom is the default mode; the lock button
-    // switches to mask drawing. The two are mutually exclusive, so a single
-    // finger can safely mean "pan" here, since drawing is only ever active
-    // while unlocked.
+    // mode is 'zoom' (the default) or 'mask'; the radio group in
+    // create_mask_editor switches it. The two are mutually exclusive, so a
+    // single finger can safely mean "pan" in zoom mode, since drawing is
+    // only ever active in mask mode.
     const state = {
         canvas: canvas, ctx: canvas.getContext('2d'),
         maskCanvas: maskCanvas, overlayCanvas: overlayCanvas,
         zoomwrap: document.getElementById(id + '_zoomwrap'),
         img: null, drawing: false, brush: __DEFAULT_BRUSH_SIZE__, lastX: 0, lastY: 0, hasMask: false,
-        locked: true, scale: 1, panX: 0, panY: 0,
+        mode: 'zoom', scale: 1, panX: 0, panY: 0,
     };
     // Every stroke is painted onto two layers: the exported mask, opaque
     // white, and the on-screen overlay in the tint colour, opaque on the
@@ -764,7 +773,7 @@ AIE.init = function (id) {
     }
 
     function down(e) {
-        if (state.locked || !state.img) return;
+        if (state.mode !== 'mask' || !state.img) return;
         if (e.touches && e.touches.length !== 1) return;
         e.preventDefault();
         state.drawing = true;
@@ -777,7 +786,7 @@ AIE.init = function (id) {
         }
     }
     function move(e) {
-        if (state.locked || !state.drawing) return;
+        if (state.mode !== 'mask' || !state.drawing) return;
         if (e.touches && e.touches.length !== 1) return;
         e.preventDefault();
         const p = getPos(e);
@@ -793,7 +802,7 @@ AIE.init = function (id) {
     canvas.addEventListener('touchmove', move, { passive: false });
     canvas.addEventListener('touchend', up);
 
-    if (state.zoomwrap) AIU.attachPanZoom(state.zoomwrap, state, function () { return state.locked; });
+    if (state.zoomwrap) AIU.attachPanZoom(state.zoomwrap, state, function () { return state.mode === 'zoom'; });
 };
 
 // Empties both mask layers and reports the mask as gone if it wasn't already.
@@ -812,12 +821,14 @@ AIU.showPlaceholder = function (id, visible) {
     if (ph) ph.style.display = visible ? 'flex' : 'none';
 };
 
-AIE.setLocked = function (id, locked) {
+AIE.setMode = function (id, mode) {
     // Brush/Feather sliders are NiceGUI ui.slider widgets, so their enabled
-    // state is toggled from Python (see toggle_lock in create_mask_editor)
+    // state is toggled from Python (see set_mode in create_mask_editor)
     // rather than by reaching into the DOM here.
     const state = AIE[id];
-    if (state) state.locked = locked;
+    if (!state) return;
+    state.mode = mode;
+    state.drawing = false;
 };
 
 AIE.resetZoom = function (id) {
