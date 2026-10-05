@@ -78,7 +78,8 @@ class ModelCapabilities:
     supports_negative_prompt: bool = False
 
     # How many annotation colours the model understands (the first N of
-    # ANNOTATION_COLORS); 0 hides the annotate control entirely. Annotations
+    # ANNOTATION_COLORS, clipped to the palette's length if N is larger);
+    # 0 hides the annotate control entirely. Annotations
     # are strokes drawn on the source image that the model reads as part of
     # the picture.
     num_annotation_colors: int = 0
