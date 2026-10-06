@@ -24,9 +24,18 @@ Rules for any AI coding agent working in this repository.
   (`-c gpg.format=openpgp -c user.signingkey=<fingerprint>
   -c commit.gpgsign=true`) — never by editing git config. The format must
   be set explicitly because the environment's default may be SSH signing.
-  Check the result with `git log -1 --format=%G?`; if no key is available,
-  say so instead of committing with another key. Never re-author or amend
-  commits to satisfy a hook.
+  The git config's author and committer are usually not the user, so also
+  set `GIT_AUTHOR_NAME`, `GIT_AUTHOR_EMAIL`, `GIT_COMMITTER_NAME` and
+  `GIT_COMMITTER_EMAIL` to the identity the user specified for commits, so
+  the platform can match the committer to the signing key. If no key is
+  available, say so instead of committing with another key.
+- After every commit, check that `git log -1 --format=%G?` prints `G` and
+  that `git cat-file -p HEAD | grep -E '^(author|committer)'` shows the
+  user's specified identity on both lines, with the signing key belonging
+  to that identity. Any other identity, including a Claude or harness
+  default, is a failure. If either check fails, print a prominent warning
+  (e.g. `WARNING: commit <hash> is not correctly signed/attributed: <what
+  failed>`) in the reply and do not push.
 - When a stop hook complains about repository state, reply with one line
   naming that state and nothing else, e.g. `git hook: you have uncommitted
   changes`, `git hook: you have untracked files`, `git hook: you have
