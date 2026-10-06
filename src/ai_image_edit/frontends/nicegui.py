@@ -608,8 +608,6 @@ WIDGET_CSS = """
     min-width: 28px;
     min-height: 28px;
     padding: 0;
-    background: #fff !important;
-    color: __CLEAR_ICON_COLOR__ !important;
     box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
 }
 
@@ -744,7 +742,6 @@ WIDGET_CSS = """
     margin: 0 auto;
 }
 """
-WIDGET_CSS = WIDGET_CSS.replace("__CLEAR_ICON_COLOR__", PRIMARY_COLOR)
 
 # --- Client-side JS ---
 # Three small namespaces, defined once as generic functions keyed by an
