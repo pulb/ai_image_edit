@@ -24,6 +24,17 @@ class RangeSpec:
     step: float = 1.0
 
 
+# The "derive the output size from the source image" aspect ratio label.
+ORIGINAL_ASPECT_RATIO = "Original"
+
+# The seed both frontends start with.
+DEFAULT_SEED = 65454653
+
+# Inpainting mask edge softness (Gaussian blur radius), shared by the
+# frontends' Feather slider and GenerationParams.feather_amount.
+FEATHER_RANGE = RangeSpec(0, 16, 3, step=1)
+
+
 @dataclass(frozen=True)
 class ModelCapabilities:
     """
@@ -104,6 +115,10 @@ class GenerationParams:
     source_image_path: str
     mask_path: Optional[str]
 
+    # No default: the sensible step count is model-specific (see
+    # capabilities.step_range), so the caller always states it.
+    steps: int
+
     # Extra reference images beyond the primary source, in order. Length
     # is bounded by capabilities.max_reference_images - 1.
     reference_images: List[str] = field(default_factory=list)
@@ -116,10 +131,9 @@ class GenerationParams:
     seed: int = 0
     randomize_seed: bool = True
 
-    aspect_ratio: str = "Original"
+    aspect_ratio: str = ORIGINAL_ASPECT_RATIO
     target_megapixels: float = 1.0
 
-    steps: int = 4
     cfg: float = 1.0
     denoise: float = 1.0
     sampler_name: Optional[str] = None
@@ -130,7 +144,7 @@ class GenerationParams:
     lora_strength: float = 0.7
 
     apply_color_correction_enabled: bool = False
-    feather_amount: int = 3
+    feather_amount: int = int(FEATHER_RANGE.default)
 
 
 @dataclass

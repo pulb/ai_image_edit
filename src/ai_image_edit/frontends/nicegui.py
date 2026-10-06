@@ -13,6 +13,7 @@ import asyncio
 import base64
 import hashlib
 import hmac
+import json
 import os
 import uuid
 from pathlib import Path
@@ -26,9 +27,18 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from nicegui import run as nicegui_run
 
 from ai_image_edit.core import imaging
-from ai_image_edit.core.errors import GenerationError
 from ai_image_edit.core.paths import WORK_DIR, to_url, from_url
-from ai_image_edit.core.types import ANNOTATION_COLORS, GenerationParams, RangeSpec
+from ai_image_edit.core.types import (
+    ANNOTATION_COLORS, DEFAULT_SEED, FEATHER_RANGE, ORIGINAL_ASPECT_RATIO, RangeSpec,
+)
+from ai_image_edit.frontends.common import (
+    HOST,
+    PORT,
+    PRIMARY_COLOR,
+    default_choice,
+    describe_error,
+    params_from_ui,
+)
 from ai_image_edit.models.base import ModelBackend
 
 
@@ -43,16 +53,11 @@ DEFAULT_BRUSH_SIZE = 48
 
 # Same idea for feather: the default is duplicated into CLIENT_JS's initial
 # state (see the __DEFAULT_FEATHER_AMOUNT__ substitution) and the slider.
-DEFAULT_FEATHER_AMOUNT = 3
+DEFAULT_FEATHER_AMOUNT = int(FEATHER_RANGE.default)
 
 # Annotation stroke width in on-screen CSS pixels (converted to image pixels
 # at draw time, like the brush). Thin and fixed: there is no slider.
 ANNOTATION_STROKE = 3
-
-# This app's one accent color — the "Model: ..." subtitle's text color and
-# ui.colors()'s primary (buttons, the active-tab/slider color, etc.) both
-# read from here so they can't drift apart.
-PRIMARY_COLOR = "#7c3aed"
 
 
 # --- Small file helpers shared by the UI layer ---
@@ -130,8 +135,7 @@ def install_password_login(password: str) -> str:
                 await asyncio.sleep(1.0)
                 ui.notify("Wrong password", color="negative")
 
-        ui.dark_mode().enable()
-        ui.colors(primary=PRIMARY_COLOR, dark="#111111", dark_page="#000000")
+        apply_dark_theme()
         with ui.card().classes("absolute-center items-stretch"):
             field = ui.input("Password", password=True, password_toggle_button=True).props("autofocus")
             field.on("keydown.enter", try_login)
@@ -139,6 +143,32 @@ def install_password_login(password: str) -> str:
         return None
 
     return os.environ.get("APP_STORAGE_SECRET") or hashlib.sha256(f"ai-image-edit-session:{password}".encode()).hexdigest()
+
+
+def call_js(ns: str, fn: str, *args, timeout: float = 5.0):
+    """Await `ns.fn(*args)` in the browser; arguments are JSON-encoded."""
+    arglist = ", ".join(json.dumps(a) for a in args)
+    return ui.run_javascript(f"{ns}.{fn}({arglist})", timeout=timeout)
+
+
+async def init_widget(ns: str, widget_id: str, label: str) -> None:
+    """Run `ns.init(widget_id)`; a timeout is logged, not fatal."""
+    try:
+        await call_js(ns, "init", widget_id, timeout=10.0)
+    except TimeoutError:
+        print(f"[{label}] {ns}.init('{widget_id}') timed out — the widget may not respond until the page is reloaded.", flush=True)
+
+
+def apply_dark_theme() -> None:
+    """
+    Dark mode in this app's colours. dark_page is Quasar's page/body
+    background variable, dark is the surface color for dark-mode components
+    like ui.card — the documented way to set these
+    (nicegui.io/documentation/colors) rather than a manual `!important` CSS
+    override fighting Quasar's own theme layer.
+    """
+    ui.dark_mode().enable()
+    ui.colors(primary=PRIMARY_COLOR, dark="#111111", dark_page="#000000")
 
 
 def create_hidden_uploader() -> ui.upload:
@@ -331,7 +361,7 @@ async def create_mask_editor(
     async def clear_image() -> None:
         holder["path"] = None
         badge.set_visibility(False)
-        await ui.run_javascript(f"AIE.clearImage('{editor_id}')", timeout=5.0)
+        await call_js("AIE", "clearImage", editor_id)
 
     editor_box, badge = create_image_frame("aie-editor-box", clear_image)
     with editor_box:
@@ -348,7 +378,7 @@ async def create_mask_editor(
 
     async def handle_file(path: str) -> None:
         holder["path"] = path
-        await ui.run_javascript(f"AIE.loadImage('{editor_id}', '{to_url(path)}')", timeout=10.0)
+        await call_js("AIE", "loadImage", editor_id, to_url(path), timeout=10.0)
         badge.set_visibility(True)
 
     # Once an image is loaded, a click on the box draws on the canvas instead
@@ -357,10 +387,10 @@ async def create_mask_editor(
     attach_file_picker(editor_box, handle_file, enabled=lambda: not holder["path"])
 
     async def remove_mask() -> None:
-        await ui.run_javascript(f"AIE.clearMask('{editor_id}')", timeout=5.0)
+        await call_js("AIE", "clearMask", editor_id)
 
     async def remove_annotations() -> None:
-        await ui.run_javascript(f"AIE.clearAnnotations('{editor_id}')", timeout=5.0)
+        await call_js("AIE", "clearAnnotations", editor_id)
 
     swatches: Dict[str, ui.button] = {}
 
@@ -398,7 +428,7 @@ async def create_mask_editor(
             with ui.column().classes("flex-1 gap-1"):
                 ui.label("Feather").classes("text-xs text-gray-400")
                 with ui.row().classes("w-full items-center gap-1 no-wrap"):
-                    feather_slider = ui.slider(min=0, max=16, step=1, value=DEFAULT_FEATHER_AMOUNT).props("dense").classes("flex-1")
+                    feather_slider = ui.slider(min=FEATHER_RANGE.min, max=FEATHER_RANGE.max, step=FEATHER_RANGE.step, value=DEFAULT_FEATHER_AMOUNT).props("dense").classes("flex-1")
                     ui.html(f'<span id="{editor_id}_feathervalue">{DEFAULT_FEATHER_AMOUNT}</span>', sanitize=False).classes(
                         "text-xs text-gray-400"
                     ).style("min-width: 1.5em")
@@ -421,7 +451,7 @@ async def create_mask_editor(
                 async def select_color(color: str) -> None:
                     for c, btn in swatches.items():
                         btn.classes(add="aie-swatch-selected" if c == color else "", remove="" if c == color else "aie-swatch-selected")
-                    await ui.run_javascript(f"AIE.setAnnotationColor('{editor_id}', '{color}')", timeout=5.0)
+                    await call_js("AIE", "setAnnotationColor", editor_id, color)
                     await set_mode("annotate")
 
                 for color in ANNOTATION_COLORS[:num_annotation_colors]:
@@ -444,7 +474,7 @@ async def create_mask_editor(
                     slider.enable()
                 else:
                     slider.disable()
-            await ui.run_javascript(f"AIE.setMode('{editor_id}', '{mode}')", timeout=5.0)
+            await call_js("AIE", "setMode", editor_id, mode)
 
         async def select_zoom() -> None:
             await set_mode("zoom")
@@ -460,13 +490,10 @@ async def create_mask_editor(
         if annotate_radio is not None:
             annotate_radio.on("update:model-value", select_annotate)
 
-    try:
-        await ui.run_javascript(f"AIE.init('{editor_id}')", timeout=10.0)
-    except TimeoutError:
-        print(f"[create_mask_editor] AIE.init('{editor_id}') timed out — the editor may not respond until the page is reloaded.", flush=True)
+    await init_widget("AIE", editor_id, "create_mask_editor")
 
     async def get_inputs() -> EditorInputs:
-        data = await ui.run_javascript(f"AIE.getInputs('{editor_id}')", timeout=15.0) if holder["path"] else None
+        data = await call_js("AIE", "getInputs", editor_id, timeout=15.0) if holder["path"] else None
         if not data:
             return EditorInputs(None, None, DEFAULT_FEATHER_AMOUNT)
         return EditorInputs(
@@ -477,10 +504,7 @@ async def create_mask_editor(
 
     async def set_image(path: str) -> None:
         holder["path"] = path
-        await ui.run_javascript(
-            f"AIE.loadImage('{editor_id}', '{to_url(path)}')",
-            timeout=10.0,
-        )
+        await call_js("AIE", "loadImage", editor_id, to_url(path), timeout=10.0)
         badge.set_visibility(True)
 
     return holder, get_inputs, set_image
@@ -531,10 +555,7 @@ async def create_compare_slider() -> Tuple[
             js_handler=f"(value) => AIS.applyClip('{slider_id}', value)",
         )
 
-    try:
-        await ui.run_javascript(f"AIS.init('{slider_id}')", timeout=10.0)
-    except TimeoutError:
-        print(f"[create_compare_slider] AIS.init('{slider_id}') timed out — the compare slider may not respond until the page is reloaded.", flush=True)
+    await init_widget("AIS", slider_id, "create_compare_slider")
 
     async def set_images(before_path: str, after_path: str) -> None:
         # The slider position itself is set from Python (NiceGUI's own
@@ -545,19 +566,16 @@ async def create_compare_slider() -> Tuple[
         # to match via AIS.applyClip(id, 50), since setting the Python
         # value alone doesn't touch the clip-path.
         range_slider.set_value(50)
-        await ui.run_javascript(
-            f"AIS.setImages('{slider_id}', '{to_url(before_path)}', '{to_url(after_path)}')",
-            timeout=10.0,
-        )
+        await call_js("AIS", "setImages", slider_id, to_url(before_path), to_url(after_path), timeout=10.0)
 
     async def set_compare(enabled: bool) -> None:
-        await ui.run_javascript(f"AIS.setCompare('{slider_id}', {str(bool(enabled)).lower()})", timeout=5.0)
+        await call_js("AIS", "setCompare", slider_id, bool(enabled))
 
     async def reset() -> None:
-        await ui.run_javascript(f"AIS.reset('{slider_id}')", timeout=5.0)
+        await call_js("AIS", "reset", slider_id)
 
     async def get_after_path() -> Optional[str]:
-        url = await ui.run_javascript(f"AIS.getAfterUrl('{slider_id}')", timeout=5.0)
+        url = await call_js("AIS", "getAfterUrl", slider_id)
         return from_url(url) if url else None
 
     return set_images, set_compare, reset, get_after_path
@@ -675,7 +693,7 @@ WIDGET_CSS = """
 
 .aie-swatch-selected {
     border-color: #ffffff;
-    box-shadow: 0 0 0 2px #7c3aed;
+    box-shadow: 0 0 0 2px __PRIMARY_COLOR__;
 }
 
 .aie-annot,
@@ -777,13 +795,18 @@ WIDGET_CSS = """
 #   AIS — the before/after comparison: a CSS clip-path dragged by a
 #         ui.slider (via js_handler), entirely client-side.
 #
-#   AIU — helpers shared by the two (pan/zoom, resetting the mask and annotations).
+#   AIU — pan/zoom helpers shared by the two.
 CLIENT_JS = r"""
 window.AIU = window.AIU || {};
 window.AIE = window.AIE || {};
 window.AIS = window.AIS || {};
 
 // Shared helpers.
+// A widget's state object: the pan/zoom fields plus whatever it adds.
+AIU.newPanZoomState = function (extra) {
+    return Object.assign({ scale: 1, panX: 0, panY: 0 }, extra);
+};
+
 AIU.applyPanZoom = function (wrap, state) {
     wrap.style.transform = 'translate(' + state.panX + 'px, ' + state.panY + 'px) scale(' + state.scale + ')';
 };
@@ -900,14 +923,14 @@ AIE.init = function (id) {
     // single finger can safely mean "pan" in zoom mode, since drawing is
     // only ever active in the other two. Annotations keep a fixed thin
     // stroke (annotStroke, CSS pixels) in the selected colour.
-    const state = {
+    const state = AIU.newPanZoomState({
         canvas: canvas, ctx: canvas.getContext('2d'),
         maskCanvas: maskCanvas, overlayCanvas: overlayCanvas, annotCanvas: annotCanvas,
         zoomwrap: document.getElementById(id + '_zoomwrap'),
         img: null, drawing: false, brush: __DEFAULT_BRUSH_SIZE__, lastX: 0, lastY: 0, hasMask: false,
         feather: __DEFAULT_FEATHER_AMOUNT__, hasAnnotation: false, annotColor: '__ANNOTATION_COLOR__', annotStroke: __ANNOTATION_STROKE__,
-        mode: 'zoom', scale: 1, panX: 0, panY: 0,
-    };
+        mode: 'zoom',
+    });
     // A mask stroke is painted onto two layers: the exported mask, opaque
     // white, and the on-screen overlay in the tint colour, opaque on the
     // canvas and shown at 50% by CSS (.aie-overlay), so repeated strokes
@@ -928,7 +951,7 @@ AIE.init = function (id) {
         return { layers: maskLayers, width: state.brush * getScale() };
     }
     AIE[id] = state;
-    AIU.showPlaceholder(id, true);
+    AIE.showPlaceholder(id, true);
 
     function getScale() {
         const rect = canvas.getBoundingClientRect();
@@ -1001,7 +1024,7 @@ AIE.init = function (id) {
 };
 
 // Empties both mask layers and reports the mask as gone if it wasn't already.
-AIU.resetMask = function (id, state) {
+AIE.resetMask = function (id, state) {
     for (const c of [state.maskCanvas, state.overlayCanvas]) {
         c.getContext('2d').clearRect(0, 0, c.width, c.height);
     }
@@ -1011,12 +1034,12 @@ AIU.resetMask = function (id, state) {
     }
 };
 
-AIU.resetAnnotations = function (state) {
+AIE.resetAnnotations = function (state) {
     state.annotCanvas.getContext('2d').clearRect(0, 0, state.annotCanvas.width, state.annotCanvas.height);
     state.hasAnnotation = false;
 };
 
-AIU.showPlaceholder = function (id, visible) {
+AIE.showPlaceholder = function (id, visible) {
     const ph = document.getElementById(id + '_placeholder');
     if (ph) ph.style.display = visible ? 'flex' : 'none';
     const box = ph && ph.closest('.aie-editor-box');
@@ -1049,22 +1072,22 @@ AIE.loadImage = function (id, url) {
             c.height = img.naturalHeight;
         }
         state.ctx.drawImage(img, 0, 0);
-        AIU.resetMask(id, state);
-        AIU.resetAnnotations(state);
+        AIE.resetMask(id, state);
+        AIE.resetAnnotations(state);
         AIE.resetZoom(id);
-        AIU.showPlaceholder(id, false);
+        AIE.showPlaceholder(id, false);
     };
     img.src = url;
 };
 
 AIE.clearMask = function (id) {
     const state = AIE[id];
-    if (state && state.img) AIU.resetMask(id, state);
+    if (state && state.img) AIE.resetMask(id, state);
 };
 
 AIE.clearAnnotations = function (id) {
     const state = AIE[id];
-    if (state && state.img) AIU.resetAnnotations(state);
+    if (state && state.img) AIE.resetAnnotations(state);
 };
 
 AIE.clearImage = function (id) {
@@ -1073,10 +1096,10 @@ AIE.clearImage = function (id) {
     state.img = null;
     state.drawing = false;
     state.ctx.clearRect(0, 0, state.canvas.width, state.canvas.height);
-    AIU.resetMask(id, state);
-    AIU.resetAnnotations(state);
+    AIE.resetMask(id, state);
+    AIE.resetAnnotations(state);
     AIE.resetZoom(id);
-    AIU.showPlaceholder(id, true);
+    AIE.showPlaceholder(id, true);
 };
 
 AIE.setBrush = function (id, size) {
@@ -1121,10 +1144,10 @@ AIS.init = function (id) {
     // sliderValue is tracked here (rather than read back from the slider's
     // own DOM) since range_slider is a Quasar-rendered ui.slider, not a raw
     // <input> with a plain .value property.
-    const state = {
+    const state = AIU.newPanZoomState({
         wrap: document.getElementById(id + '_zoomwrap'),
-        compare: false, sliderValue: 50, scale: 1, panX: 0, panY: 0,
-    };
+        compare: false, sliderValue: 50,
+    });
     AIS[id] = state;
     if (state.wrap) AIU.attachPanZoom(state.wrap, state, function () { return true; });
 };
@@ -1195,6 +1218,7 @@ AIS.reset = function (id) {
 CLIENT_JS = CLIENT_JS.replace("__DEFAULT_BRUSH_SIZE__", str(DEFAULT_BRUSH_SIZE))
 CLIENT_JS = CLIENT_JS.replace("__DEFAULT_FEATHER_AMOUNT__", str(DEFAULT_FEATHER_AMOUNT))
 CLIENT_JS = CLIENT_JS.replace("__MASK_TINT__", PRIMARY_COLOR)
+WIDGET_CSS = WIDGET_CSS.replace("__PRIMARY_COLOR__", PRIMARY_COLOR)
 CLIENT_JS = CLIENT_JS.replace("__ANNOTATION_COLOR__", ANNOTATION_COLORS[0])
 CLIENT_JS = CLIENT_JS.replace("__ANNOTATION_STROKE__", str(ANNOTATION_STROKE))
 
@@ -1229,12 +1253,7 @@ def run(model: ModelBackend) -> None:
         # effect, which would silently drop the CLIENT_JS script and WIDGET_CSS
         # stylesheet entirely).
         ui.add_head_html(f"<style>{WIDGET_CSS}</style><script>{CLIENT_JS}</script>")
-        ui.dark_mode().enable()
-        # dark_page is Quasar's page/body background variable, dark is the
-        # surface color for dark-mode components like ui.card — the documented
-        # way to set these (nicegui.io/documentation/colors) rather than a
-        # manual `!important` CSS override fighting Quasar's own theme layer.
-        ui.colors(primary=PRIMARY_COLOR, dark="#111111", dark_page="#000000")
+        apply_dark_theme()
 
         # ui.run_javascript() already awaits the client connection internally
         # before executing (since NiceGUI 3.0), so this isn't needed to make
@@ -1257,7 +1276,7 @@ def run(model: ModelBackend) -> None:
                 prompt = ui.textarea(label="Prompt").props("rows=6 outlined dark").classes("w-full")
 
                 with ui.row().classes("w-full items-center gap-4"):
-                    seed_input = ui.number(label="Seed", value=65454653, format="%d").props("outlined dark").classes("flex-1")
+                    seed_input = ui.number(label="Seed", value=DEFAULT_SEED, format="%d").props("outlined dark").classes("flex-1")
                     randomize_seed = ui.switch("Randomize seed", value=True)
                     if not caps.supports_seed:
                         seed_input.disable()
@@ -1295,12 +1314,12 @@ def run(model: ModelBackend) -> None:
 
                 def handle_mask_change(has_mask: bool) -> None:
                     nonlocal previous_aspect_ratio, previous_megapixels
-                    if "Original" not in caps.supported_aspect_ratios:
+                    if ORIGINAL_ASPECT_RATIO not in caps.supported_aspect_ratios:
                         return
                     if has_mask:
-                        if aspect_ratio.value != "Original":
+                        if aspect_ratio.value != ORIGINAL_ASPECT_RATIO:
                             previous_aspect_ratio = aspect_ratio.value
-                        aspect_ratio.value = "Original"
+                        aspect_ratio.value = ORIGINAL_ASPECT_RATIO
                         aspect_ratio.disable()
                         # Shows the tier the model will use: it follows the image.
                         source_mp = model.megapixels_for_source(editor_holder["path"]) if editor_holder["path"] else None
@@ -1401,13 +1420,11 @@ def run(model: ModelBackend) -> None:
 
                     sampler_name = None
                     if caps.sampler_choices:
-                        sampler_default = caps.default_sampler if caps.default_sampler in caps.sampler_choices else caps.sampler_choices[0]
-                        sampler_name = ui.select(caps.sampler_choices, value=sampler_default, label="Sampler name").props("outlined dark").classes("w-full q-mt-sm")
+                        sampler_name = ui.select(caps.sampler_choices, value=default_choice(caps.default_sampler, caps.sampler_choices), label="Sampler name").props("outlined dark").classes("w-full q-mt-sm")
 
                     scheduler = None
                     if caps.scheduler_choices:
-                        scheduler_default = caps.default_scheduler if caps.default_scheduler in caps.scheduler_choices else caps.scheduler_choices[0]
-                        scheduler = ui.select(caps.scheduler_choices, value=scheduler_default, label="Scheduler").props("outlined dark").classes("w-full")
+                        scheduler = ui.select(caps.scheduler_choices, value=default_choice(caps.default_scheduler, caps.scheduler_choices), label="Scheduler").props("outlined dark").classes("w-full")
 
                     apply_color_correction_switch = ui.switch("Apply color corrections", value=False).classes("q-mt-sm")
 
@@ -1447,7 +1464,6 @@ def run(model: ModelBackend) -> None:
 
                 source_image_path = editor_holder["path"]
                 editor_inputs = await get_editor_inputs()
-                mask_path = editor_inputs.mask_path if caps.supports_inpainting else None
                 annotated_image_path = None
                 if caps.num_annotation_colors > 0 and editor_inputs.annotation_layer_path:
                     annotated_image_path = await nicegui_run.io_bound(
@@ -1455,10 +1471,11 @@ def run(model: ModelBackend) -> None:
                     )
                 lora_files = available_loras.get(lora_name.value, []) if lora_name is not None else []
 
-                params = GenerationParams(
-                    prompt=prompt.value or "",
+                params = params_from_ui(
+                    caps,
+                    prompt=prompt.value,
                     source_image_path=source_image_path,
-                    mask_path=mask_path,
+                    mask_path=editor_inputs.mask_path,
                     annotated_image_path=annotated_image_path,
                     reference_images=[h["path"] for h in reference_holders if h["path"]],
                     seed=seed_input.value,
@@ -1466,23 +1483,15 @@ def run(model: ModelBackend) -> None:
                     aspect_ratio=aspect_ratio.value,
                     target_megapixels=megapixels.value,
                     steps=steps.value,
-                    # cfg/lora_strength fall back to the capability's own
-                    # declared default (not a bare 0.0) when the control
-                    # wasn't created — every model's own cfg_range/
-                    # lora_strength_range starts above 0, and neither model
-                    # backend currently guards its use of params.cfg/
-                    # params.lora_strength behind supports_cfg/supports_loras,
-                    # so a bare 0.0 here would silently fall outside a
-                    # future such model's valid range.
-                    cfg=cfg.value if cfg is not None else caps.cfg_range.default,
-                    denoise=denoise.value if denoise is not None else 1.0,
+                    cfg=cfg.value if cfg is not None else None,
+                    denoise=denoise.value if denoise is not None else None,
                     sampler_name=sampler_name.value if sampler_name is not None else None,
                     scheduler=scheduler.value if scheduler is not None else None,
-                    negative_prompt=negative_prompt.value if negative_prompt is not None else "",
+                    negative_prompt=negative_prompt.value if negative_prompt is not None else None,
                     lora_files=lora_files,
-                    lora_strength=lora_strength.value if lora_strength is not None else caps.lora_strength_range.default,
-                    apply_color_correction_enabled=apply_color_correction_switch.value,
-                    feather_amount=editor_inputs.feather_amount if caps.supports_inpainting else 0,
+                    lora_strength=lora_strength.value if lora_strength is not None else None,
+                    apply_color_correction=apply_color_correction_switch.value,
+                    feather_amount=editor_inputs.feather_amount,
                 )
                 result = await nicegui_run.io_bound(model.generate, params)
 
@@ -1492,10 +1501,8 @@ def run(model: ModelBackend) -> None:
                 use_as_input_btn.enable()
                 download_btn.enable()
 
-            except GenerationError as e:
-                ui.notify(str(e), type="negative")
             except Exception as e:  # noqa: BLE001 — surface unexpected errors instead of hanging silently
-                ui.notify(f"Unexpected error: {e}", type="negative")
+                ui.notify(describe_error(e), type="negative")
             finally:
                 generate_btn.props(remove="loading")
                 generate_btn.enable()
@@ -1572,8 +1579,8 @@ def run(model: ModelBackend) -> None:
     # (github.com/zauberzeug/nicegui/issues/6018) — worth an upgrade if this
     # keeps happening even for quick tab switches.
     ui.run(
-        host="0.0.0.0",
-        port=7860,
+        host=HOST,
+        port=PORT,
         title="AI Image Edit",
         dark=True,
         reload=False,

@@ -22,9 +22,16 @@ import gradio as gr
 import numpy as np
 from PIL import Image
 
-from ai_image_edit.core.errors import GenerationError
 from ai_image_edit.core.paths import WORK_DIR
-from ai_image_edit.core.types import GenerationParams
+from ai_image_edit.core.types import DEFAULT_SEED, FEATHER_RANGE, ORIGINAL_ASPECT_RATIO
+from ai_image_edit.frontends.common import (
+    HOST,
+    PORT,
+    PRIMARY_COLOR,
+    default_choice,
+    describe_error,
+    params_from_ui,
+)
 from ai_image_edit.models.base import ModelBackend
 
 # --- Configuration constants ---
@@ -33,11 +40,6 @@ from ai_image_edit.models.base import ModelBackend
 # untouched background before _extract_mask treats a pixel as painted — see
 # that function's docstring for why a small tolerance is needed here at all.
 _MASK_DIFF_THRESHOLD = 24
-
-# This app's one accent color — the "Model: ..." subtitle's text color and
-# the solid image borders (CUSTOM_CSS, below) both read from here, and it
-# matches the NiceGUI app's own PRIMARY_COLOR/ui.colors(primary=...).
-PRIMARY_COLOR = "#7c3aed"
 
 # --- Entry point ---
 # Everything below is model-dependent, so it lives inside run() rather
@@ -246,7 +248,7 @@ def run(model: ModelBackend) -> None:
                     prompt = gr.Textbox(label="Prompt", lines=6)
                     with gr.Row():
                         seed_input = gr.Number(
-                            label="Seed", value=65454653, precision=0,
+                            label="Seed", value=DEFAULT_SEED, precision=0,
                             interactive=caps.supports_seed,
                         )
                         randomize_seed = gr.Checkbox(
@@ -282,7 +284,8 @@ def run(model: ModelBackend) -> None:
                             elem_classes="aie-image-border",
                         )
                         feather_slider = gr.Slider(
-                            minimum=0, maximum=16, step=1, value=3, label="Feather",
+                            minimum=FEATHER_RANGE.min, maximum=FEATHER_RANGE.max, step=FEATHER_RANGE.step,
+                            value=FEATHER_RANGE.default, label="Feather",
                         )
                     else:
                         edit_image = gr.Image(
@@ -290,7 +293,8 @@ def run(model: ModelBackend) -> None:
                             elem_classes="aie-image-border",
                         )
                         feather_slider = gr.Slider(
-                            minimum=0, maximum=16, step=1, value=3, label="Feather", visible=False,
+                            minimum=FEATHER_RANGE.min, maximum=FEATHER_RANGE.max, step=FEATHER_RANGE.step,
+                            value=FEATHER_RANGE.default, label="Feather", visible=False,
                         )
 
                 # --- Reference images + LoRAs ---
@@ -342,18 +346,12 @@ def run(model: ModelBackend) -> None:
                             step=caps.denoise_range.step, value=caps.denoise_range.default,
                             label="Denoise", visible=caps.supports_denoise,
                         )
-                        sampler_default = None
-                        if caps.sampler_choices:
-                            sampler_default = caps.default_sampler if caps.default_sampler in caps.sampler_choices else caps.sampler_choices[0]
                         sampler_name = gr.Dropdown(
-                            choices=caps.sampler_choices or [], value=sampler_default,
+                            choices=caps.sampler_choices or [], value=default_choice(caps.default_sampler, caps.sampler_choices),
                             label="Sampler name", visible=bool(caps.sampler_choices),
                         )
-                        scheduler_default = None
-                        if caps.scheduler_choices:
-                            scheduler_default = caps.default_scheduler if caps.default_scheduler in caps.scheduler_choices else caps.scheduler_choices[0]
                         scheduler = gr.Dropdown(
-                            choices=caps.scheduler_choices or [], value=scheduler_default,
+                            choices=caps.scheduler_choices or [], value=default_choice(caps.default_scheduler, caps.scheduler_choices),
                             label="Scheduler", visible=bool(caps.scheduler_choices),
                         )
                         apply_color_correction = gr.Checkbox(label="Apply color corrections", value=False)
@@ -380,14 +378,14 @@ def run(model: ModelBackend) -> None:
             # As soon as a mask is drawn on a model that supports inpainting, the
             # output must derive its dimensions from the source image's own
             # framing, so both Aspect ratio and Resolution are disabled while a
-            # mask exists — Aspect ratio additionally forced to "Original",
+            # mask exists — Aspect ratio additionally forced to ORIGINAL_ASPECT_RATIO,
             # Resolution set to the tier the model will use for the image
             # (model.megapixels_for_source) — only
             # when "Original" is actually one of the model's
             # supported_aspect_ratios — mirroring handle_mask_change() in the
             # NiceGUI app (simplified: it doesn't restore the exact prior
             # selection, just re-enables the dropdowns once the mask is cleared).
-            if HAS_EDITOR_MASK and "Original" in caps.supported_aspect_ratios:
+            if HAS_EDITOR_MASK and ORIGINAL_ASPECT_RATIO in caps.supported_aspect_ratios:
                 def on_editor_change(editor_value):
                     # _quick_has_edit(), not _extract_mask(): this fires on
                     # every edit_image.change event (every brush stroke
@@ -403,7 +401,7 @@ def run(model: ModelBackend) -> None:
                         # Shows the tier the model will use: it follows the image.
                         source_mp = model.megapixels_for_source(editor_value["background"])
                         mp_update = gr.update(interactive=False) if source_mp is None else gr.update(value=source_mp, interactive=False)
-                        return gr.update(value="Original", interactive=False), mp_update
+                        return gr.update(value=ORIGINAL_ASPECT_RATIO, interactive=False), mp_update
                     return gr.update(interactive=True), gr.update(interactive=len(caps.supported_megapixels) > 1)
 
                 edit_image.change(fn=on_editor_change, inputs=edit_image, outputs=[aspect_ratio, megapixels])
@@ -426,40 +424,32 @@ def run(model: ModelBackend) -> None:
                 reference_paths = [p for p in ref_vals if p]
                 lora_files = available_loras.get(lora_name_val, []) if caps.supports_loras else []
 
-                params = GenerationParams(
-                    prompt=prompt_val or "",
+                params = params_from_ui(
+                    caps,
+                    prompt=prompt_val,
                     source_image_path=source_path,
                     mask_path=mask_path,
                     reference_images=reference_paths,
-                    seed=int(seed_val) if seed_val is not None else 0,
-                    randomize_seed=bool(randomize_val),
+                    seed=seed_val,
+                    randomize_seed=randomize_val,
                     aspect_ratio=ar_val,
                     target_megapixels=mp_val,
                     steps=steps_val,
-                    # cfg/lora_strength fall back to the capability's own
-                    # declared default (not a bare 0.0) when unsupported —
-                    # every model's own cfg_range/lora_strength_range starts
-                    # above 0, and neither model backend currently guards
-                    # its use of params.cfg/params.lora_strength behind
-                    # supports_cfg/supports_loras, so a bare 0.0 here would
-                    # silently fall outside a future such model's valid range.
-                    cfg=cfg_val if caps.supports_cfg else caps.cfg_range.default,
-                    denoise=denoise_val if caps.supports_denoise else 1.0,
-                    sampler_name=sampler_val if caps.sampler_choices else None,
-                    scheduler=scheduler_val if caps.scheduler_choices else None,
-                    negative_prompt=negprompt_val if caps.supports_negative_prompt else "",
+                    cfg=cfg_val,
+                    denoise=denoise_val,
+                    sampler_name=sampler_val,
+                    scheduler=scheduler_val,
+                    negative_prompt=negprompt_val,
                     lora_files=lora_files,
-                    lora_strength=lora_strength_val if caps.supports_loras else caps.lora_strength_range.default,
-                    apply_color_correction_enabled=bool(color_corr_val),
-                    feather_amount=int(feather_val) if HAS_EDITOR_MASK else 0,
+                    lora_strength=lora_strength_val,
+                    apply_color_correction=color_corr_val,
+                    feather_amount=feather_val,
                 )
 
                 try:
                     result = model.generate(params)
-                except GenerationError as e:
-                    raise gr.Error(str(e))
                 except Exception as e:  # noqa: BLE001 — surface unexpected errors instead of hanging silently
-                    raise gr.Error(f"Unexpected error: {e}")
+                    raise gr.Error(describe_error(e))
 
                 return (
                     result.actual_seed,
@@ -527,8 +517,8 @@ def run(model: ModelBackend) -> None:
             return hmac.compare_digest(entered.encode(), password.encode())
 
     demo.queue().launch(
-        server_name="0.0.0.0",
-        server_port=7860,
+        server_name=HOST,
+        server_port=PORT,
         allowed_paths=[str(WORK_DIR)],
         auth=auth,
     )
