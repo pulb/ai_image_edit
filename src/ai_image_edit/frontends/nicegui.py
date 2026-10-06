@@ -620,6 +620,8 @@ WIDGET_CSS = """
     min-height: 120px;
     cursor: pointer;
     overflow: hidden;
+    border: 1px solid #333;
+    border-radius: 8px;
 }
 
 .aie-zoomwrap {
@@ -635,8 +637,6 @@ WIDGET_CSS = """
     height: auto;
     touch-action: none;
     background: #000;
-    border: 1px solid #333;
-    border-radius: 8px;
 }
 
 .aie-swatch {
@@ -660,7 +660,6 @@ WIDGET_CSS = """
     box-sizing: border-box;
     width: 100%;
     height: 100%;
-    border: 1px solid transparent;
     pointer-events: none;
 }
 
@@ -670,7 +669,6 @@ WIDGET_CSS = """
     box-sizing: border-box;
     width: 100%;
     height: 100%;
-    border: 1px solid transparent;
     opacity: 0.5;
     pointer-events: none;
 }
