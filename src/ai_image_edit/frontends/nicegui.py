@@ -563,15 +563,35 @@ async def create_compare_slider() -> Tuple[
 # a layer — including this plain <style> block — already outranks layered
 # rules regardless of specificity.
 WIDGET_CSS = """
-.aie-upload-box {
+/* The three image frames: reference upload, editor, result comparison. */
+.aie-upload-box,
+.aie-editor-box,
+.ais-container {
     position: relative;
     width: 100%;
-    min-height: 160px;
-    cursor: pointer;
+    overflow: hidden;
     border: 1px solid #444;
     border-radius: 8px;
     background: #000;
-    overflow: hidden;
+}
+
+.aie-upload-box {
+    min-height: 160px;
+}
+
+.aie-editor-box {
+    min-height: 120px;
+}
+
+.ais-container {
+    min-height: 200px;
+}
+
+/* Clickable to open the file picker: always for the upload box, and for the
+   editor only while it is empty (once loaded, a click draws). */
+.aie-upload-box,
+.aie-editor-box.aie-pick {
+    cursor: pointer;
 }
 
 .aie-preview {
@@ -611,17 +631,8 @@ WIDGET_CSS = """
     box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
 }
 
-.aie-editor-box {
-    position: relative;
-    width: 100%;
-    min-height: 120px;
-    cursor: pointer;
-    overflow: hidden;
-    border: 1px solid #333;
-    border-radius: 8px;
-}
-
-.aie-zoomwrap {
+.aie-zoomwrap,
+.ais-zoomwrap {
     position: relative;
     width: 100%;
     touch-action: none;
@@ -651,7 +662,8 @@ WIDGET_CSS = """
     box-shadow: 0 0 0 2px #7c3aed;
 }
 
-.aie-annot {
+.aie-annot,
+.aie-overlay {
     position: absolute;
     inset: 0;
     box-sizing: border-box;
@@ -661,13 +673,7 @@ WIDGET_CSS = """
 }
 
 .aie-overlay {
-    position: absolute;
-    inset: 0;
-    box-sizing: border-box;
-    width: 100%;
-    height: 100%;
     opacity: 0.5;
-    pointer-events: none;
 }
 
 .aie-brush-preview {
@@ -680,23 +686,6 @@ WIDGET_CSS = """
     background: rgba(255, 255, 255, 0.15);
     pointer-events: none;
     display: none;
-}
-
-.ais-container {
-    position: relative;
-    width: 100%;
-    min-height: 200px;
-    background: #000;
-    border: 1px solid #333;
-    border-radius: 8px;
-    overflow: hidden;
-}
-
-.ais-zoomwrap {
-    position: relative;
-    width: 100%;
-    touch-action: none;
-    transform-origin: 50% 50%;
 }
 
 .ais-after {
@@ -923,6 +912,7 @@ AIE.init = function (id) {
         return { layers: maskLayers, width: state.brush * getScale() };
     }
     AIE[id] = state;
+    AIU.showPlaceholder(id, true);
 
     function getScale() {
         const rect = canvas.getBoundingClientRect();
@@ -1013,6 +1003,8 @@ AIU.resetAnnotations = function (state) {
 AIU.showPlaceholder = function (id, visible) {
     const ph = document.getElementById(id + '_placeholder');
     if (ph) ph.style.display = visible ? 'flex' : 'none';
+    const box = ph && ph.closest('.aie-editor-box');
+    if (box) box.classList.toggle('aie-pick', visible);
 };
 
 AIE.setMode = function (id, mode) {
