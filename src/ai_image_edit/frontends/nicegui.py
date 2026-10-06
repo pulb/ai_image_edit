@@ -171,7 +171,6 @@ def create_hidden_uploader() -> ui.upload:
 def create_clear_badge(on_click: Callable) -> ui.button:
     """A round X button overlapping the top-right corner of its .aie-corner-wrap; hidden until shown."""
     badge = ui.button(icon="close", on_click=on_click).props("round dense unelevated size=sm").classes("aie-clear")
-    badge.tooltip("Remove image")
     badge.set_visibility(False)
     return badge
 
