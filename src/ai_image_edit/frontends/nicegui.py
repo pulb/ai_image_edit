@@ -168,6 +168,14 @@ def create_hidden_uploader() -> ui.upload:
 # This is safe here because none of this HTML is ever built from user input
 # — only server-generated uuids and fixed markup are interpolated into it.
 
+def create_clear_badge(on_click: Callable) -> ui.button:
+    """A round X button overlapping the top-right corner of its .aie-corner-wrap; hidden until shown."""
+    badge = ui.button(icon="close", on_click=on_click).props("round dense unelevated size=sm").classes("aie-clear")
+    badge.tooltip("Remove image")
+    badge.set_visibility(False)
+    return badge
+
+
 def create_simple_image_upload(label: str) -> dict:
     """
     A click-to-upload image box with no editing — used for the reference
@@ -193,10 +201,11 @@ def create_simple_image_upload(label: str) -> dict:
 
     with ui.column().classes("w-full gap-1") as container:
         ui.label(label).classes("text-sm text-gray-400")
-        with ui.element("div").classes("aie-upload-box") as box:
-            placeholder = ui.label("Click to upload an image").classes("aie-placeholder")
-            preview = ui.image().classes("aie-preview")
-            preview.set_visibility(False)
+        with ui.element("div").classes("aie-corner-wrap") as wrap:
+            with ui.element("div").classes("aie-upload-box") as box:
+                placeholder = ui.label("Click to upload an image").classes("aie-placeholder")
+                preview = ui.image().classes("aie-preview")
+                preview.set_visibility(False)
 
         uploader = create_hidden_uploader()
 
@@ -209,8 +218,10 @@ def create_simple_image_upload(label: str) -> dict:
             holder["path"] = None
             preview.set_visibility(False)
             placeholder.set_visibility(True)
+            badge.set_visibility(False)
 
-        ui.button("Clear", on_click=clear_image).props("flat dense size=sm").classes("text-xs")
+        with wrap:
+            badge = create_clear_badge(clear_image)
 
     holder["container"] = container
     holder["clear"] = clear_image
@@ -221,6 +232,7 @@ def create_simple_image_upload(label: str) -> dict:
         preview.set_source(to_url(path))
         preview.set_visibility(True)
         placeholder.set_visibility(False)
+        badge.set_visibility(True)
         uploader.reset()
 
     uploader.on_upload(handle_upload)
@@ -288,17 +300,18 @@ async def create_mask_editor(
 
         ui.on("aie_mask_state", handle_mask_event)
 
-    with ui.element("div").classes("aie-editor-box") as editor_box:
-        ui.html(
-            f'<div id="{editor_id}_zoomwrap" class="aie-zoomwrap">'
-            f'<canvas id="{editor_id}_canvas" class="aie-canvas"></canvas>'
-            f'<canvas id="{editor_id}_annot" class="aie-annot"></canvas>'
-            f'<canvas id="{editor_id}_overlay" class="aie-overlay"></canvas>'
-            f'<div id="{editor_id}_placeholder" class="aie-placeholder">Click to upload an image</div>'
-            f'</div>'
-            f'<div id="{editor_id}_brushpreview" class="aie-brush-preview"></div>',
-            sanitize=False,
-        )
+    with ui.element("div").classes("aie-corner-wrap") as wrap:
+        with ui.element("div").classes("aie-editor-box") as editor_box:
+            ui.html(
+                f'<div id="{editor_id}_zoomwrap" class="aie-zoomwrap">'
+                f'<canvas id="{editor_id}_canvas" class="aie-canvas"></canvas>'
+                f'<canvas id="{editor_id}_annot" class="aie-annot"></canvas>'
+                f'<canvas id="{editor_id}_overlay" class="aie-overlay"></canvas>'
+                f'<div id="{editor_id}_placeholder" class="aie-placeholder">Click to upload an image</div>'
+                f'</div>'
+                f'<div id="{editor_id}_brushpreview" class="aie-brush-preview"></div>',
+                sanitize=False,
+            )
 
     uploader = create_hidden_uploader()
 
@@ -315,15 +328,18 @@ async def create_mask_editor(
         path = await save_uploaded_file(e.file)
         holder["path"] = path
         await ui.run_javascript(f"AIE.loadImage('{editor_id}', '{to_url(path)}')", timeout=10.0)
+        badge.set_visibility(True)
         uploader.reset()
 
     uploader.on_upload(handle_upload)
 
     async def clear_image() -> None:
         holder["path"] = None
+        badge.set_visibility(False)
         await ui.run_javascript(f"AIE.clearImage('{editor_id}')", timeout=5.0)
 
-    ui.button("Clear", on_click=clear_image).props("flat dense size=sm").classes("text-xs")
+    with wrap:
+        badge = create_clear_badge(clear_image)
 
     async def remove_mask() -> None:
         await ui.run_javascript(f"AIE.clearMask('{editor_id}')", timeout=5.0)
@@ -450,6 +466,7 @@ async def create_mask_editor(
             f"AIE.loadImage('{editor_id}', '{to_url(path)}')",
             timeout=10.0,
         )
+        badge.set_visibility(True)
 
     return holder, get_inputs, set_image
 
@@ -574,6 +591,27 @@ WIDGET_CSS = """
     font-family: sans-serif;
     font-size: 14px;
     pointer-events: none;
+}
+
+.aie-corner-wrap {
+    position: relative;
+    width: 100%;
+    margin-top: 6px;
+}
+
+.aie-clear {
+    position: absolute !important;
+    top: -12px;
+    right: -12px;
+    z-index: 5;
+    width: 28px;
+    height: 28px;
+    min-width: 28px;
+    min-height: 28px;
+    padding: 0;
+    background: #fff !important;
+    color: __CLEAR_ICON_COLOR__ !important;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
 }
 
 .aie-editor-box {
@@ -709,6 +747,7 @@ WIDGET_CSS = """
     margin: 0 auto;
 }
 """
+WIDGET_CSS = WIDGET_CSS.replace("__CLEAR_ICON_COLOR__", PRIMARY_COLOR)
 
 # --- Client-side JS ---
 # Three small namespaces, defined once as generic functions keyed by an
