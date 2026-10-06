@@ -30,9 +30,8 @@ Both are installed; the Gradio SDK provides Gradio itself.
 The Space runs without a password login: don't set `APP_PASSWORD`. Access is
 controlled by the Space's visibility (keep it private).
 
-Optional variables: `HF_TOKEN` (gated weights or a private AOTI repo),
-`QWEN21_AOTI` / `QWEN21_AOTI_REPO` (see
-`src/ai_image_edit/models/qwen_image/model.py`).
+Optional variables are the same as for `qwen_image` on RunPod (see
+[`../runpod/DEPLOY.md`](../runpod/DEPLOY.md)), except `HF_HUB_CACHE`.
 
 ## Hardware
 

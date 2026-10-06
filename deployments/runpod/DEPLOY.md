@@ -24,8 +24,9 @@ Each image sets its own `MODEL_BACKEND` and uses `FRONTEND=nicegui`, so
 no backend or frontend configuration is needed. Pick the backend by
 choosing the image.
 
-Optional Pod environment variables for `qwen_image`: `HF_TOKEN`,
-`QWEN21_AOTI`, `QWEN21_AOTI_REPO`, `HF_HUB_CACHE`.
+Optional Pod environment variables for `qwen_image`: `HF_TOKEN` (gated
+weights or a private AOTI repo), `QWEN21_AOTI` / `QWEN21_AOTI_REPO` (see
+`src/ai_image_edit/models/qwen_image/model.py`), `HF_HUB_CACHE`.
 
 For `qwen_image_edit_comfy`, `COMFY_CHECKPOINT_PATH` selects the checkpoint
 (a path under ComfyUI's `models/checkpoints` folder). The image sets it to the

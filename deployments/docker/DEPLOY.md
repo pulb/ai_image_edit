@@ -7,11 +7,6 @@ Two images, both built from the repo root. The app serves on port `7860`.
 | `Dockerfile.qwen_image_edit_comfy` | `qwen_image_edit_comfy` | `nicegui` | self-hosted ComfyUI backend |
 | `Dockerfile.qwen_image` | `qwen_image` | `nicegui` | see [RunPod](../runpod/DEPLOY.md) |
 
-## Backend and frontend
-
-Each image sets its own `MODEL_BACKEND` and uses the NiceGUI frontend
-(`FRONTEND=nicegui`), so no backend or frontend configuration is needed.
-
 ## Password login
 
 The app sits behind a password login when `APP_PASSWORD` is

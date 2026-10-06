@@ -33,7 +33,10 @@ RUN git clone https://github.com/Comfy-Org/ComfyUI.git .
 # Install PyTorch (CUDA 12.6 wheels) manually — this base image has no
 # CUDA/PyTorch preinstalled, unlike the pytorch/pytorch image. --user
 # installs into $HOME/.local since /usr/local is root-owned here.
-RUN pip install --no-cache-dir --user torch==2.11.0 torchvision==0.26.0 torchaudio==2.11.0 \
+ARG TORCH_VERSION=2.11.0
+ARG TORCHVISION_VERSION=0.26.0
+ARG TORCHAUDIO_VERSION=2.11.0
+RUN pip install --no-cache-dir --user torch==${TORCH_VERSION} torchvision==${TORCHVISION_VERSION} torchaudio==${TORCHAUDIO_VERSION} \
     --index-url https://download.pytorch.org/whl/cu126
     
 # Install Python dependencies (including packages for Custom Nodes).

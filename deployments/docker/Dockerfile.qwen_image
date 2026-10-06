@@ -45,7 +45,9 @@ ENV REQUIRE_PASSWORD=1
 # PyTorch (CUDA 12.6 wheels) — this base image has no CUDA/PyTorch
 # preinstalled. --user installs into $HOME/.local since /usr/local is
 # root-owned here. No torchaudio: nothing in this deployment uses audio.
-RUN pip install --no-cache-dir --user torch==2.11.0 torchvision==0.26.0 \
+ARG TORCH_VERSION=2.11.0
+ARG TORCHVISION_VERSION=0.26.0
+RUN pip install --no-cache-dir --user torch==${TORCH_VERSION} torchvision==${TORCHVISION_VERSION} \
     --index-url https://download.pytorch.org/whl/cu126
 
 # Install the app as a package with the NiceGUI frontend, plus the qwen_image
@@ -60,10 +62,9 @@ RUN pip install --no-cache-dir --user \
     "ai-image-edit-qwen @ git+https://github.com/pulb/ai_image_edit_qwen@${QWEN_LIB_REF}" \
     "$HOME/pkg[nicegui_frontend]"
 
-# HF_TOKEN (for gated weights or a private AOTI repo) and QWEN21_AOTI /
-# QWEN21_AOTI_REPO (see models/qwen_image/model.py's start()) are read
-# from the environment at runtime, not baked in here — set them via
-# RunPod's or the Space's own environment variable settings if needed.
+# Optional runtime variables (HF_TOKEN, QWEN21_AOTI, QWEN21_AOTI_REPO) are
+# read from the environment, not baked in here; see
+# deployments/runpod/DEPLOY.md.
 #
 # Weights aren't baked into this image (see the top-of-file note) — every
 # fresh container re-downloads Qwen-Image-2.1 from the Hub on startup. On
