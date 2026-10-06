@@ -175,6 +175,46 @@ def create_clear_badge(on_click: Callable) -> ui.button:
     return badge
 
 
+PLACEHOLDER_TEXT = "Click to upload an image"
+
+
+def create_image_frame(box_class: str, on_clear: Callable) -> Tuple[ui.element, ui.button]:
+    """
+    The wrapper shared by the editor and the reference-image slots: a
+    .aie-corner-wrap holding the framed box (`box_class`) and its clear
+    badge. Returns (box, badge); the box's content goes in `with box:`.
+    """
+    with ui.element("div").classes("aie-corner-wrap"):
+        with ui.element("div").classes(box_class) as box:
+            pass
+        badge = create_clear_badge(on_clear)
+    return box, badge
+
+
+def attach_file_picker(
+    box: ui.element,
+    on_file: Callable[[str], Awaitable[None]],
+    enabled: Callable[[], bool] = lambda: True,
+) -> None:
+    """
+    Clicking `box` while enabled() is true opens the file picker of a hidden
+    uploader; the chosen file is saved and its local path handed to on_file.
+    """
+    uploader = create_hidden_uploader()
+
+    async def open_picker() -> None:
+        if enabled():
+            await uploader.run_method("pickFiles", timeout=5.0)
+
+    box.on("click", open_picker)
+
+    async def handle_upload(e) -> None:
+        await on_file(await save_uploaded_file(e.file))
+        uploader.reset()
+
+    uploader.on_upload(handle_upload)
+
+
 def create_simple_image_upload(label: str) -> dict:
     """
     A click-to-upload image box with no editing — used for the reference
@@ -189,8 +229,8 @@ def create_simple_image_upload(label: str) -> dict:
     this app defines itself and injects via ui.add_head_html — see the
     comment above WIDGET_CSS for why that's preferred here over NiceGUI's
     bundled Tailwind classes. The box itself is a real nicegui `ui.element`
-    rather than raw HTML so a NiceGUI click handler (box.on("click", ...))
-    can be attached to it directly.
+    rather than raw HTML so a NiceGUI click handler can be attached to it
+    directly (see attach_file_picker).
 
     Returns holder — holder['path'] always reflects the currently selected
     file's local path (or None). holder['container'] is the slot's element
@@ -200,18 +240,6 @@ def create_simple_image_upload(label: str) -> dict:
 
     with ui.column().classes("w-full gap-1") as container:
         ui.label(label).classes("text-sm text-gray-400")
-        with ui.element("div").classes("aie-corner-wrap") as wrap:
-            with ui.element("div").classes("aie-upload-box") as box:
-                placeholder = ui.label("Click to upload an image").classes("aie-placeholder")
-                preview = ui.image().classes("aie-preview")
-                preview.set_visibility(False)
-
-        uploader = create_hidden_uploader()
-
-        async def open_picker() -> None:
-            await uploader.run_method("pickFiles", timeout=5.0)
-
-        box.on("click", open_picker)
 
         def clear_image() -> None:
             holder["path"] = None
@@ -219,22 +247,23 @@ def create_simple_image_upload(label: str) -> dict:
             placeholder.set_visibility(True)
             badge.set_visibility(False)
 
-        with wrap:
-            badge = create_clear_badge(clear_image)
+        box, badge = create_image_frame("aie-upload-box", clear_image)
+        with box:
+            placeholder = ui.label(PLACEHOLDER_TEXT).classes("aie-placeholder")
+            preview = ui.image().classes("aie-preview")
+            preview.set_visibility(False)
+
+        async def handle_file(path: str) -> None:
+            holder["path"] = path
+            preview.set_source(to_url(path))
+            preview.set_visibility(True)
+            placeholder.set_visibility(False)
+            badge.set_visibility(True)
+
+        attach_file_picker(box, handle_file)
 
     holder["container"] = container
     holder["clear"] = clear_image
-
-    async def handle_upload(e) -> None:
-        path = await save_uploaded_file(e.file)
-        holder["path"] = path
-        preview.set_source(to_url(path))
-        preview.set_visibility(True)
-        placeholder.set_visibility(False)
-        badge.set_visibility(True)
-        uploader.reset()
-
-    uploader.on_upload(handle_upload)
 
     return holder
 
@@ -299,46 +328,33 @@ async def create_mask_editor(
 
         ui.on("aie_mask_state", handle_mask_event)
 
-    with ui.element("div").classes("aie-corner-wrap") as wrap:
-        with ui.element("div").classes("aie-editor-box") as editor_box:
-            ui.html(
-                f'<div id="{editor_id}_zoomwrap" class="aie-zoomwrap">'
-                f'<canvas id="{editor_id}_canvas" class="aie-canvas"></canvas>'
-                f'<canvas id="{editor_id}_annot" class="aie-annot"></canvas>'
-                f'<canvas id="{editor_id}_overlay" class="aie-overlay"></canvas>'
-                f'<div id="{editor_id}_placeholder" class="aie-placeholder">Click to upload an image</div>'
-                f'</div>'
-                f'<div id="{editor_id}_brushpreview" class="aie-brush-preview"></div>',
-                sanitize=False,
-            )
-
-    uploader = create_hidden_uploader()
-
-    async def open_picker_if_empty() -> None:
-        # Once an image is loaded, a click on the box should draw on the
-        # canvas instead of reopening the picker — holder['path'] already
-        # tells us which state we're in, no need to ask the browser.
-        if not holder["path"]:
-            await uploader.run_method("pickFiles", timeout=5.0)
-
-    editor_box.on("click", open_picker_if_empty)
-
-    async def handle_upload(e) -> None:
-        path = await save_uploaded_file(e.file)
-        holder["path"] = path
-        await ui.run_javascript(f"AIE.loadImage('{editor_id}', '{to_url(path)}')", timeout=10.0)
-        badge.set_visibility(True)
-        uploader.reset()
-
-    uploader.on_upload(handle_upload)
-
     async def clear_image() -> None:
         holder["path"] = None
         badge.set_visibility(False)
         await ui.run_javascript(f"AIE.clearImage('{editor_id}')", timeout=5.0)
 
-    with wrap:
-        badge = create_clear_badge(clear_image)
+    editor_box, badge = create_image_frame("aie-editor-box", clear_image)
+    with editor_box:
+        ui.html(
+            f'<div id="{editor_id}_zoomwrap" class="aie-zoomwrap">'
+            f'<canvas id="{editor_id}_canvas" class="aie-canvas"></canvas>'
+            f'<canvas id="{editor_id}_annot" class="aie-annot"></canvas>'
+            f'<canvas id="{editor_id}_overlay" class="aie-overlay"></canvas>'
+            f'<div id="{editor_id}_placeholder" class="aie-placeholder">{PLACEHOLDER_TEXT}</div>'
+            f'</div>'
+            f'<div id="{editor_id}_brushpreview" class="aie-brush-preview"></div>',
+            sanitize=False,
+        )
+
+    async def handle_file(path: str) -> None:
+        holder["path"] = path
+        await ui.run_javascript(f"AIE.loadImage('{editor_id}', '{to_url(path)}')", timeout=10.0)
+        badge.set_visibility(True)
+
+    # Once an image is loaded, a click on the box draws on the canvas instead
+    # of reopening the picker — holder['path'] already tells us which state
+    # we're in, no need to ask the browser.
+    attach_file_picker(editor_box, handle_file, enabled=lambda: not holder["path"])
 
     async def remove_mask() -> None:
         await ui.run_javascript(f"AIE.clearMask('{editor_id}')", timeout=5.0)
