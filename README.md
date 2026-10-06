@@ -5,7 +5,7 @@ and generation. It provides a web based UI optimized for mobile devices in
 front of a pluggable image-generation backend.
 
 <p align="center">
-  <img src="doc/annotation-workflow.webp" alt="Annotation workflow: type a prompt, draw colored circles, generate">
+  <img src="doc/annotation-workflow.webp" alt="Annotation workflow: type a prompt, draw colored circles, generate" width="301">
 </p>
 
 | Feature | Description |
