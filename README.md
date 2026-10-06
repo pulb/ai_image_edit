@@ -4,6 +4,10 @@ A comfortable, responsive, model-agnostic app for AI-assisted image editing
 and generation. It provides a web based UI optimized for mobile devices in
 front of a pluggable image-generation backend.
 
+<p align="center">
+  <img src="doc/annotation-workflow.webp" alt="Annotation workflow: type a prompt, draw colored circles, generate" width="320">
+</p>
+
 | Feature | Description |
 |---|---|
 | Privacy | Runs on your own hardware or in a disposable container, so your images and prompts stay under your control and vanish with it |
