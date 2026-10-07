@@ -68,8 +68,9 @@ docker run -p 7860:7860 --gpus all --shm-size=640m -e APP_PASSWORD=... ai-image-
 
 Qwen-Image-2.1 with quantized GGUF weights, run through ComfyUI and the
 [ComfyUI-GGUF](https://github.com/leejet/ComfyUI-GGUF) node, which needs far
-less GPU memory than the `qwen_image21` image. The weights are baked into the
-image; choose them with build arguments:
+less GPU memory than the `qwen_image21` image. This backend and image are
+meant for low-VRAM GPUs, on RunPod or in self-hosted environments (tested on a
+16 GB GPU). The weights are baked into the image; choose them with build arguments:
 
 | Build argument | Default | Meaning |
 |---|---|---|
@@ -100,14 +101,16 @@ Set `COMFY_EXTRA_ARGS` at run time to pass arguments to ComfyUI, for example
 | Arguments | Use when |
 |---|---|
 | `--lowvram` | The GPU has little memory (about 8 GB or less). |
-| `--highvram --disable-dynamic-vram` | The GPU has about 32 GB or more (estimate; see below). By default ComfyUI re-stages the text encoder for every new prompt, which added roughly 10-15 s per generation in our tests; with these flags the weights stay on the GPU and generation time matches the Diffusers-based backend. `--disable-dynamic-vram` is deprecated in ComfyUI and will be removed. |
+| `--highvram --disable-dynamic-vram` | The GPU has about 24 GB or more (estimate; see below). By default ComfyUI re-stages the text encoder for every new prompt, which added roughly 10-15 s per generation in our tests; with these flags the weights stay on the GPU and generation time matches the Diffusers-based backend. `--disable-dynamic-vram` is deprecated in ComfyUI and will be removed. |
 | `--disable-comfy-compiler` | Sampling appears to hang on the first step. |
 
-The weights that `--highvram` keeps resident need roughly 26-30 GB with the
-default `Q4_K_M` model (about 12-13 GB model, 9 GB text encoder, under 1 GB VAE,
-plus 3-6 GB of activations while sampling) and about 40 GB with `Q8_0`. These
-figures are estimates: a 32 GB GPU is about the minimum, 40 GB or more is
-comfortable. On smaller GPUs leave the flags off. Check the actual peak with
+The weights that `--highvram` keeps resident add up to about 14 GB with the
+default `Q4_K_M` model (4.6 GB model, 8.9 GB text encoder, under 1 GB VAE).
+Sampling needs a few GB of activations on top (a rough guess: 3-6 GB), so
+expect roughly 17-20 GB in total, and `Q8_0` (7.6 GB model) about 3 GB more.
+These figures are estimates: a 24 GB GPU should be enough, while a 16 GB GPU is
+probably too small. The image runs without the flags on a 16 GB GPU (tested).
+If you want to try the flags on a smaller GPU, check the peak with
 `nvidia-smi` during a generation.
 
 ComfyUI (`COMFYUI_REF`) and ComfyUI-GGUF (`COMFYUI_GGUF_REF`) are pinned to tested
