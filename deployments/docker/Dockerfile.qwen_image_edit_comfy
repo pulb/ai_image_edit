@@ -23,6 +23,13 @@ WORKDIR $HOME/app
 # explicitly rather than relying on the app's own default.
 ENV MODEL_BACKEND=qwen_image_edit_comfy
 
+# Images (uploads, results, ComfyUI's input/output/temp folders) live in RAM
+# under /dev/shm, never on disk. This is the soft cap the app enforces by
+# deleting the oldest files first. It cannot exceed 90% of the container's
+# /dev/shm (docker run --shm-size; Docker's default is 64 MB), and the app
+# warns at startup if it had to lower it.
+ENV AI_IMAGE_EDIT_WORK_MAX_SIZE=512m
+
 # This image is meant for public hosts (RunPod's HTTP proxy has no login of
 # its own), so the app refuses to start unless APP_PASSWORD is set.
 ENV REQUIRE_PASSWORD=1

@@ -8,6 +8,10 @@ from ai_image_edit.core.types import GenerationParams, ModelCapabilities
 # This app's one accent colour: both frontends read their purple from here.
 PRIMARY_COLOR = "#7c3aed"
 
+# Newest work-dir files trim_work_dir() never deletes: the files of the
+# generation that just finished (source, mask, annotated, result, ...).
+RECENT_FILES_KEPT = 8
+
 HOST = "0.0.0.0"
 PORT = 7860
 

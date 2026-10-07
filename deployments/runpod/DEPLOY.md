@@ -32,6 +32,15 @@ For `qwen_image_edit_comfy`, `COMFY_CHECKPOINT_PATH` selects the checkpoint
 (a path under ComfyUI's `models/checkpoints` folder). The image sets it to the
 weights it ships with; override it to use another file that exists in the Pod.
 
+## Image storage
+
+Uploads and results are kept in RAM under `/dev/shm`, not on the Pod's disk
+(see [Docker](../docker/DEPLOY.md#image-storage) for the details and the
+`AI_IMAGE_EDIT_WORK_MAX_SIZE` / `AI_IMAGE_EDIT_WORK_DIR` variables). The
+size of `/dev/shm` is set by RunPod, not by the image, and the actual cap may
+be lower than `AI_IMAGE_EDIT_WORK_MAX_SIZE` if `/dev/shm` is small (the app
+prints a warning at startup). Check it with `df -h /dev/shm` in the Pod.
+
 ## Access protection
 
 RunPod's HTTP proxy is public and has no login of its own, so anyone with

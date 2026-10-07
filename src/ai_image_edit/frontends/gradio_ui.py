@@ -22,12 +22,13 @@ import gradio as gr
 import numpy as np
 from PIL import Image
 
-from ai_image_edit.core.paths import WORK_DIR
+from ai_image_edit.core.paths import WORK_DIR, trim_work_dir
 from ai_image_edit.core.types import DEFAULT_SEED, FEATHER_RANGE, ORIGINAL_ASPECT_RATIO
 from ai_image_edit.frontends.common import (
     HOST,
     PORT,
     PRIMARY_COLOR,
+    RECENT_FILES_KEPT,
     default_choice,
     describe_error,
     params_from_ui,
@@ -450,6 +451,7 @@ def run(model: ModelBackend) -> None:
                     result = model.generate(params)
                 except Exception as e:  # noqa: BLE001 — surface unexpected errors instead of hanging silently
                     raise gr.Error(describe_error(e))
+                trim_work_dir(RECENT_FILES_KEPT)
 
                 return (
                     result.actual_seed,

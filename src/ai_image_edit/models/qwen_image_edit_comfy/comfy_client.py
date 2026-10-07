@@ -37,7 +37,14 @@ def launch_comfy_process() -> subprocess.Popen:
     handle so the caller (QwenImageEditComfyModel.shutdown) can terminate it.
     """
     print("Starting ComfyUI server in the background...", flush=True)
-    return subprocess.Popen(["python", "-u", "main.py", "--port", "8188"])
+    # ComfyUI's input/output/temp folders live under WORK_DIR too, so
+    # everything the app handles sits in one place (RAM-backed by default).
+    comfy_dir = WORK_DIR.resolve() / "comfy"
+    args = ["--port", "8188"]
+    for name in ("input", "output", "temp"):
+        (comfy_dir / name).mkdir(parents=True, exist_ok=True)
+        args += [f"--{name}-directory", str(comfy_dir / name)]
+    return subprocess.Popen(["python", "-u", "main.py", *args])
 
 
 def upload_image(filepath: Optional[str]) -> Optional[str]:

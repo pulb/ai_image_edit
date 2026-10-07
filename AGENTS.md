@@ -85,7 +85,10 @@ Rules for any AI coding agent working in this repository.
   (possibly cropped) source path and hand back a result path.
 - **Working directory**: generated/uploaded/composited files live under
   `core/paths.py`'s `WORK_DIR`, shared by both frontends, served to the
-  browser at `/files/<name>`.
+  browser at `/files/<name>`. It defaults to a folder under `/dev/shm`
+  (RAM-backed), is overridable with `AI_IMAGE_EDIT_WORK_DIR`, and is capped by
+  `AI_IMAGE_EDIT_WORK_MAX_SIZE` through `trim_work_dir()`. The ComfyUI backend
+  keeps its input/output/temp folders under it too.
 - **License headers**: this project is GPL-3.0-or-later. Every source
   file starts with `# SPDX-License-Identifier: GPL-3.0-or-later` (or the
   file-format-appropriate comment syntax) as its very first line, before
