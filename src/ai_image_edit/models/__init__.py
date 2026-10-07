@@ -5,7 +5,7 @@ Registry + factory for model backends.
 Each model's module is imported lazily, inside its loader function, rather
 than at the top of this file. That matters concretely here:
 the ComfyUI backends (qwen_image_edit_2511_aio, qwen_image21_gguf) and
-qwen_image have almost disjoint dependency sets (ComfyUI's own stack vs. the
+qwen_image21 have almost disjoint dependency sets (ComfyUI's own stack vs. the
 separately installed ai-image-edit-qwen package with torch/diffusers/spaces),
 and a given deployment only ever runs one of them. Importing all eagerly at
 package load would mean a comfy-only deployment breaks at startup unless it
@@ -33,24 +33,24 @@ def _load_qwen_image21_gguf() -> ModelBackend:
     return QwenImage21GGUFModel()
 
 
-def _load_qwen_image() -> ModelBackend:
+def _load_qwen_image21() -> ModelBackend:
     try:
-        from ai_image_edit.models.qwen_image import QwenImageModel
+        from ai_image_edit.models.qwen_image21 import QwenImage21Model
     except ModuleNotFoundError as exc:
         if (exc.name or "").split(".")[0] != "ai_image_edit_qwen":
             raise
         raise RuntimeError(
-            "Backend 'qwen_image' needs the ai-image-edit-qwen package: "
+            "Backend 'qwen_image21' needs the ai-image-edit-qwen package: "
             "pip install git+https://github.com/pulb/ai_image_edit_qwen"
         ) from exc
 
-    return QwenImageModel()
+    return QwenImage21Model()
 
 
 MODEL_LOADERS: Dict[str, Callable[[], ModelBackend]] = {
     "qwen_image_edit_2511_aio": _load_qwen_image_edit_2511_aio,
     "qwen_image21_gguf": _load_qwen_image21_gguf,
-    "qwen_image": _load_qwen_image,
+    "qwen_image21": _load_qwen_image21,
 }
 
 

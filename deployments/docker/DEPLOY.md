@@ -6,7 +6,7 @@ Three images, all built from the repo root. The app serves on port `7860`.
 |---|---|---|---|
 | `Dockerfile.qwen_image_edit_2511_aio` | `qwen_image_edit_2511_aio` | `nicegui` | self-hosted ComfyUI backend |
 | `Dockerfile.qwen_image21_gguf` | `qwen_image21_gguf` | `nicegui` | quantized Qwen-Image-2.1 for consumer GPUs |
-| `Dockerfile.qwen_image` | `qwen_image` | `nicegui` | see [RunPod](../runpod/DEPLOY.md) |
+| `Dockerfile.qwen_image21` | `qwen_image21` | `nicegui` | see [RunPod](../runpod/DEPLOY.md) |
 
 ## Image storage
 
@@ -56,7 +56,7 @@ docker run -p 7860:7860 --gpus all --shm-size=640m -e APP_PASSWORD=... ai-image-
 
 Qwen-Image-2.1 with quantized GGUF weights, run through ComfyUI and the
 [ComfyUI-GGUF](https://github.com/leejet/ComfyUI-GGUF) node, which needs far
-less GPU memory than the `qwen_image` image. The weights are baked into the
+less GPU memory than the `qwen_image21` image. The weights are baked into the
 image; choose them with build arguments:
 
 | Build argument | Default | Meaning |
@@ -83,7 +83,7 @@ for example `-e COMFY_EXTRA_ARGS=--lowvram` on GPUs with little memory, and
 The weights are under the Qwen RESEARCH LICENSE AGREEMENT
 (non-commercial use only).
 
-## qwen_image image
+## qwen_image21 image
 
 Build and run steps, the Pod setup and the CI build are in
 [`../runpod/DEPLOY.md`](../runpod/DEPLOY.md).

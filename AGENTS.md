@@ -40,7 +40,7 @@ Rules for any AI coding agent working in this repository.
   naming that state and nothing else, e.g. `git hook: you have uncommitted
   changes`, `git hook: you have untracked files`, `git hook: you have
   unpushed commits`. Do not commit, push, or amend in response.
-- When making any change, check whether it also applies to the qwen_image
+- When making any change, check whether it also applies to the qwen_image21
   backend repository (`ai_image_edit_qwen`,
   https://github.com/pulb/ai_image_edit_qwen) — interface, naming,
   packaging, docs or workflow changes may need a matching change there.
@@ -65,22 +65,22 @@ Rules for any AI coding agent working in this repository.
   new backend in `models/__init__.py`'s `MODEL_LOADERS`.
 - **Lazy model imports**: `models/__init__.py` imports each backend's
   module lazily, inside its loader function, not at module top level.
-  The shipped backends (`qwen_image` vs. the ComfyUI-based
+  The shipped backends (`qwen_image21` vs. the ComfyUI-based
   `qwen_image_edit_2511_aio` and `qwen_image21_gguf`) have almost disjoint
   dependency sets, and a given deployment only installs one stack — keep new backends lazy-imported
   the same way. The
-  `qwen_image` loader turns a missing `ai_image_edit_qwen` package into an
+  `qwen_image21` loader turns a missing `ai_image_edit_qwen` package into an
   install hint and re-raises any other import error unchanged.
 - **Qwen-licensed code**: the Qwen-Image-2.1 pipeline and AOTI kernels live
   in the separate `ai_image_edit_qwen` package
   (https://github.com/pulb/ai_image_edit_qwen) under the Qwen Research
-  License, not the GPL. `src/ai_image_edit/models/qwen_image/model.py` only imports it.
+  License, not the GPL. `src/ai_image_edit/models/qwen_image21/model.py` only imports it.
   Never copy Qwen-licensed or Space-derived code into this repo.
 - **ComfyUI backends**: `models/comfyui/` holds what the ComfyUI-based
   backends share (`client.py`, `common.py`). Each backend's main weights file
   is named by the `MODEL_FILE` environment variable (a path relative to its
   folder under ComfyUI's `models/`), set in the backend's Dockerfile.
-  Qwen-Image-2.1 output sizes shared by `qwen_image` and `qwen_image21_gguf`
+  Qwen-Image-2.1 output sizes shared by `qwen_image21` and `qwen_image21_gguf`
   live in `models/qwen21_size.py`.
 - **Default backend**: `src/ai_image_edit/app.py` defaults `MODEL_BACKEND` to
   `qwen_image_edit_2511_aio`; each `deployments/docker/Dockerfile.*` sets

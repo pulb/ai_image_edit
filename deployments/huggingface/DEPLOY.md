@@ -1,6 +1,6 @@
 # Hugging Face Space
 
-Runs the `qwen_image` backend (diffusers pipeline for Qwen-Image-2.1) in a
+Runs the `qwen_image21` backend (diffusers pipeline for Qwen-Image-2.1) in a
 Gradio-SDK Space. The app is installed as a package from this repo; the
 Space itself only holds three small files. It serves on port `7860`.
 
@@ -21,7 +21,7 @@ private (see the [License](../../README.md#license) section).
 
 ## Backend and frontend
 
-`app.py` sets the defaults `MODEL_BACKEND=qwen_image` and `FRONTEND=gradio`.
+`app.py` sets the defaults `MODEL_BACKEND=qwen_image21` and `FRONTEND=gradio`.
 To change them, edit those two lines, or set `MODEL_BACKEND` / `FRONTEND`
 under **Settings → Variables and secrets** in the Space, which take
 precedence over the defaults. Valid frontends are `gradio` and `nicegui`.
@@ -30,7 +30,7 @@ Both are installed; the Gradio SDK provides Gradio itself.
 The Space runs without a password login: don't set `APP_PASSWORD`. Access is
 controlled by the Space's visibility (keep it private).
 
-Optional variables are the same as for `qwen_image` on RunPod (see
+Optional variables are the same as for `qwen_image21` on RunPod (see
 [`../runpod/DEPLOY.md`](../runpod/DEPLOY.md)), except `HF_HUB_CACHE`.
 
 ## Hardware

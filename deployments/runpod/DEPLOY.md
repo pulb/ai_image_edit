@@ -10,11 +10,11 @@ steps are described under [Build](#build) and [Pod setup](#pod-setup) below.
 
 | Backend | Dockerfile | Weights |
 |---|---|---|
-| `qwen_image` | [`Dockerfile.qwen_image`](../docker/Dockerfile.qwen_image) | downloaded from the Hugging Face Hub at startup |
+| `qwen_image21` | [`Dockerfile.qwen_image21`](../docker/Dockerfile.qwen_image21) | downloaded from the Hugging Face Hub at startup |
 | `qwen_image_edit_2511_aio` | [`Dockerfile.qwen_image_edit_2511_aio`](../docker/Dockerfile.qwen_image_edit_2511_aio) | checkpoint and LoRAs baked into the image |
 | `qwen_image21_gguf` | [`Dockerfile.qwen_image21_gguf`](../docker/Dockerfile.qwen_image21_gguf) | quantized GGUF weights baked into the image, chosen with build arguments (see [Docker](../docker/DEPLOY.md#gguf-image)) |
 
-The `qwen_image` image installs the separately licensed
+The `qwen_image21` image installs the separately licensed
 [`ai-image-edit-qwen`](https://github.com/pulb/ai_image_edit_qwen) package,
 so it combines GPL and Qwen-licensed code: keep it private (see the
 [License](../../README.md#license) section).
@@ -25,9 +25,9 @@ Each image sets its own `MODEL_BACKEND` and uses `FRONTEND=nicegui`, so
 no backend or frontend configuration is needed. Pick the backend by
 choosing the image.
 
-Optional Pod environment variables for `qwen_image`: `HF_TOKEN` (gated
+Optional Pod environment variables for `qwen_image21`: `HF_TOKEN` (gated
 weights or a private AOTI repo), `QWEN21_AOTI` / `QWEN21_AOTI_REPO` (see
-`src/ai_image_edit/models/qwen_image/model.py`), `HF_HUB_CACHE`.
+`src/ai_image_edit/models/qwen_image21/model.py`), `HF_HUB_CACHE`.
 
 For `qwen_image_edit_2511_aio`, `MODEL_FILE` selects the checkpoint
 (a path under ComfyUI's `models/checkpoints` folder). For `qwen_image21_gguf`,
@@ -66,8 +66,8 @@ SSH tunnel or Tailscale.
 From the repo root:
 
 ```bash
-# qwen_image
-docker build -f deployments/docker/Dockerfile.qwen_image -t ai-image-edit-qwen .
+# qwen_image21
+docker build -f deployments/docker/Dockerfile.qwen_image21 -t ai-image-edit-qwen .
 
 # qwen_image_edit_2511_aio
 docker build -f deployments/docker/Dockerfile.qwen_image_edit_2511_aio -t ai-image-edit .
@@ -77,13 +77,13 @@ docker build -f deployments/docker/Dockerfile.qwen_image21_gguf -t ai-image-edit
 ```
 
 `--build-arg QWEN_LIB_REF=<branch|tag|commit>` pins the package version of
-the `qwen_image` image (default `main`).
+the `qwen_image21` image (default `main`).
 
 ## CI build
 
-`.github/workflows/docker-qwen-image.yml` builds the `qwen_image` image on
+`.github/workflows/docker-qwen-image21.yml` builds the `qwen_image21` image on
 every push to `main` that touches the relevant files, on `v*` tags, and on
-manual runs. It pushes `ghcr.io/<owner>/<repo>-qwen-image` tagged `latest`,
+manual runs. It pushes `ghcr.io/<owner>/<repo>-qwen-image21` tagged `latest`,
 the git tag and the short commit SHA. Each build uses the newest commit of
 `ai-image-edit-qwen`, resolved when the build starts. Pushes to that
 package's repo don't trigger a build: run the workflow manually to pick them
@@ -94,14 +94,14 @@ a registry RunPod can pull from. It has not been tried on RunPod.
 
 ## Pod setup
 
-1. Create a Pod from the image (for `qwen_image`:
-   `ghcr.io/<owner>/<repo>-qwen-image:<tag>`), exposing HTTP port `7860`.
+1. Create a Pod from the image (for `qwen_image21`:
+   `ghcr.io/<owner>/<repo>-qwen-image21:<tag>`), exposing HTTP port `7860`.
    Recommended GPUs: A100 or L40S.
 2. If the registry package is private (GHCR packages are by default), add a
    registry credential under **Settings → Container Registry Auth** in the
    RunPod console. For GHCR that is your GitHub username and a PAT with
    `read:packages`; making the package public skips this.
-3. `qwen_image` only: attach a network volume (a Pod mounts it at
+3. `qwen_image21` only: attach a network volume (a Pod mounts it at
    `/workspace`) and set `HF_HUB_CACHE=/workspace/hf-cache`, so the multi-GB
    weights download once instead of on every fresh container.
 

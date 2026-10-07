@@ -5,7 +5,7 @@ submitting a workflow and waiting for it to finish, and fetching the
 result.
 
 Shared by the ComfyUI-based backends (qwen_image_edit_2511_aio,
-qwen_image21_gguf); a model like qwen_image that doesn't run through ComfyUI
+qwen_image21_gguf); a model like qwen_image21 that doesn't run through ComfyUI
 never touches it, and never has to.
 """
 import json

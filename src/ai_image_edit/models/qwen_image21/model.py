@@ -45,7 +45,7 @@ MAX_SEED = 2 ** 31 - 1
 
 DEFAULT_AOTI_REPO = "hugging-apps/qwen-image-2-1-aoti"
 
-class QwenImageModel(ModelBackend):
+class QwenImage21Model(ModelBackend):
     """Qwen-Image-2.1, run as a direct diffusers pipeline."""
 
     @property
@@ -153,7 +153,7 @@ class QwenImageModel(ModelBackend):
         def _infer(model_input_path: str) -> str:
             image_paths = [p for p in [model_input_path, *params.reference_images] if p]
             print(
-                f"[qwen_image] images={len(image_paths)} resolution_tier={resolution} "
+                f"[qwen_image21] images={len(image_paths)} resolution_tier={resolution} "
                 f"size={(gen_width, gen_height)} steps={params.steps} cfg={params.cfg}",
                 flush=True,
             )

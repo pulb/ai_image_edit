@@ -7,7 +7,7 @@ change "gradio" to "nicegui" to use NiceGUI.
 """
 import os
 
-os.environ.setdefault("MODEL_BACKEND", "qwen_image")
+os.environ.setdefault("MODEL_BACKEND", "qwen_image21")
 os.environ.setdefault("FRONTEND", "gradio")
 
 from ai_image_edit.app import main

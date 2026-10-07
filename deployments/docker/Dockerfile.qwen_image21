@@ -7,12 +7,12 @@
 # https://huggingface.co/Qwen/Qwen-Image-2.1/blob/main/LICENSE). The
 # resulting image combines both, so keep it private.
 #
-# Builds an image for the NiceGUI frontend + qwen_image backend only (the
+# Builds an image for the NiceGUI frontend + qwen_image21 backend only (the
 # direct diffusers pipeline, no ComfyUI). Meant for RunPod (a GPU pod
 # exposing port 7860) and Hugging Face (a Dockerfile-type Space, which
 # also expects port 7860). Unlike the sibling Dockerfile (which deploys
 # qwen_image_edit_2511_aio), this installs no ComfyUI, no gradio, and no
-# aria2-fetched checkpoints/LoRAs — qwen_image loads its weights from the
+# aria2-fetched checkpoints/LoRAs — qwen_image21 loads its weights from the
 # Hugging Face Hub at startup instead (see ai_image_edit_qwen's
 # pipeline.load()), so nothing needs to be baked into the image beyond
 # Python deps.
@@ -35,7 +35,7 @@ WORKDIR $HOME/app
 
 # Pin explicitly — app.py's own defaults already match, but a deployment
 # shouldn't depend on that staying true.
-ENV MODEL_BACKEND=qwen_image
+ENV MODEL_BACKEND=qwen_image21
 ENV FRONTEND=nicegui
 
 # Images (uploads, results) live in RAM under /dev/shm, never on disk. This
@@ -56,7 +56,7 @@ ARG TORCHVISION_VERSION=0.26.0
 RUN pip install --no-cache-dir --user torch==${TORCH_VERSION} torchvision==${TORCHVISION_VERSION} \
     --index-url https://download.pytorch.org/whl/cu126
 
-# Install the app as a package with the NiceGUI frontend, plus the qwen_image
+# Install the app as a package with the NiceGUI frontend, plus the qwen_image21
 # backend's inference package ai-image-edit-qwen, installed separately so
 # QWEN_LIB_REF can pin it to a branch, tag or commit. It brings the pinned
 # diffusers commit, transformers, accelerate and `spaces`. No gradio: this

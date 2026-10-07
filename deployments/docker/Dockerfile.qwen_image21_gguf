@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Qwen-Image 2.1 with quantized GGUF weights, run through ComfyUI and the
-# ComfyUI-GGUF custom node. Needs far less GPU memory than the qwen_image
+# ComfyUI-GGUF custom node. Needs far less GPU memory than the qwen_image21
 # image, so it runs on consumer GPUs. Which weights go into the image is
 # chosen with the build arguments below.
 #

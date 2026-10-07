@@ -1,26 +1,26 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Builds deployments/docker/Dockerfile.qwen_image (the NiceGUI + qwen_image image
+# Builds deployments/docker/Dockerfile.qwen_image21 (the NiceGUI + qwen_image21 image
 # meant for a RunPod GPU Pod) and pushes it to GHCR. This workflow only
 # builds and pushes — it does not touch a running RunPod Pod. RunPod's
 # API has no "swap this Pod's image" call, so redeploying means
 # terminating and recreating the Pod on the new tag yourself, via the
 # RunPod console or `runpodctl`, once you're ready to roll it out.
-name: Build qwen_image Docker image
+name: Build qwen_image21 Docker image
 
 on:
   push:
     branches: [main]
     tags: ["v*"]
     paths:
-      - "deployments/docker/Dockerfile.qwen_image"
+      - "deployments/docker/Dockerfile.qwen_image21"
       - "pyproject.toml"
       - "src/**"
   workflow_dispatch: {}
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}-qwen-image
+  IMAGE_NAME: ${{ github.repository }}-qwen-image21
 
 jobs:
   build-and-push:
@@ -67,7 +67,7 @@ jobs:
       - uses: docker/build-push-action@v6
         with:
           context: .
-          file: deployments/docker/Dockerfile.qwen_image
+          file: deployments/docker/Dockerfile.qwen_image21
           push: true
           build-args: |
             QWEN_LIB_REF=${{ steps.qwen_lib.outputs.sha }}

@@ -37,11 +37,11 @@ preconfigured with the most suitable backend.
   [GGUF weights](https://huggingface.co/abenzerps/Qwen-Image-2.1-Uncensored-GGUF),
   driven through ComfyUI and the
   [ComfyUI-GGUF](https://github.com/leejet/ComfyUI-GGUF) node. Needs far less
-  GPU memory than `qwen_image`: the default Q4_K_M quantization is a
+  GPU memory than `qwen_image21`: the default Q4_K_M quantization is a
   4.6 GB file, meant for consumer GPUs, at some cost in quality. Quantization, uncensored or unmodified model and text
   encoder precision are build arguments of its Dockerfile. The weights are
   under the Qwen RESEARCH LICENSE AGREEMENT (see [License](#license)).
-- **`qwen_image`** — a direct [diffusers](https://github.com/huggingface/diffusers)
+- **`qwen_image21`** — a direct [diffusers](https://github.com/huggingface/diffusers)
   pipeline for Qwen-Image-2.1. Needs the separately licensed
   [`ai-image-edit-qwen`](https://github.com/pulb/ai_image_edit_qwen)
   package (see [License](#license)).
@@ -61,13 +61,13 @@ The UI is served on port `7860`.
 
 | Target | Backend | Frontend | Guide |
 |---|---|---|---|
-| ⭐ **RunPod GPU Pod** (recommended) | `qwen_image_edit_2511_aio`, `qwen_image21_gguf`, `qwen_image` (one image each) | NiceGUI only | [`deployments/runpod`](deployments/runpod/DEPLOY.md) |
-| Hugging Face Space | `qwen_image` | Gradio (ZeroGPU), Gradio or NiceGUI (paid GPU) | [`deployments/huggingface`](deployments/huggingface/DEPLOY.md) |
-| Docker (self-hosted) | `qwen_image_edit_2511_aio`, `qwen_image21_gguf`, `qwen_image` (one image each) | NiceGUI only | [`deployments/docker`](deployments/docker/DEPLOY.md) |
+| ⭐ **RunPod GPU Pod** (recommended) | `qwen_image_edit_2511_aio`, `qwen_image21_gguf`, `qwen_image21` (one image each) | NiceGUI only | [`deployments/runpod`](deployments/runpod/DEPLOY.md) |
+| Hugging Face Space | `qwen_image21` | Gradio (ZeroGPU), Gradio or NiceGUI (paid GPU) | [`deployments/huggingface`](deployments/huggingface/DEPLOY.md) |
+| Docker (self-hosted) | `qwen_image_edit_2511_aio`, `qwen_image21_gguf`, `qwen_image21` (one image each) | NiceGUI only | [`deployments/docker`](deployments/docker/DEPLOY.md) |
 
 ### Generation times
 
-Approximate generation times for the `qwen_image` backend (Qwen-Image-2.1) on
+Approximate generation times for the `qwen_image21` backend (Qwen-Image-2.1) on
 common GPUs, by output resolution in megapixels (MP), at the default of 40
 steps. They are rough figures from single runs, not benchmarks, and will vary
 with the step count and reference images.
@@ -87,7 +87,7 @@ The Qwen-Image-2.1 weights used by the `qwen_image21_gguf` backend are under the
 same agreement (non-commercial use only); the GGUF files are third-party
 conversions, and the default uncensored variant is a third-party modified version of the model.
 
-The `qwen_image` backend depends on a separate package,
+The `qwen_image21` backend depends on a separate package,
 [`ai-image-edit-qwen`](https://github.com/pulb/ai_image_edit_qwen), which
 is under the Qwen RESEARCH LICENSE AGREEMENT rather than the GPL, as are
 the Qwen-Image-2.1 weights it loads. That agreement allows non-commercial

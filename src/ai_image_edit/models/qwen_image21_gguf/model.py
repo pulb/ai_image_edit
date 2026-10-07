@@ -3,7 +3,7 @@
 ModelBackend for Qwen-Image-2.1 with quantized GGUF weights, served through a
 local ComfyUI instance with the ComfyUI-GGUF custom node
 (https://github.com/leejet/ComfyUI-GGUF). The quantized weights fit on
-consumer GPUs, unlike the full-precision qwen_image backend.
+consumer GPUs, unlike the full-precision qwen_image21 backend.
 
 The graph is the official ComfyUI Qwen-Image-2.1 image-edit template with the
 diffusion model loaded through UnetLoaderGGUF (see workflow_api.json). The
@@ -12,7 +12,7 @@ path relative to its folder under ComfyUI's models/:
 MODEL_FILE (diffusion_models), TEXT_ENCODER_FILE (text_encoders), VAE_FILE (vae).
 
 ComfyUI wire-protocol details live in models/comfyui/client.py; output sizes
-are shared with the qwen_image backend (qwen21_size.py); crop/composite is
+are shared with the qwen_image21 backend (qwen21_size.py); crop/composite is
 core/imaging.py.
 """
 import json
