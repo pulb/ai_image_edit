@@ -11,6 +11,8 @@ front of a pluggable image-generation backend.
   <br>
 </p>
 
+## Features
+
 | Feature | Description |
 |---|---|
 | Privacy | Runs on your own hardware or in a disposable container, so your images and prompts stay under your control and vanish with it |
@@ -21,7 +23,12 @@ front of a pluggable image-generation backend.
 | Aspect ratios | Presets for common, widely used aspect ratios |
 | LoRAs | Optional LoRA support, auto-detected from a local loras folder |
 
-Backends, selected with `MODEL_BACKEND`:
+## Backends and frontends
+
+### Backends
+
+Selected with `MODEL_BACKEND`. The [deployments](#deployment) are already
+preconfigured with the most suitable backend.
 
 - **`qwen_image_edit_comfy`** (default) — Qwen-Image-Edit
   ([Phr00t's AIO merge](https://huggingface.co/Phr00t/Qwen-Image-Edit-Rapid-AIO))
@@ -31,7 +38,10 @@ Backends, selected with `MODEL_BACKEND`:
   [`ai-image-edit-qwen`](https://github.com/pulb/ai_image_edit_qwen)
   package (see [License](#license)).
 
-Frontends, selected with `FRONTEND`:
+### Frontends
+
+Selected with `FRONTEND`. The [deployments](#deployment) are already
+preconfigured with the most suitable frontend.
 
 - **[NiceGUI](https://nicegui.io/)** (default) — the snappier frontend.
 - **[Gradio](https://www.gradio.app/)** — fallback frontend, required for
@@ -46,6 +56,19 @@ The UI is served on port `7860`.
 | ⭐ **RunPod GPU Pod** (recommended) | `qwen_image_edit_comfy`, `qwen_image` (one image each) | NiceGUI only | [`deployments/runpod`](deployments/runpod/DEPLOY.md) |
 | Hugging Face Space | `qwen_image` | Gradio (ZeroGPU), Gradio or NiceGUI (paid GPU) | [`deployments/huggingface`](deployments/huggingface/DEPLOY.md) |
 | Docker (self-hosted) | `qwen_image_edit_comfy`, `qwen_image` (one image each) | NiceGUI only | [`deployments/docker`](deployments/docker/DEPLOY.md) |
+
+### Generation times
+
+Approximate generation times for the `qwen_image` backend (Qwen-Image-2.1) on
+common GPUs, by output resolution in megapixels (MP), at the default of 40
+steps. They are rough figures from single runs, not benchmarks, and will vary
+with the step count and reference images.
+
+| GPU | 1 MP | 2 MP |
+|---|---|---|
+| NVIDIA H200 | ~10 s | ~1 min |
+| NVIDIA A100 | ~20 s | ~2 min |
+| NVIDIA L40S | ~23 s | insufficient mem |
 
 ## License
 
