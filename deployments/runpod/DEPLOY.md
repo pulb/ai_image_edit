@@ -32,8 +32,10 @@ weights or a private AOTI repo), `QWEN21_AOTI` / `QWEN21_AOTI_REPO` (see
 For `qwen_image_edit_2511_aio`, `MODEL_FILE` selects the checkpoint
 (a path under ComfyUI's `models/checkpoints` folder). For `qwen_image21_gguf`,
 `MODEL_FILE`, `TEXT_ENCODER_FILE` and `VAE_FILE` select the weights, and
-`COMFY_EXTRA_ARGS` (e.g. `--lowvram`) passes arguments to ComfyUI. The image sets it to the
-weights it ships with; override it to use another file that exists in the Pod.
+`COMFY_EXTRA_ARGS` passes arguments to ComfyUI (which ones to use depending on
+the GPU memory: [Docker](../docker/DEPLOY.md#comfyui-arguments-comfy_extra_args)).
+The image sets the weight variables to the weights it ships with; override them
+to use another file that exists in the Pod.
 
 ## Image storage
 

@@ -105,8 +105,9 @@ RUN aria2c -x 16 -s 16 -k 1M -d models/vae -o "$VAE_FILE" \
 
 # Generations on smaller GPUs can take minutes (weights are offloaded to RAM).
 ENV COMFY_GENERATION_TIMEOUT=600
-# Extra ComfyUI command line arguments, e.g. "--lowvram" for GPUs with 8 GB or
-# less. Set at run time (docker run -e COMFY_EXTRA_ARGS=--lowvram).
+# Extra ComfyUI command line arguments, set at run time (docker run -e
+# COMFY_EXTRA_ARGS=...). Which ones to use depending on the GPU memory:
+# deployments/docker/DEPLOY.md.
 ENV COMFY_EXTRA_ARGS=""
 
 # Install the app as a package. It is built from its own directory, not the

@@ -77,15 +77,32 @@ docker run -p 7860:7860 --gpus all --shm-size=640m -e APP_PASSWORD=... ai-image-
 The image sets `MODEL_FILE`, `TEXT_ENCODER_FILE` and `VAE_FILE` (paths under
 ComfyUI's `models/diffusion_models`, `models/text_encoders` and `models/vae`)
 to the files it downloaded; override them to use other files that exist in
-the container. Set `COMFY_EXTRA_ARGS` at run time to pass arguments to ComfyUI,
-for example `-e COMFY_EXTRA_ARGS=--lowvram` on GPUs with little memory, and
-`COMFY_GENERATION_TIMEOUT` (seconds, default 600 here) for slow GPUs.
+the container. `COMFY_GENERATION_TIMEOUT` (seconds, default 600 here) is
+for slow GPUs.
+
+### ComfyUI arguments (`COMFY_EXTRA_ARGS`)
+
+Set `COMFY_EXTRA_ARGS` at run time to pass arguments to ComfyUI, for example
+`-e COMFY_EXTRA_ARGS="--highvram --disable-dynamic-vram"`:
+
+| Arguments | Use when |
+|---|---|
+| `--lowvram` | The GPU has little memory (about 8 GB or less). |
+| `--highvram --disable-dynamic-vram` | The GPU has about 32 GB or more (estimate; see below). By default ComfyUI re-stages the text encoder for every new prompt, which added roughly 10-15 s per generation in our tests; with these flags the weights stay on the GPU and generation time matches the Diffusers-based backend. `--disable-dynamic-vram` is deprecated in ComfyUI and will be removed. |
+| `--disable-comfy-compiler` | Sampling appears to hang on the first step. |
+
+The weights that `--highvram` keeps resident need roughly 26-30 GB with the
+default `Q4_K_M` model (about 12-13 GB model, 9 GB text encoder, under 1 GB VAE,
+plus 3-6 GB of activations while sampling) and about 40 GB with `Q8_0`. These
+figures are estimates: a 32 GB GPU is about the minimum, 40 GB or more is
+comfortable. On smaller GPUs leave the flags off. Check the actual peak with
+`nvidia-smi` during a generation.
+
 ComfyUI (`COMFYUI_REF`) and ComfyUI-GGUF (`COMFYUI_GGUF_REF`) are pinned to tested
 commits. ComfyUI-GGUF is also patched at build time
 (`patches/comfyui_gguf_input_act.py`): ComfyUI 0.39 passes new keyword
 arguments such as `input_act` to every Linear layer, which upstream does not
-accept yet. The build fails if the patch no longer applies. If sampling still
-appears to hang on the first step, try `-e COMFY_EXTRA_ARGS=--disable-comfy-compiler`.
+accept yet. The build fails if the patch no longer applies.
 The weights are under the Qwen RESEARCH LICENSE AGREEMENT
 (non-commercial use only).
 
