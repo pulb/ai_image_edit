@@ -1,12 +1,15 @@
 # Docker
 
 Three images, all built from the repo root. The app serves on port `7860`.
+Each image sets its own `MODEL_BACKEND` and uses `FRONTEND=nicegui`, so no
+backend or frontend configuration is needed: pick the backend by choosing the
+image.
 
 | Dockerfile | Backend | Frontend | Use |
 |---|---|---|---|
 | `Dockerfile.qwen_image_edit_2511_aio` | `qwen_image_edit_2511_aio` | `nicegui` | all-in-one checkpoint run through ComfyUI |
 | `Dockerfile.qwen_image21_gguf` | `qwen_image21_gguf` | `nicegui` | quantized Qwen-Image-2.1 for consumer GPUs |
-| `Dockerfile.qwen_image21` | `qwen_image21` | `nicegui` | see [RunPod](../runpod/DEPLOY.md) |
+| `Dockerfile.qwen_image21` | `qwen_image21` | `nicegui` | diffusers pipeline, weights downloaded at startup |
 
 ## Image storage
 
@@ -33,10 +36,19 @@ container's RAM limit.
 
 ## Password login
 
-The app sits behind a password login when `APP_PASSWORD` is
-set (for example `-e APP_PASSWORD=...`). All images set
-`REQUIRE_PASSWORD=1` and refuse to start without it. Details are in
-[`../runpod/DEPLOY.md`](../runpod/DEPLOY.md).
+The app sits behind a password login when `APP_PASSWORD` is set (for example
+`-e APP_PASSWORD=...`), which protects the whole app, including the image
+files it serves. All images set `REQUIRE_PASSWORD=1` and refuse to start
+without it.
+
+With NiceGUI (the images' frontend), logins survive restarts as long as the
+password stays the same; changing it logs everyone out. Set
+`APP_STORAGE_SECRET` to a long random value to keep sessions independent of
+the password. A wrong password is delayed by one second. The Gradio frontend
+also honors `APP_PASSWORD` (any username, shared password), but every restart
+logs everyone out. Either way this is a single shared password without real rate
+limiting. For stronger protection, don't expose the port and use an
+SSH tunnel or Tailscale.
 
 ## qwen_image_edit_2511_aio image
 
@@ -106,7 +118,37 @@ accept yet. The build fails if the patch no longer applies.
 The weights are under the Qwen RESEARCH LICENSE AGREEMENT
 (non-commercial use only).
 
+`.github/workflows/docker-qwen-image21-gguf.yml` builds the image (about
+15 GB with its weights) on manual runs, where quantization, uncensored or
+unmodified model and text encoder precision are inputs, and on `v*` tags. It
+pushes `ghcr.io/<owner>/<repo>-qwen-image21-gguf` tagged with the variant, for
+example `uc-q4_k_m`. Keep the package private for the same reason.
+
 ## qwen_image21 image
 
-Build and run steps, the Pod setup and the CI build are in
-[`../runpod/DEPLOY.md`](../runpod/DEPLOY.md).
+Diffusers pipeline with the weights downloaded from the Hugging Face Hub at
+startup (no ComfyUI). It installs the separately licensed
+[`ai-image-edit-qwen`](https://github.com/pulb/ai_image_edit_qwen) package, so
+it combines GPL and Qwen-licensed code: keep it private (see the
+[License](../../README.md#license) section).
+
+```bash
+docker build -f deployments/docker/Dockerfile.qwen_image21 -t ai-image-edit-qwen .
+docker run -p 7860:7860 --gpus all --shm-size=640m -e APP_PASSWORD=... ai-image-edit-qwen
+```
+
+`--build-arg QWEN_LIB_REF=<branch|tag|commit>` pins the package version
+(default `main`).
+
+Optional environment variables: `HF_TOKEN` (gated weights or a private AOTI
+repo), `QWEN21_AOTI` / `QWEN21_AOTI_REPO` (see
+`src/ai_image_edit/models/qwen_image21/model.py`), `HF_HUB_CACHE`. Point
+`HF_HUB_CACHE` at a volume so the multi-GB weights download once instead of on
+every fresh container.
+
+`.github/workflows/docker-qwen-image21.yml` builds the image on every push to
+`main` that touches the relevant files, on `v*` tags, and on manual runs. It
+pushes `ghcr.io/<owner>/<repo>-qwen-image21` tagged `latest`, the git tag and
+the short commit SHA. Each build uses the newest commit of
+`ai-image-edit-qwen`, resolved when the build starts. Pushes to that package's
+repo don't trigger a build: run the workflow manually to pick them up.

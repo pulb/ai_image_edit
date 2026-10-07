@@ -70,7 +70,7 @@ RUN pip install --no-cache-dir --user \
 
 # Optional runtime variables (HF_TOKEN, QWEN21_AOTI, QWEN21_AOTI_REPO) are
 # read from the environment, not baked in here; see
-# deployments/runpod/DEPLOY.md.
+# deployments/docker/DEPLOY.md.
 #
 # Weights aren't baked into this image (see the top-of-file note) — every
 # fresh container re-downloads Qwen-Image-2.1 from the Hub on startup. On

@@ -30,8 +30,9 @@ Both are installed; the Gradio SDK provides Gradio itself.
 The Space runs without a password login: don't set `APP_PASSWORD`. Access is
 controlled by the Space's visibility (keep it private).
 
-Optional variables are the same as for `qwen_image21` on RunPod (see
-[`../runpod/DEPLOY.md`](../runpod/DEPLOY.md)), except `HF_HUB_CACHE`.
+Optional variables are the same as for the `qwen_image21` image (see
+[`../docker/DEPLOY.md`](../docker/DEPLOY.md#qwen_image21-image)), except
+`HF_HUB_CACHE`.
 
 ## Hardware
 
@@ -48,6 +49,6 @@ Optional variables are the same as for `qwen_image21` on RunPod (see
   frontend and also runs under the Gradio SDK, because the Space just runs
   `app.py` on port `7860`.
 - To run it as a Docker Space instead, see
-  [`../runpod/DEPLOY.md`](../runpod/DEPLOY.md): the same image works, with
+  [`../docker/DEPLOY.md`](../docker/DEPLOY.md): the same image works, with
   `sdk: docker` in the card and the Dockerfile copied to the Space root as
   `Dockerfile`.
