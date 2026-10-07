@@ -184,8 +184,9 @@ def create_hidden_uploader() -> ui.upload:
     downstream validates file type either way; it is only a hint to the OS
     picker.
     """
-    uploader = ui.upload(auto_upload=True, max_files=1).props('accept="*/*"')
-    uploader.set_visibility(False)
+    # Hidden with a CSS class, not set_visibility(False): since NiceGUI 3.18
+    # the upload route rejects (403) uploads to elements that are not visible.
+    uploader = ui.upload(auto_upload=True, max_files=1).props('accept="*/*"').classes("hidden")
     return uploader
 
 
