@@ -18,7 +18,11 @@ much as the filesystem allows).
 
 The actual cap may be lower than that setting. It is limited to 90% of the
 size of `/dev/shm`, and Docker gives `/dev/shm` only 64 MB by default: pass
-`--shm-size=1g` (or more) to `docker run`. If the setting had to be lowered,
+`--shm-size=640m` (or more) to `docker run`. 640 MB is the smallest round
+size that fits the default 512 MB cap: 512 MB needs a `/dev/shm` of at least
+about 570 MB (512 / 0.9), and 640 MB leaves some headroom. If you raise
+`AI_IMAGE_EDIT_WORK_MAX_SIZE`, raise `--shm-size` to at least that value
+divided by 0.9. If the setting had to be lowered,
 the app prints a warning at startup. `/dev/shm` is shared with anything else
 in the container that uses it. `AI_IMAGE_EDIT_WORK_DIR` moves the folder
 elsewhere.
@@ -45,7 +49,7 @@ is empty or the file does not exist.
 
 ```bash
 docker build -f deployments/docker/Dockerfile.qwen_image_edit_2511_aio -t ai-image-edit .
-docker run -p 7860:7860 --gpus all --shm-size=1g -e APP_PASSWORD=... ai-image-edit
+docker run -p 7860:7860 --gpus all --shm-size=640m -e APP_PASSWORD=... ai-image-edit
 ```
 
 ## GGUF image
@@ -67,7 +71,7 @@ docker build -f deployments/docker/Dockerfile.qwen_image21_gguf -t ai-image-edit
 # unmodified model, Q8_0:
 docker build -f deployments/docker/Dockerfile.qwen_image21_gguf \
     --build-arg QWEN_GGUF_UNCENSORED= --build-arg QWEN_GGUF_QUANT=Q8_0 -t ai-image-edit-gguf .
-docker run -p 7860:7860 --gpus all --shm-size=1g -e APP_PASSWORD=... ai-image-edit-gguf
+docker run -p 7860:7860 --gpus all --shm-size=640m -e APP_PASSWORD=... ai-image-edit-gguf
 ```
 
 The image sets `MODEL_FILE`, `TEXT_ENCODER_FILE` and `VAE_FILE` (paths under
