@@ -80,6 +80,12 @@ to the files it downloaded; override them to use other files that exist in
 the container. Set `COMFY_EXTRA_ARGS` at run time to pass arguments to ComfyUI,
 for example `-e COMFY_EXTRA_ARGS=--lowvram` on GPUs with little memory, and
 `COMFY_GENERATION_TIMEOUT` (seconds, default 600 here) for slow GPUs.
+ComfyUI (`COMFYUI_REF`) and ComfyUI-GGUF (`COMFYUI_GGUF_REF`) are pinned to tested
+commits. ComfyUI-GGUF is also patched at build time
+(`patches/comfyui_gguf_input_act.py`): ComfyUI 0.39 passes new keyword
+arguments such as `input_act` to every Linear layer, which upstream does not
+accept yet. The build fails if the patch no longer applies. If sampling still
+appears to hang on the first step, try `-e COMFY_EXTRA_ARGS=--disable-comfy-compiler`.
 The weights are under the Qwen RESEARCH LICENSE AGREEMENT
 (non-commercial use only).
 

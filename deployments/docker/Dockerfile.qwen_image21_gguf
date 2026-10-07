@@ -37,8 +37,11 @@ ENV AI_IMAGE_EDIT_WORK_MAX_SIZE=512m
 # its own), so the app refuses to start unless APP_PASSWORD is set.
 ENV REQUIRE_PASSWORD=1
 
-# Clone ComfyUI
-RUN git clone https://github.com/Comfy-Org/ComfyUI.git .
+# Clone ComfyUI, pinned to a known commit (0.39.0) so that a later ComfyUI
+# change cannot silently break the GGUF node. Bump it deliberately and re-test.
+ARG COMFYUI_REF=87c32827017c50c6a629da941439015b4ad656e6
+RUN git clone https://github.com/Comfy-Org/ComfyUI.git . && \
+    git checkout ${COMFYUI_REF}
 
 # Install PyTorch (CUDA 12.6 wheels) manually — this base image has no
 # CUDA/PyTorch preinstalled, unlike the pytorch/pytorch image. --user
@@ -56,7 +59,16 @@ RUN pip install --no-cache-dir --user torch==${TORCH_VERSION} torchvision==${TOR
 RUN pip install --no-cache-dir --user -r requirements.txt
 
 # ComfyUI-GGUF custom node (loads the GGUF diffusion model) and its dependencies.
+# Pinned to a known commit and patched: ComfyUI >= 0.39 passes fused-activation
+# keyword arguments (input_act, ...) to every Linear layer, which upstream's
+# GGMLOps.Linear does not accept yet ("unexpected keyword argument 'input_act'").
+# The patch step fails the build if upstream's code has changed, so drop it
+# (and bump the ref) once upstream supports this.
+ARG COMFYUI_GGUF_REF=373048b8403a7820620065210a691263d4da0a61
+COPY deployments/docker/patches/comfyui_gguf_input_act.py /tmp/comfyui_gguf_input_act.py
 RUN git clone https://github.com/leejet/ComfyUI-GGUF custom_nodes/ComfyUI-GGUF && \
+    git -C custom_nodes/ComfyUI-GGUF checkout ${COMFYUI_GGUF_REF} && \
+    python /tmp/comfyui_gguf_input_act.py custom_nodes/ComfyUI-GGUF/ops.py && \
     pip install --no-cache-dir --user -r custom_nodes/ComfyUI-GGUF/requirements.txt
 
 # Which weights to bake into the image (build arguments, e.g.
