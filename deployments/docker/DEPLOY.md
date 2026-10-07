@@ -4,7 +4,7 @@ Three images, all built from the repo root. The app serves on port `7860`.
 
 | Dockerfile | Backend | Frontend | Use |
 |---|---|---|---|
-| `Dockerfile.qwen_image_edit_2511_aio` | `qwen_image_edit_2511_aio` | `nicegui` | self-hosted ComfyUI backend |
+| `Dockerfile.qwen_image_edit_2511_aio` | `qwen_image_edit_2511_aio` | `nicegui` | all-in-one checkpoint run through ComfyUI |
 | `Dockerfile.qwen_image21_gguf` | `qwen_image21_gguf` | `nicegui` | quantized Qwen-Image-2.1 for consumer GPUs |
 | `Dockerfile.qwen_image21` | `qwen_image21` | `nicegui` | see [RunPod](../runpod/DEPLOY.md) |
 
@@ -38,7 +38,7 @@ set (for example `-e APP_PASSWORD=...`). All images set
 `REQUIRE_PASSWORD=1` and refuse to start without it. Details are in
 [`../runpod/DEPLOY.md`](../runpod/DEPLOY.md).
 
-## ComfyUI image
+## qwen_image_edit_2511_aio image
 
 Clones ComfyUI, installs PyTorch, downloads the model checkpoint and a set of
 LoRAs, then starts the app. The checkpoint is set by two variables near the top
@@ -52,7 +52,7 @@ docker build -f deployments/docker/Dockerfile.qwen_image_edit_2511_aio -t ai-ima
 docker run -p 7860:7860 --gpus all --shm-size=640m -e APP_PASSWORD=... ai-image-edit
 ```
 
-## GGUF image
+## qwen_image21_gguf image
 
 Qwen-Image-2.1 with quantized GGUF weights, run through ComfyUI and the
 [ComfyUI-GGUF](https://github.com/leejet/ComfyUI-GGUF) node, which needs far

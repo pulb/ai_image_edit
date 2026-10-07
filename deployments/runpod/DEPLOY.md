@@ -12,7 +12,7 @@ steps are described under [Build](#build) and [Pod setup](#pod-setup) below.
 |---|---|---|
 | `qwen_image21` | [`Dockerfile.qwen_image21`](../docker/Dockerfile.qwen_image21) | downloaded from the Hugging Face Hub at startup |
 | `qwen_image_edit_2511_aio` | [`Dockerfile.qwen_image_edit_2511_aio`](../docker/Dockerfile.qwen_image_edit_2511_aio) | checkpoint and LoRAs baked into the image |
-| `qwen_image21_gguf` | [`Dockerfile.qwen_image21_gguf`](../docker/Dockerfile.qwen_image21_gguf) | quantized GGUF weights baked into the image, chosen with build arguments (see [Docker](../docker/DEPLOY.md#gguf-image)) |
+| `qwen_image21_gguf` | [`Dockerfile.qwen_image21_gguf`](../docker/Dockerfile.qwen_image21_gguf) | quantized GGUF weights baked into the image, chosen with build arguments (see [Docker](../docker/DEPLOY.md#qwen_image21_gguf-image)) |
 
 The `qwen_image21` image installs the separately licensed
 [`ai-image-edit-qwen`](https://github.com/pulb/ai_image_edit_qwen) package,
@@ -91,8 +91,8 @@ the git tag and the short commit SHA. Each build uses the newest commit of
 package's repo don't trigger a build: run the workflow manually to pick them
 up.
 
-There is no CI build for the ComfyUI image. Build it yourself and push it to
-a registry RunPod can pull from. It has not been tried on RunPod.
+There is no CI build for the `qwen_image_edit_2511_aio` image. Build it
+yourself and push it to a registry RunPod can pull from.
 
 ## Pod setup
 
