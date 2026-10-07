@@ -4,7 +4,7 @@ ModelBackend implementation for Phr00t's Qwen-Image-Edit-Rapid-AIO,
 served through a local ComfyUI instance:
 https://huggingface.co/Phr00t/Qwen-Image-Edit-Rapid-AIO
 
-All ComfyUI wire-protocol details live in comfy_client.py; pixel-level
+All ComfyUI wire-protocol details live in models/comfyui/client.py; pixel-level
 color-matching/compositing lives in core/imaging.py, shared with every
 other model that does external crop/mask/composite around inference. This
 module owns workflow construction (building the ComfyUI graph for one
@@ -29,7 +29,8 @@ from ai_image_edit.core.errors import GenerationError
 from ai_image_edit.core.result_cache import cached_infer
 from ai_image_edit.core.types import GenerationParams, GenerationResult, ModelCapabilities, RangeSpec
 from ai_image_edit.models.base import ModelBackend
-from ai_image_edit.models.qwen_image_edit_comfy import comfy_client
+from ai_image_edit.models.comfyui import client as comfy_client
+from ai_image_edit.models.comfyui.common import MODEL_FILE_ENV, SAMPLER_CHOICES, SCHEDULER_CHOICES, configured_file
 
 LORA_DIR = "models/loras"
 
@@ -42,20 +43,6 @@ DEFAULT_SAMPLER = "sa_solver"
 DEFAULT_SCHEDULER = "beta"
 DEFAULT_ASPECT_RATIO = "Original"
 
-# Valid ComfyUI KSampler scheduler names (from comfy/samplers.py's SCHEDULER_HANDLERS).
-SCHEDULER_CHOICES = ["normal", "karras", "exponential", "simple", "ddim_uniform", "beta", "sgm_uniform", "linear_quadratic", "kl_optimal"]
-
-# Valid ComfyUI KSampler sampler names (comfy/samplers.py's KSAMPLER_NAMES + ["ddim", "uni_pc", "uni_pc_bh2"]).
-SAMPLER_CHOICES = [
-    "euler", "euler_cfg_pp", "euler_ancestral", "euler_ancestral_cfg_pp", "heun", "heunpp2",
-    "exp_heun_2_x0", "exp_heun_2_x0_sde", "dpm_2", "dpm_2_ancestral",
-    "lms", "dpm_fast", "dpm_adaptive", "dpmpp_2s_ancestral", "dpmpp_2s_ancestral_cfg_pp", "dpmpp_sde", "dpmpp_sde_gpu",
-    "dpmpp_2m", "dpmpp_2m_cfg_pp", "dpmpp_2m_sde", "dpmpp_2m_sde_gpu", "dpmpp_2m_sde_heun", "dpmpp_2m_sde_heun_gpu",
-    "dpmpp_3m_sde", "dpmpp_3m_sde_gpu", "ddpm", "lcm",
-    "ipndm", "ipndm_v", "deis", "res_multistep", "res_multistep_cfg_pp", "res_multistep_ancestral", "res_multistep_ancestral_cfg_pp",
-    "gradient_estimation", "gradient_estimation_cfg_pp", "er_sde", "seeds_2", "seeds_3", "sa_solver", "sa_solver_pece",
-    "ddim", "uni_pc", "uni_pc_bh2"
-]
 
 # Fixed negative prompt applied to every generation (node 4 in workflow_api.json).
 NEGATIVE_PROMPT = "worst quality, low quality, bad anatomy, bad hands, text, error, missing fingers, extra digit, fewer digits, cropped, jpeg artifacts, signature, watermark, username, blurry"
@@ -63,22 +50,10 @@ NEGATIVE_PROMPT = "worst quality, low quality, bad anatomy, bad hands, text, err
 # workflow_api.json lives next to this file (shipped as package data).
 WORKFLOW_PATH = Path(__file__).parent / "workflow_api.json"
 
-# The checkpoint comes from this environment variable (a path relative to
-# ComfyUI's models/checkpoints folder), not from the workflow file, so it is
-# defined in one place only — the Dockerfile.
-CHECKPOINT_ENV = "COMFY_CHECKPOINT_PATH"
+# The checkpoint comes from the MODEL_FILE environment variable (a path
+# relative to ComfyUI's models/checkpoints folder), not from the workflow
+# file, so it is defined in one place only — the Dockerfile.
 CHECKPOINTS_DIR = Path("models/checkpoints")
-
-
-def _checkpoint_name() -> str:
-    """The configured checkpoint path, with forward slashes. Raises if it is not set."""
-    value = os.environ.get(CHECKPOINT_ENV, "").strip().replace("\\", "/")
-    if not value:
-        raise RuntimeError(
-            f"{CHECKPOINT_ENV} is not set: set it to the checkpoint's path relative to "
-            f"ComfyUI's {CHECKPOINTS_DIR} folder."
-        )
-    return value
 
 # Aspect ratio presets: label -> (w_ratio, h_ratio) fed into the target-area
 # formula below. "Original" is a sentinel meaning "derive dimensions from
@@ -125,7 +100,7 @@ def _dimensions_for(aspect_w: int, aspect_h: int, target_area: float, multiple: 
     return (final_w, final_h)
 
 
-class QwenImageEditComfyModel(ModelBackend):
+class QwenImageEdit2511AIOModel(ModelBackend):
     """Qwen-Image-Edit-Rapid-AIO, run through a local ComfyUI server."""
 
     def __init__(self) -> None:
@@ -138,7 +113,7 @@ class QwenImageEditComfyModel(ModelBackend):
     @property
     def model_version(self) -> Optional[str]:
         """The "vNN" part of the checkpoint filename, e.g. "v23"."""
-        match = re.search(r"-(v\d+)(?=\.|-|_|$)", os.environ.get(CHECKPOINT_ENV, ""))
+        match = re.search(r"-(v\d+)(?=\.|-|_|$)", os.environ.get(MODEL_FILE_ENV, ""))
         return match.group(1) if match else None
 
     @property
@@ -167,9 +142,7 @@ class QwenImageEditComfyModel(ModelBackend):
 
     def start(self) -> None:
         # Checked before ComfyUI starts, so a missing setting or file fails fast.
-        checkpoint = CHECKPOINTS_DIR / _checkpoint_name()
-        if not checkpoint.is_file():
-            raise RuntimeError(f"Checkpoint file not found: {checkpoint} (set by {CHECKPOINT_ENV}).")
+        configured_file(MODEL_FILE_ENV, CHECKPOINTS_DIR)
         self._process = comfy_client.launch_comfy_process()
 
     def shutdown(self) -> None:
@@ -239,7 +212,7 @@ class QwenImageEditComfyModel(ModelBackend):
         with open(WORKFLOW_PATH, "r", encoding="utf-8") as f:
             workflow = json.load(f)
 
-        workflow["1"]["inputs"]["ckpt_name"] = _checkpoint_name()
+        workflow["1"]["inputs"]["ckpt_name"] = configured_file(MODEL_FILE_ENV, CHECKPOINTS_DIR)
 
         workflow["7"]["inputs"]["image"] = comfy_client.upload_image(source_image_path)
 
@@ -329,7 +302,7 @@ class QwenImageEditComfyModel(ModelBackend):
             params.source_image_path, effective_aspect_ratio, params.target_megapixels
         )
         print(
-            f"[qwen_image_edit_comfy] mask={'yes' if params.mask_path else 'no'} gen_dims={gen_width}x{gen_height} "
+            f"[qwen_image_edit_2511_aio] mask={'yes' if params.mask_path else 'no'} gen_dims={gen_width}x{gen_height} "
             f"mp={params.target_megapixels} steps={params.steps} sampler={params.sampler_name} scheduler={params.scheduler}",
             flush=True,
         )
@@ -347,11 +320,11 @@ class QwenImageEditComfyModel(ModelBackend):
 
             t0 = time.time()
             prompt_id = comfy_client.submit_workflow_and_wait(workflow, client_id)
-            print(f"[qwen_image_edit_comfy] ComfyUI generation took {time.time() - t0:.1f}s", flush=True)
+            print(f"[qwen_image_edit_2511_aio] ComfyUI generation took {time.time() - t0:.1f}s", flush=True)
 
             t1 = time.time()
             output_path = comfy_client.fetch_generated_image(prompt_id)
-            print(f"[qwen_image_edit_comfy] fetch_generated_image took {time.time() - t1:.1f}s", flush=True)
+            print(f"[qwen_image_edit_2511_aio] fetch_generated_image took {time.time() - t1:.1f}s", flush=True)
             return output_path
 
         infer = cached_infer(_infer, self.display_name, params, seed=actual_seed, width=gen_width, height=gen_height)

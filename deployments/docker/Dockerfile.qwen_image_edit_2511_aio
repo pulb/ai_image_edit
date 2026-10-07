@@ -21,7 +21,7 @@ WORKDIR $HOME/app
 # This image is built for the ComfyUI-based model specifically (it clones
 # ComfyUI and downloads its checkpoint/LoRAs below) — pin the backend
 # explicitly rather than relying on the app's own default.
-ENV MODEL_BACKEND=qwen_image_edit_comfy
+ENV MODEL_BACKEND=qwen_image_edit_2511_aio
 
 # Images (uploads, results, ComfyUI's input/output/temp folders) live in RAM
 # under /dev/shm, never on disk. This is the soft cap the app enforces by
@@ -53,20 +53,19 @@ RUN pip install --no-cache-dir --user torch==${TORCH_VERSION} torchvision==${TOR
 RUN pip install --no-cache-dir --user -r requirements.txt
 
 # The checkpoint: where to download it from, and where it is stored relative
-# to models/checkpoints. The app loads whatever COMFY_CHECKPOINT_PATH names
-# and refuses to start if that file is missing. To use other weights, change
-# both values.
-ENV COMFY_CHECKPOINT_URL="https://huggingface.co/Phr00t/Qwen-Image-Edit-Rapid-AIO/resolve/main/v23/Qwen-Rapid-AIO-NSFW-v23.safetensors?download=true" \
-    COMFY_CHECKPOINT_PATH="Qwen/Qwen-Rapid-AIO-v23.safetensors"
+# to models/checkpoints. The app loads whatever MODEL_FILE names and refuses
+# to start if that file is missing. To use other weights, change both values.
+ENV MODEL_FILE_URL="https://huggingface.co/Phr00t/Qwen-Image-Edit-Rapid-AIO/resolve/main/v23/Qwen-Rapid-AIO-NSFW-v23.safetensors?download=true" \
+    MODEL_FILE="Qwen/Qwen-Rapid-AIO-v23.safetensors"
 
 # Download the checkpoint (16 concurrent connections)
 RUN aria2c -x 16 -s 16 -k 1M \
-    -d "models/checkpoints/$(dirname "$COMFY_CHECKPOINT_PATH")" \
-    -o "$(basename "$COMFY_CHECKPOINT_PATH")" \
-    "$COMFY_CHECKPOINT_URL"
+    -d "models/checkpoints/$(dirname "$MODEL_FILE")" \
+    -o "$(basename "$MODEL_FILE")" \
+    "$MODEL_FILE_URL"
 
 # Download LoRAs. Each goes into its own models/loras/<Name> subfolder —
-# QwenImageEditComfyModel.list_loras() (models/qwen_image_edit_comfy/model.py)
+# QwenImageEdit2511AIOModel.list_loras() (models/qwen_image_edit_2511_aio/model.py)
 # uses the subfolder name as the display name and loads every
 # .safetensors/.pt file inside it together, which is why AnyPose (two
 # weight files) gets two -o'd downloads into the same folder.

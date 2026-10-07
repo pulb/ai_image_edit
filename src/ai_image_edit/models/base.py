@@ -9,7 +9,7 @@ in-process torch pipeline, or anything else) is the model's own
 business and never leaks into this contract — that's what lets a completely
 different execution model (e.g. qwen_image's direct torch pipeline, with no
 ComfyUI involved at all) implement the same interface as
-qwen_image_edit_comfy without either one needing to know about the other.
+qwen_image_edit_2511_aio without either one needing to know about the other.
 """
 from abc import ABC, abstractmethod
 from typing import Dict, List, Optional

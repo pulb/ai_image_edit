@@ -30,9 +30,17 @@ front of a pluggable image-generation backend.
 Selected with `MODEL_BACKEND`. The [deployments](#deployment) are already
 preconfigured with the most suitable backend.
 
-- **`qwen_image_edit_comfy`** (default) — Qwen-Image-Edit
+- **`qwen_image_edit_2511_aio`** (default) — Qwen-Image-Edit 2511
   ([Phr00t's AIO merge](https://huggingface.co/Phr00t/Qwen-Image-Edit-Rapid-AIO))
   plus a curated set of LoRAs, driven through [ComfyUI](https://github.com/comfyanonymous/ComfyUI).
+- **`qwen_image21_gguf`** — Qwen-Image-2.1 with quantized
+  [GGUF weights](https://huggingface.co/abenzerps/Qwen-Image-2.1-Uncensored-GGUF),
+  driven through ComfyUI and the
+  [ComfyUI-GGUF](https://github.com/leejet/ComfyUI-GGUF) node. Needs far less
+  GPU memory than `qwen_image`: the default Q4_K_M quantization is a
+  4.6 GB file, meant for consumer GPUs, at some cost in quality. Quantization, uncensored or unmodified model and text
+  encoder precision are build arguments of its Dockerfile. The weights are
+  under the Qwen RESEARCH LICENSE AGREEMENT (see [License](#license)).
 - **`qwen_image`** — a direct [diffusers](https://github.com/huggingface/diffusers)
   pipeline for Qwen-Image-2.1. Needs the separately licensed
   [`ai-image-edit-qwen`](https://github.com/pulb/ai_image_edit_qwen)
@@ -53,9 +61,9 @@ The UI is served on port `7860`.
 
 | Target | Backend | Frontend | Guide |
 |---|---|---|---|
-| ⭐ **RunPod GPU Pod** (recommended) | `qwen_image_edit_comfy`, `qwen_image` (one image each) | NiceGUI only | [`deployments/runpod`](deployments/runpod/DEPLOY.md) |
+| ⭐ **RunPod GPU Pod** (recommended) | `qwen_image_edit_2511_aio`, `qwen_image21_gguf`, `qwen_image` (one image each) | NiceGUI only | [`deployments/runpod`](deployments/runpod/DEPLOY.md) |
 | Hugging Face Space | `qwen_image` | Gradio (ZeroGPU), Gradio or NiceGUI (paid GPU) | [`deployments/huggingface`](deployments/huggingface/DEPLOY.md) |
-| Docker (self-hosted) | `qwen_image_edit_comfy`, `qwen_image` (one image each) | NiceGUI only | [`deployments/docker`](deployments/docker/DEPLOY.md) |
+| Docker (self-hosted) | `qwen_image_edit_2511_aio`, `qwen_image21_gguf`, `qwen_image` (one image each) | NiceGUI only | [`deployments/docker`](deployments/docker/DEPLOY.md) |
 
 ### Generation times
 
@@ -74,6 +82,10 @@ with the step count and reference images.
 
 Licensed under the GNU General Public License v3.0 or later
 (GPL-3.0-or-later). See [`LICENSE`](LICENSE) for the full text.
+
+The Qwen-Image-2.1 weights used by the `qwen_image21_gguf` backend are under the
+same agreement (non-commercial use only); the GGUF files are third-party
+conversions, and the default uncensored variant is a third-party modified version of the model.
 
 The `qwen_image` backend depends on a separate package,
 [`ai-image-edit-qwen`](https://github.com/pulb/ai_image_edit_qwen), which

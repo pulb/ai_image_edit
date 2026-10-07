@@ -1,0 +1,91 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# Builds deployments/docker/Dockerfile.qwen_image21_gguf (ComfyUI + quantized
+# GGUF Qwen-Image-2.1, for consumer GPUs) and pushes it to GHCR. The weights
+# (~15 GB) are baked into the image, so this runs only on manual dispatch and
+# on v* tags, not on every push. The weights are under the Qwen RESEARCH
+# LICENSE AGREEMENT (non-commercial): keep the package private.
+name: Build qwen_image21_gguf Docker image
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      quant:
+        description: GGUF quantization (Q4_0, Q4_K_M, Q5_K_M, Q6_K, Q8_0, BF16 for uncensored only)
+        default: Q4_K_M
+      uncensored:
+        description: Use the uncensored model
+        type: boolean
+        default: true
+      text_encoder_quant:
+        description: Text encoder precision
+        type: choice
+        options: [int8_convrot, bf16]
+        default: int8_convrot
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}-qwen-image21-gguf
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      # The weights plus PyTorch need far more than the runner's free disk.
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          sudo docker image prune --all --force
+          df -h /
+
+      - uses: actions/checkout@v4
+
+      # GHCR requires a lowercase image path.
+      - name: Lowercase image name
+        run: echo "IMAGE_NAME_LC=${IMAGE_NAME,,}" >> "$GITHUB_ENV"
+
+      # Defaults apply on tag pushes, where there are no inputs. The tag
+      # names the variant, e.g. uc-q4_k_m or standard-q8_0.
+      - name: Resolve variant
+        run: |
+          quant="${{ inputs.quant || 'Q4_K_M' }}"
+          if [ "${{ inputs.uncensored }}" = "false" ]; then
+            echo "UNCENSORED=" >> "$GITHUB_ENV"; echo "VARIANT=standard-${quant,,}" >> "$GITHUB_ENV"
+          else
+            echo "UNCENSORED=1" >> "$GITHUB_ENV"; echo "VARIANT=uc-${quant,,}" >> "$GITHUB_ENV"
+          fi
+          echo "QUANT=$quant" >> "$GITHUB_ENV"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/metadata-action@v5
+        id: meta
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LC }}
+          tags: |
+            type=raw,value=${{ env.VARIANT }}
+            type=ref,event=tag,suffix=-${{ env.VARIANT }}
+
+      # No layer cache: the huge weight layers would exceed the Actions cache.
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deployments/docker/Dockerfile.qwen_image21_gguf
+          push: true
+          build-args: |
+            QWEN_GGUF_UNCENSORED=${{ env.UNCENSORED }}
+            QWEN_GGUF_QUANT=${{ env.QUANT }}
+            QWEN_TEXT_ENCODER_QUANT=${{ inputs.text_encoder_quant || 'int8_convrot' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}

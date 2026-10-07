@@ -1,0 +1,112 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Qwen-Image 2.1 with quantized GGUF weights, run through ComfyUI and the
+# ComfyUI-GGUF custom node. Needs far less GPU memory than the qwen_image
+# image, so it runs on consumer GPUs. Which weights go into the image is
+# chosen with the build arguments below.
+#
+# Base image: plain Python (Debian slim), no bundled CUDA/PyTorch — torch
+# is installed manually below via pip, which pulls its own bundled CUDA
+# runtime libs (cuDNN, cuBLAS, NCCL, etc.) from the cu126 wheel index. No
+# system CUDA toolkit is needed since nothing here compiles CUDA code.
+FROM python:3.11-slim
+
+# Install system dependencies 
+RUN apt-get update && apt-get install -y git wget libgl1 libglib2.0-0 build-essential aria2 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Add  HF user
+RUN useradd -m -u 1000 user
+USER user
+ENV MKL_THREADING_LAYER=GNU
+
+ENV HOME=/home/user \
+    PATH=/home/user/.local/bin:$PATH
+WORKDIR $HOME/app
+
+# Pin the backend explicitly rather than relying on the app's own default.
+ENV MODEL_BACKEND=qwen_image21_gguf
+
+# Images (uploads, results, ComfyUI's input/output/temp folders) live in RAM
+# under /dev/shm, never on disk. This is the soft cap the app enforces by
+# deleting the oldest files first. It cannot exceed 90% of the container's
+# /dev/shm (docker run --shm-size; Docker's default is 64 MB), and the app
+# warns at startup if it had to lower it.
+ENV AI_IMAGE_EDIT_WORK_MAX_SIZE=512m
+
+# This image is meant for public hosts (RunPod's HTTP proxy has no login of
+# its own), so the app refuses to start unless APP_PASSWORD is set.
+ENV REQUIRE_PASSWORD=1
+
+# Clone ComfyUI
+RUN git clone https://github.com/Comfy-Org/ComfyUI.git .
+
+# Install PyTorch (CUDA 12.6 wheels) manually — this base image has no
+# CUDA/PyTorch preinstalled, unlike the pytorch/pytorch image. --user
+# installs into $HOME/.local since /usr/local is root-owned here.
+ARG TORCH_VERSION=2.11.0
+ARG TORCHVISION_VERSION=0.26.0
+ARG TORCHAUDIO_VERSION=2.11.0
+RUN pip install --no-cache-dir --user torch==${TORCH_VERSION} torchvision==${TORCHVISION_VERSION} torchaudio==${TORCHAUDIO_VERSION} \
+    --index-url https://download.pytorch.org/whl/cu126
+    
+# Install Python dependencies (including packages for Custom Nodes).
+# requirements.txt here is ComfyUI's own, from the git clone above. The app's
+# own dependencies come from the ai-image-edit package's extras, installed
+# below.
+RUN pip install --no-cache-dir --user -r requirements.txt
+
+# ComfyUI-GGUF custom node (loads the GGUF diffusion model) and its dependencies.
+RUN git clone https://github.com/leejet/ComfyUI-GGUF custom_nodes/ComfyUI-GGUF && \
+    pip install --no-cache-dir --user -r custom_nodes/ComfyUI-GGUF/requirements.txt
+
+# Which weights to bake into the image (build arguments, e.g.
+# --build-arg QWEN_GGUF_QUANT=Q8_0):
+#   QWEN_GGUF_REPO          Hugging Face repo with the GGUF files and the
+#                           companion text encoder/VAE files below.
+#   QWEN_GGUF_UNCENSORED    Non-empty (default 1): the third-party uncensored version,
+#                           qwen-image-2.1-UC-<quant>.gguf. Empty
+#                           (--build-arg QWEN_GGUF_UNCENSORED=): the
+#                           unmodified model, qwen-image-2.1-<quant>.gguf.
+#   QWEN_GGUF_QUANT         Q4_0, Q4_K_M (default), Q5_K_M, Q6_K, Q8_0 or, for
+#                           the uncensored model only, BF16. Larger = better
+#                           quality, more memory.
+#   QWEN_TEXT_ENCODER_QUANT int8_convrot (default, 9.4 GB) or bf16 (17.5 GB).
+ARG QWEN_GGUF_REPO=abenzerps/Qwen-Image-2.1-Uncensored-GGUF
+ARG QWEN_GGUF_UNCENSORED=1
+ARG QWEN_GGUF_QUANT=Q4_K_M
+ARG QWEN_TEXT_ENCODER_QUANT=int8_convrot
+
+# The files, as paths relative to the matching folder under models/. The app
+# loads whatever these name and refuses to start if one is missing.
+ENV MODEL_FILE="qwen-image-2.1-${QWEN_GGUF_UNCENSORED:+UC-}${QWEN_GGUF_QUANT}.gguf" \
+    TEXT_ENCODER_FILE="qwen3vl_8b_${QWEN_TEXT_ENCODER_QUANT}.safetensors" \
+    VAE_FILE="qwen_image_2.1_vae_bf16.safetensors"
+
+# Download the files (16 concurrent connections each). One RUN per file, so
+# every image layer stays below GHCR's per-layer size limit.
+RUN aria2c -x 16 -s 16 -k 1M -d models/diffusion_models -o "$MODEL_FILE" \
+    "https://huggingface.co/${QWEN_GGUF_REPO}/resolve/main/$MODEL_FILE?download=true"
+RUN aria2c -x 16 -s 16 -k 1M -d models/text_encoders -o "$TEXT_ENCODER_FILE" \
+    "https://huggingface.co/${QWEN_GGUF_REPO}/resolve/main/text_encoders/$TEXT_ENCODER_FILE?download=true"
+RUN aria2c -x 16 -s 16 -k 1M -d models/vae -o "$VAE_FILE" \
+    "https://huggingface.co/${QWEN_GGUF_REPO}/resolve/main/vae/$VAE_FILE?download=true"
+
+# Generations on smaller GPUs can take minutes (weights are offloaded to RAM).
+ENV COMFY_GENERATION_TIMEOUT=600
+# Extra ComfyUI command line arguments, e.g. "--lowvram" for GPUs with 8 GB or
+# less. Set at run time (docker run -e COMFY_EXTRA_ARGS=--lowvram).
+ENV COMFY_EXTRA_ARGS=""
+
+# Install the app as a package. It is built from its own directory, not the
+# ComfyUI checkout (which has a pyproject.toml of its own). The app is
+# started from the ComfyUI root, which the backend relies on (main.py,
+# models/).
+COPY --chown=user pyproject.toml LICENSE $HOME/pkg/
+COPY --chown=user src $HOME/pkg/src
+RUN pip install --no-cache-dir --user "$HOME/pkg[comfy_backend,nicegui_frontend]"
+
+# Enable port 
+EXPOSE 7860
+
+# Start App
+CMD ["python", "-m", "ai_image_edit"]

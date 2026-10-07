@@ -37,4 +37,5 @@ gradio_frontend = ["gradio"]
 where = ["src"]
 
 [tool.setuptools.package-data]
-"ai_image_edit.models.qwen_image_edit_comfy" = ["workflow_api.json"]
+"ai_image_edit.models.qwen_image_edit_2511_aio" = ["workflow_api.json"]
+"ai_image_edit.models.qwen_image21_gguf" = ["workflow_api.json"]

@@ -82,7 +82,7 @@ class ModelCapabilities:
     supports_cfg: bool = True
     supports_denoise: bool = True
     supports_seed: bool = True
-    # False by default: qwen_image_edit_comfy applies its own fixed negative
+    # False by default: qwen_image_edit_2511_aio applies its own fixed negative
     # prompt internally and never asks the user for one. A model that wants
     # a user-facing negative-prompt box (only useful alongside supports_cfg,
     # since CFG is what actually uses it) sets this True.

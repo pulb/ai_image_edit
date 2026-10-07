@@ -1,17 +1,18 @@
 # RunPod
 
-Runs either backend with the NiceGUI frontend in a GPU Pod. Each backend has
+Runs any backend with the NiceGUI frontend in a GPU Pod. Each backend has
 its own image, built from the repo root. The app serves on port `7860`.
 
 A public [RunPod template](https://console.runpod.io/hub/template/ayt3pyrp7w?ref=e1nr94ls)
-works with either image. You only need to replace its container image with
+works with any of the images. You only need to replace its container image with
 your own and, if your registry is private, add registry credentials. Both
 steps are described under [Build](#build) and [Pod setup](#pod-setup) below.
 
 | Backend | Dockerfile | Weights |
 |---|---|---|
 | `qwen_image` | [`Dockerfile.qwen_image`](../docker/Dockerfile.qwen_image) | downloaded from the Hugging Face Hub at startup |
-| `qwen_image_edit_comfy` | [`Dockerfile.qwen_image_edit_comfy`](../docker/Dockerfile.qwen_image_edit_comfy) | checkpoint and LoRAs baked into the image |
+| `qwen_image_edit_2511_aio` | [`Dockerfile.qwen_image_edit_2511_aio`](../docker/Dockerfile.qwen_image_edit_2511_aio) | checkpoint and LoRAs baked into the image |
+| `qwen_image21_gguf` | [`Dockerfile.qwen_image21_gguf`](../docker/Dockerfile.qwen_image21_gguf) | quantized GGUF weights baked into the image, chosen with build arguments (see [Docker](../docker/DEPLOY.md#gguf-image)) |
 
 The `qwen_image` image installs the separately licensed
 [`ai-image-edit-qwen`](https://github.com/pulb/ai_image_edit_qwen) package,
@@ -28,8 +29,10 @@ Optional Pod environment variables for `qwen_image`: `HF_TOKEN` (gated
 weights or a private AOTI repo), `QWEN21_AOTI` / `QWEN21_AOTI_REPO` (see
 `src/ai_image_edit/models/qwen_image/model.py`), `HF_HUB_CACHE`.
 
-For `qwen_image_edit_comfy`, `COMFY_CHECKPOINT_PATH` selects the checkpoint
-(a path under ComfyUI's `models/checkpoints` folder). The image sets it to the
+For `qwen_image_edit_2511_aio`, `MODEL_FILE` selects the checkpoint
+(a path under ComfyUI's `models/checkpoints` folder). For `qwen_image21_gguf`,
+`MODEL_FILE`, `TEXT_ENCODER_FILE` and `VAE_FILE` select the weights, and
+`COMFY_EXTRA_ARGS` (e.g. `--lowvram`) passes arguments to ComfyUI. The image sets it to the
 weights it ships with; override it to use another file that exists in the Pod.
 
 ## Image storage
@@ -46,7 +49,7 @@ prints a warning at startup). Check it with `df -h /dev/shm` in the Pod.
 RunPod's HTTP proxy is public and has no login of its own, so anyone with
 the Pod URL can use the app. Set the Pod environment variable
 `APP_PASSWORD` to put the whole app, including the image files it serves,
-behind a password login page. Both images set `REQUIRE_PASSWORD=1` and
+behind a password login page. All images set `REQUIRE_PASSWORD=1` and
 refuse to start without `APP_PASSWORD`.
 
 With NiceGUI (the images' frontend), logins survive restarts as long as the
@@ -66,8 +69,11 @@ From the repo root:
 # qwen_image
 docker build -f deployments/docker/Dockerfile.qwen_image -t ai-image-edit-qwen .
 
-# qwen_image_edit_comfy
-docker build -f deployments/docker/Dockerfile.qwen_image_edit_comfy -t ai-image-edit .
+# qwen_image_edit_2511_aio
+docker build -f deployments/docker/Dockerfile.qwen_image_edit_2511_aio -t ai-image-edit .
+
+# qwen_image21_gguf
+docker build -f deployments/docker/Dockerfile.qwen_image21_gguf -t ai-image-edit-gguf .
 ```
 
 `--build-arg QWEN_LIB_REF=<branch|tag|commit>` pins the package version of
@@ -103,3 +109,10 @@ a registry RunPod can pull from. It has not been tried on RunPod.
 
 RunPod can't swap a running Pod's image. Terminate and recreate the Pod on
 the new tag (console or `runpodctl`).
+
+`.github/workflows/docker-qwen-image21-gguf.yml` builds the `qwen_image21_gguf`
+image (about 15 GB with its weights) on manual runs, where quantization,
+uncensored or unmodified model and text encoder precision are inputs, and on
+`v*` tags. It pushes `ghcr.io/<owner>/<repo>-qwen-image21-gguf` tagged with the
+variant, for example `uc-q4_k_m`. Keep the package private: the weights are
+under the Qwen RESEARCH LICENSE AGREEMENT (non-commercial use only).

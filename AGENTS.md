@@ -65,9 +65,10 @@ Rules for any AI coding agent working in this repository.
   new backend in `models/__init__.py`'s `MODEL_LOADERS`.
 - **Lazy model imports**: `models/__init__.py` imports each backend's
   module lazily, inside its loader function, not at module top level.
-  The two shipped backends (`qwen_image`, `qwen_image_edit_comfy`) have
-  almost disjoint dependency sets, and a given deployment only installs
-  one of them — keep new backends lazy-imported the same way. The
+  The shipped backends (`qwen_image` vs. the ComfyUI-based
+  `qwen_image_edit_2511_aio` and `qwen_image21_gguf`) have almost disjoint
+  dependency sets, and a given deployment only installs one stack — keep new backends lazy-imported
+  the same way. The
   `qwen_image` loader turns a missing `ai_image_edit_qwen` package into an
   install hint and re-raises any other import error unchanged.
 - **Qwen-licensed code**: the Qwen-Image-2.1 pipeline and AOTI kernels live
@@ -75,9 +76,15 @@ Rules for any AI coding agent working in this repository.
   (https://github.com/pulb/ai_image_edit_qwen) under the Qwen Research
   License, not the GPL. `src/ai_image_edit/models/qwen_image/model.py` only imports it.
   Never copy Qwen-licensed or Space-derived code into this repo.
+- **ComfyUI backends**: `models/comfyui/` holds what the ComfyUI-based
+  backends share (`client.py`, `common.py`). Each backend's main weights file
+  is named by the `MODEL_FILE` environment variable (a path relative to its
+  folder under ComfyUI's `models/`), set in the backend's Dockerfile.
+  Qwen-Image-2.1 output sizes shared by `qwen_image` and `qwen_image21_gguf`
+  live in `models/qwen21_size.py`.
 - **Default backend**: `src/ai_image_edit/app.py` defaults `MODEL_BACKEND` to
-  `qwen_image_edit_comfy`; `deployments/docker/Dockerfile.qwen_image` sets
-  `MODEL_BACKEND=qwen_image` explicitly.
+  `qwen_image_edit_2511_aio`; each `deployments/docker/Dockerfile.*` sets
+  `MODEL_BACKEND` explicitly.
 - **Masking**: masked generation (crop → infer → composite/color-correct)
   is handled externally via `core/imaging.py`'s `run_masked_generation()`,
   shared by every backend that supports inpainting. A model backend does

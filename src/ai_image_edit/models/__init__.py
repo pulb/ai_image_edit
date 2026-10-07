@@ -4,13 +4,13 @@ Registry + factory for model backends.
 
 Each model's module is imported lazily, inside its loader function, rather
 than at the top of this file. That matters concretely here:
-qwen_image_edit_comfy and qwen_image have almost disjoint dependency sets
-(ComfyUI's own stack vs. the separately installed ai-image-edit-qwen
-package with torch/diffusers/spaces), and a given
-deployment only ever runs one of them. Importing both eagerly at package
-load would mean a comfy-only deployment breaks at startup unless it *also*
-installs diffusers/spaces/torch, and vice versa — with lazy imports, each
-deployment only needs the one model it actually selected to be installed.
+the ComfyUI backends (qwen_image_edit_2511_aio, qwen_image21_gguf) and
+qwen_image have almost disjoint dependency sets (ComfyUI's own stack vs. the
+separately installed ai-image-edit-qwen package with torch/diffusers/spaces),
+and a given deployment only ever runs one of them. Importing all eagerly at
+package load would mean a comfy-only deployment breaks at startup unless it
+*also* installs diffusers/spaces/torch, and vice versa — with lazy imports,
+each deployment only needs the one model it actually selected to be installed.
 
 Add a new model by writing a class that implements ModelBackend
 (models/base.py) and adding one small loader function + one line in
@@ -21,10 +21,16 @@ from typing import Callable, Dict
 from ai_image_edit.models.base import ModelBackend
 
 
-def _load_qwen_image_edit_comfy() -> ModelBackend:
-    from ai_image_edit.models.qwen_image_edit_comfy import QwenImageEditComfyModel
+def _load_qwen_image_edit_2511_aio() -> ModelBackend:
+    from ai_image_edit.models.qwen_image_edit_2511_aio import QwenImageEdit2511AIOModel
 
-    return QwenImageEditComfyModel()
+    return QwenImageEdit2511AIOModel()
+
+
+def _load_qwen_image21_gguf() -> ModelBackend:
+    from ai_image_edit.models.qwen_image21_gguf import QwenImage21GGUFModel
+
+    return QwenImage21GGUFModel()
 
 
 def _load_qwen_image() -> ModelBackend:
@@ -42,7 +48,8 @@ def _load_qwen_image() -> ModelBackend:
 
 
 MODEL_LOADERS: Dict[str, Callable[[], ModelBackend]] = {
-    "qwen_image_edit_comfy": _load_qwen_image_edit_comfy,
+    "qwen_image_edit_2511_aio": _load_qwen_image_edit_2511_aio,
+    "qwen_image21_gguf": _load_qwen_image21_gguf,
     "qwen_image": _load_qwen_image,
 }
 

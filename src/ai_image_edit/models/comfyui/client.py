@@ -4,16 +4,17 @@ ComfyUI wire protocol: launching the server process, uploading images,
 submitting a workflow and waiting for it to finish, and fetching the
 result.
 
-Private to qwen_image_edit_comfy — nothing outside models/qwen_image_edit_comfy/
-imports this. Any future ComfyUI-based model can reuse it directly; a model
-like qwen_image that doesn't run through ComfyUI never touches it, and
-never has to.
+Shared by the ComfyUI-based backends (qwen_image_edit_2511_aio,
+qwen_image21_gguf); a model like qwen_image that doesn't run through ComfyUI
+never touches it, and never has to.
 """
 import json
+import os
+import shlex
 import subprocess
 import time
 import urllib.request
-from typing import Optional
+from typing import List, Optional
 
 import requests
 import websocket
@@ -27,24 +28,39 @@ SERVER_ADDRESS = "127.0.0.1:8188"
 # ComfyUI job that stalls, fails without emitting a proper execution_error
 # message, or a websocket connection that silently drops would leave the
 # app hanging forever with no feedback.
-GENERATION_TIMEOUT_SECONDS = 120
+# COMFY_GENERATION_TIMEOUT overrides the default (seconds); slower GPUs need more.
+GENERATION_TIMEOUT_SECONDS = int(os.environ.get("COMFY_GENERATION_TIMEOUT", "120"))
 
 
 def launch_comfy_process() -> subprocess.Popen:
     """
     Starts the ComfyUI server in the background. -u forces unbuffered
     output, so startup progress isn't silently swallowed. Returns the Popen
-    handle so the caller (QwenImageEditComfyModel.shutdown) can terminate it.
+    handle so the caller can terminate it. COMFY_EXTRA_ARGS adds command line
+    arguments, e.g. --lowvram.
     """
     print("Starting ComfyUI server in the background...", flush=True)
     # ComfyUI's input/output/temp folders live under WORK_DIR too, so
     # everything the app handles sits in one place (RAM-backed by default).
     comfy_dir = WORK_DIR.resolve() / "comfy"
-    args = ["--port", "8188"]
+    args = ["--port", "8188", *shlex.split(os.environ.get("COMFY_EXTRA_ARGS", ""))]
     for name in ("input", "output", "temp"):
         (comfy_dir / name).mkdir(parents=True, exist_ok=True)
         args += [f"--{name}-directory", str(comfy_dir / name)]
     return subprocess.Popen(["python", "-u", "main.py", *args])
+
+
+def missing_nodes(class_names: List[str]) -> List[str]:
+    """The node classes among `class_names` that the running ComfyUI does not know."""
+    try:
+        return [
+            name for name in class_names
+            if not requests.get(f"http://{SERVER_ADDRESS}/object_info/{name}", timeout=10).json()
+        ]
+    except (requests.exceptions.RequestException, ValueError) as e:
+        raise GenerationError(
+            f"Cannot reach ComfyUI ({e}). The backend may still be starting or has crashed. Please wait a moment and try again."
+        )
 
 
 def upload_image(filepath: Optional[str]) -> Optional[str]:
