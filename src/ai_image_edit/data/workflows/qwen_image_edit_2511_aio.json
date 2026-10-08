@@ -1,0 +1,170 @@
+{
+  "format_version": 1,
+  "manifest": {
+    "model_name": "Qwen-Image-Edit Rapid-AIO",
+    "model_version": {"env": "MODEL_FILE", "regex": "-(v\\d+)(?=\\.|-|_|$)"},
+    "required_nodes": [],
+
+    "files": [
+      {"env": "MODEL_FILE", "folder": "models/checkpoints", "set": "1.ckpt_name"}
+    ],
+
+    "bind": {
+      "prompt":    "3.prompt",
+      "seed":      "2.seed",
+      "steps":     "2.steps",
+      "cfg":       "2.cfg",
+      "denoise":   "2.denoise",
+      "sampler":   "2.sampler_name",
+      "scheduler": "2.scheduler"
+    },
+    "constants": {
+      "4.prompt": "worst quality, low quality, bad anatomy, bad hands, text, error, missing fingers, extra digit, fewer digits, cropped, jpeg artifacts, signature, watermark, username, blurry"
+    },
+    "seed": {"min": 1, "max": 4294967295, "wrap": false},
+
+    "images": {
+      "source": "7.image",
+      "references": {"target": "3.image{n}", "first_n": 2, "loader_ids": ["8", "10"], "max": 2}
+    },
+
+    "size": {"policy": "fixed_area", "megapixels": [1.0], "multiple": 8, "bind": {"width": "9.width", "height": "9.height"}},
+
+    "loras": {
+      "dir": "models/loras",
+      "loader_class": "LoraLoader",
+      "first_id": 100,
+      "from": {"model": ["1", 0], "clip": ["1", 1]},
+      "outputs": ["model", "clip"],
+      "feeds": {"model": ["2.model"], "clip": ["3.clip", "4.clip"]},
+      "strength_inputs": ["strength_model", "strength_clip"]
+    },
+
+    "capabilities": {
+      "supports_inpainting": true,
+      "num_annotation_colors": 1,
+      "sampler": {"default": "sa_solver"},
+      "scheduler": {"default": "beta"},
+      "steps": {"min": 1, "max": 10, "default": 4, "step": 1},
+      "cfg": {"min": 0.1, "max": 10.0, "default": 1.0, "step": 0.1},
+      "denoise": {"min": 0.0, "max": 1.0, "default": 1.0, "step": 0.01},
+      "lora_strength": {"min": 0.1, "max": 2.0, "default": 0.7, "step": 0.05}
+    }
+  },
+  "workflow": {
+    "1": {
+      "inputs": {
+        "ckpt_name": ""
+      },
+      "class_type": "CheckpointLoaderSimple"
+    },
+    "2": {
+      "inputs": {
+        "seed": 65454653,
+        "steps": 4,
+        "cfg": 1,
+        "sampler_name": "sa_solver",
+        "scheduler": "beta",
+        "denoise": 1,
+        "model": [
+          "1",
+          0
+        ],
+        "positive": [
+          "3",
+          0
+        ],
+        "negative": [
+          "4",
+          0
+        ],
+        "latent_image": [
+          "9",
+          0
+        ]
+      },
+      "class_type": "KSampler"
+    },
+    "3": {
+      "inputs": {
+        "prompt": "Put the woman holding a balloon next to the ninja in the hallway.",
+        "clip": [
+          "1",
+          1
+        ],
+        "vae": [
+          "1",
+          2
+        ],
+        "image1": [
+          "7",
+          0
+        ],
+        "image2": [
+          "8",
+          0
+        ]
+      },
+      "class_type": "TextEncodeQwenImageEditPlus"
+    },
+    "4": {
+      "inputs": {
+        "prompt": "",
+        "clip": [
+          "1",
+          1
+        ],
+        "vae": [
+          "1",
+          2
+        ]
+      },
+      "class_type": "TextEncodeQwenImageEditPlus"
+    },
+    "5": {
+      "inputs": {
+        "samples": [
+          "2",
+          0
+        ],
+        "vae": [
+          "1",
+          2
+        ]
+      },
+      "class_type": "VAEDecode"
+    },
+    "6": {
+      "inputs": {
+        "filename_prefix": "ComfyUI",
+        "images": [
+          "5",
+          0
+        ]
+      },
+      "class_type": "SaveImage"
+    },
+    "7": {
+      "inputs": {
+        "image": "ComfyUI_temp_zmuag_00002_.png",
+        "upload": "image"
+      },
+      "class_type": "LoadImage"
+    },
+    "8": {
+      "inputs": {
+        "image": "ComfyUI_temp_ljpig_00008_.png",
+        "upload": "image"
+      },
+      "class_type": "LoadImage"
+    },
+    "9": {
+      "inputs": {
+        "width": 768,
+        "height": 768,
+        "batch_size": 1
+      },
+      "class_type": "EmptyLatentImage"
+    }
+  }
+}

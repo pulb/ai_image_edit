@@ -29,6 +29,8 @@ comfy_backend = [
     "sentencepiece",
     "transformers",
 ]
+# Tests (see AGENTS.md)
+test = ["jsonschema"]
 # Frontends (FRONTEND)
 nicegui_frontend = ["nicegui==3.18.0"]
 gradio_frontend = ["gradio"]
@@ -37,5 +39,6 @@ gradio_frontend = ["gradio"]
 where = ["src"]
 
 [tool.setuptools.package-data]
-# ComfyUI models are folders of data (a manifest and a workflow), not packages.
-"ai_image_edit.models" = ["*/manifest.json", "*/workflow_api.json"]
+# The workflow files and their JSON Schema are installed with the app.
+"ai_image_edit" = ["data/*.json", "data/workflows/*.json"]
+

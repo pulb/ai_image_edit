@@ -1,0 +1,238 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/pulb/ai_image_edit/blob/main/src/ai_image_edit/data/workflow.schema.json",
+  "title": "AI Image Edit workflow file",
+  "description": "A ComfyUI workflow (API format) plus the manifest that maps the app's inputs onto it. Described in doc/contribution/workflow_files.md.",
+  "type": "object",
+  "required": ["format_version", "manifest", "workflow"],
+  "additionalProperties": false,
+  "properties": {
+    "format_version": {"const": 1},
+    "manifest": {"$ref": "#/$defs/manifest"},
+    "workflow": {"$ref": "#/$defs/workflow"}
+  },
+  "$defs": {
+    "target": {
+      "description": "A workflow input: '<node id>.<input name>'. The input name may contain dots.",
+      "type": "string",
+      "pattern": "^[^.\\s]+\\..+$"
+    },
+    "range": {
+      "type": "object",
+      "required": ["min", "max", "default"],
+      "additionalProperties": false,
+      "properties": {
+        "min": {"type": "number"},
+        "max": {"type": "number"},
+        "default": {"type": "number"},
+        "step": {"type": "number", "exclusiveMinimum": 0}
+      }
+    },
+    "choices": {
+      "description": "A name of a built-in list or the list itself.",
+      "oneOf": [
+        {"enum": ["comfy_samplers", "comfy_schedulers"]},
+        {"type": "array", "items": {"type": "string"}, "minItems": 1}
+      ]
+    },
+    "choice_setting": {
+      "type": "object",
+      "required": ["default"],
+      "additionalProperties": false,
+      "properties": {
+        "default": {"type": "string"},
+        "choices": {"$ref": "#/$defs/choices"}
+      }
+    },
+    "link": {
+      "description": "A reference to an output of a node: [node id, output slot].",
+      "type": "array",
+      "prefixItems": [{"type": "string"}, {"type": "integer", "minimum": 0}],
+      "items": false,
+      "minItems": 2
+    },
+    "workflow": {
+      "description": "A ComfyUI workflow exported with 'Save (API Format)'. Inputs the app fills in carry a placeholder.",
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "object",
+        "required": ["class_type", "inputs"],
+        "properties": {
+          "class_type": {"type": "string", "minLength": 1},
+          "inputs": {"type": "object"},
+          "_meta": {"type": "object"}
+        },
+        "additionalProperties": false
+      }
+    },
+    "manifest": {
+      "type": "object",
+      "required": ["model_name", "files", "bind", "images", "size", "capabilities"],
+      "additionalProperties": false,
+      "properties": {
+        "model_name": {"type": "string", "minLength": 1},
+        "model_version": {
+          "description": "The version shown after the name: a string, or (transitional, until weights are declared in the file) a rule that derives it from an environment variable.",
+          "oneOf": [
+            {"type": "string", "minLength": 1},
+            {
+              "type": "object",
+              "required": ["env", "regex"],
+              "additionalProperties": false,
+              "properties": {
+                "env": {"type": "string"},
+                "regex": {"type": "string", "format": "regex"},
+                "basename": {"type": "boolean"},
+                "ignore_case": {"type": "boolean"},
+                "upper": {"type": "boolean"},
+                "prefixes": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": ["regex", "text"],
+                    "additionalProperties": false,
+                    "properties": {"regex": {"type": "string"}, "text": {"type": "string"}}
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "required_nodes": {"type": "array", "items": {"type": "string"}},
+        "missing_nodes_hint": {"type": "string"},
+        "files": {
+          "description": "Weight files: the variable holds a path relative to folder, which is written to 'set'.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["env", "folder", "set"],
+            "additionalProperties": false,
+            "properties": {
+              "env": {"type": "string"},
+              "folder": {"type": "string"},
+              "set": {"$ref": "#/$defs/target"}
+            }
+          }
+        },
+        "bind": {
+          "type": "object",
+          "required": ["prompt", "seed", "steps", "sampler", "scheduler"],
+          "additionalProperties": false,
+          "properties": {
+            "prompt": {"$ref": "#/$defs/target"},
+            "negative_prompt": {"$ref": "#/$defs/target"},
+            "seed": {"$ref": "#/$defs/target"},
+            "steps": {"$ref": "#/$defs/target"},
+            "cfg": {"$ref": "#/$defs/target"},
+            "denoise": {"$ref": "#/$defs/target"},
+            "sampler": {"$ref": "#/$defs/target"},
+            "scheduler": {"$ref": "#/$defs/target"}
+          }
+        },
+        "constants": {
+          "type": "object",
+          "propertyNames": {"$ref": "#/$defs/target"}
+        },
+        "seed": {
+          "type": "object",
+          "required": ["min", "max"],
+          "additionalProperties": false,
+          "properties": {
+            "min": {"type": "integer", "minimum": 0},
+            "max": {"type": "integer", "minimum": 1},
+            "wrap": {"type": "boolean"}
+          }
+        },
+        "images": {
+          "type": "object",
+          "required": ["source"],
+          "additionalProperties": false,
+          "properties": {
+            "source": {"$ref": "#/$defs/target"},
+            "references": {
+              "type": "object",
+              "required": ["target", "max"],
+              "additionalProperties": false,
+              "properties": {
+                "target": {"type": "string", "pattern": "^[^.\\s]+\\..*\\{n\\}.*$"},
+                "first_n": {"type": "integer", "minimum": 0},
+                "max": {"type": "integer", "minimum": 1},
+                "loader_ids": {"type": "array", "items": {"type": "string"}, "minItems": 1},
+                "loader_id_start": {"type": "integer", "minimum": 0}
+              },
+              "oneOf": [{"required": ["loader_ids"]}, {"required": ["loader_id_start"]}]
+            }
+          }
+        },
+        "size": {
+          "type": "object",
+          "required": ["policy", "bind"],
+          "properties": {
+            "policy": {"enum": ["qwen21_tiers", "fixed_area"]},
+            "bind": {"type": "object", "additionalProperties": {"$ref": "#/$defs/target"}}
+          },
+          "allOf": [
+            {
+              "if": {"properties": {"policy": {"const": "qwen21_tiers"}}},
+              "then": {
+                "properties": {"policy": true, "bind": {"required": ["resolution"], "propertyNames": {"const": "resolution"}}},
+                "additionalProperties": false
+              }
+            },
+            {
+              "if": {"properties": {"policy": {"const": "fixed_area"}}},
+              "then": {
+                "required": ["megapixels"],
+                "properties": {
+                  "policy": true,
+                  "bind": {"required": ["width", "height"], "propertyNames": {"enum": ["width", "height"]}},
+                  "megapixels": {"type": "array", "items": {"type": "number", "exclusiveMinimum": 0}, "minItems": 1},
+                  "default_megapixels": {"type": "number", "exclusiveMinimum": 0},
+                  "multiple": {"type": "integer", "minimum": 1}
+                },
+                "additionalProperties": false
+              }
+            }
+          ]
+        },
+        "loras": {
+          "type": "object",
+          "required": ["dir", "loader_class", "first_id", "from", "outputs", "feeds", "strength_inputs"],
+          "additionalProperties": false,
+          "properties": {
+            "dir": {"type": "string"},
+            "loader_class": {"type": "string"},
+            "first_id": {"type": "integer", "minimum": 0},
+            "from": {"type": "object", "minProperties": 1, "additionalProperties": {"$ref": "#/$defs/link"}},
+            "outputs": {"type": "array", "items": {"type": "string"}, "minItems": 1},
+            "feeds": {
+              "type": "object",
+              "minProperties": 1,
+              "additionalProperties": {"type": "array", "items": {"$ref": "#/$defs/target"}, "minItems": 1}
+            },
+            "strength_inputs": {"type": "array", "items": {"type": "string"}, "minItems": 1}
+          }
+        },
+        "capabilities": {
+          "type": "object",
+          "required": ["supports_inpainting", "sampler", "scheduler", "steps"],
+          "additionalProperties": false,
+          "properties": {
+            "supports_inpainting": {"type": "boolean"},
+            "num_annotation_colors": {"type": "integer", "minimum": 0},
+            "sampler": {"$ref": "#/$defs/choice_setting"},
+            "scheduler": {"$ref": "#/$defs/choice_setting"},
+            "steps": {"$ref": "#/$defs/range"},
+            "cfg": {"$ref": "#/$defs/range"},
+            "denoise": {"$ref": "#/$defs/range"},
+            "lora_strength": {"$ref": "#/$defs/range"}
+          }
+        }
+      },
+      "dependentSchemas": {
+        "loras": {"properties": {"capabilities": {"required": ["lora_strength"]}}}
+      }
+    }
+  }
+}

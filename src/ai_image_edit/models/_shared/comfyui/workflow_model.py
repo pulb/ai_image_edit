@@ -1,14 +1,10 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """
-A ModelBackend that is described by data instead of code: a folder with a
-ComfyUI workflow (workflow_api.json, API format) and a manifest.json that says
-how the app's inputs map onto that workflow.
-
-    models/<name>/manifest.json
-    models/<name>/workflow_api.json
-
-A model is registered by creating such a folder (see models/__init__.py). The
-manifest format is documented in doc/contribution/comfy_manifest.md.
+A ModelBackend that is described by data instead of code: one JSON file
+(ai_image_edit/data/workflows/<name>.json) with a ComfyUI workflow in API format and a
+manifest that says how the app's inputs map onto that workflow. The file is
+registered by its name (see models/__init__.py); its format is documented in
+doc/contribution/workflow_files.md.
 
 Workflow targets are written "<node id>.<input name>", e.g. "6.seed"; the
 input name may itself contain dots ("5.images.image_2").
@@ -32,6 +28,7 @@ from ai_image_edit.models.base import ModelBackend
 from ai_image_edit.models._shared.comfyui import client as comfy_client
 from ai_image_edit.models._shared.comfyui.common import SAMPLER_CHOICES, SCHEDULER_CHOICES, configured_file
 from ai_image_edit.models._shared.comfyui.size_policies import POLICIES, ResolvedSize, SizePolicy
+from ai_image_edit.models._shared.comfyui.workflow_files import read_workflow_file
 
 _NAMED_CHOICES = {"comfy_samplers": SAMPLER_CHOICES, "comfy_schedulers": SCHEDULER_CHOICES}
 _BINDABLE = {"prompt", "negative_prompt", "seed", "steps", "cfg", "sampler", "scheduler", "denoise"}
@@ -69,13 +66,11 @@ class ComfyWorkflowModel(ModelBackend):
         self._validate()
 
     @classmethod
-    def from_manifest(cls, manifest_path: Path) -> "ComfyWorkflowModel":
-        manifest_path = Path(manifest_path)
-        with open(manifest_path, "r", encoding="utf-8") as f:
-            manifest = json.load(f)
-        with open(manifest_path.parent / manifest.get("workflow", "workflow_api.json"), "r", encoding="utf-8") as f:
-            workflow = json.load(f)
-        return cls(manifest_path.parent.name, manifest, workflow)
+    def from_file(cls, path: Path) -> "ComfyWorkflowModel":
+        """The model described by a workflow file; its name is the file name without .json."""
+        path = Path(path)
+        manifest, workflow = read_workflow_file(path)
+        return cls(path.stem, manifest, workflow)
 
     # ------------------------------------------------------------ validation
 
@@ -134,6 +129,9 @@ class ComfyWorkflowModel(ModelBackend):
         spec = self._manifest.get("model_version")
         if not spec:
             return None
+        if isinstance(spec, str):
+            return spec
+        # Transitional: derived from the weights file name until the weights are declared in the file.
         value = os.environ.get(spec["env"], "")
         if spec.get("basename"):
             value = Path(value).name
