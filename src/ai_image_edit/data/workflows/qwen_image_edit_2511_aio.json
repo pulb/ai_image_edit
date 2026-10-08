@@ -2,7 +2,7 @@
   "format_version": 1,
   "manifest": {
     "model_name": "Qwen-Image-Edit Rapid-AIO",
-    "model_version": {"env": "MODEL_FILE", "regex": "-(v\\d+)(?=\\.|-|_|$)", "default": "Qwen/Qwen-Rapid-AIO-v23.safetensors"},
+    "model_version": "v23",
     "required_nodes": [],
 
     "files": [

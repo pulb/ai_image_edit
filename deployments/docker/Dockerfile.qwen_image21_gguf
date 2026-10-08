@@ -92,7 +92,8 @@ ARG QWEN_TEXT_ENCODER_QUANT=int8_convrot
 # loads whatever these name and refuses to start if one is missing.
 ENV MODEL_FILE="qwen-image-2.1-${QWEN_GGUF_UNCENSORED:+UC-}${QWEN_GGUF_QUANT}.gguf" \
     TEXT_ENCODER_FILE="qwen3vl_8b_${QWEN_TEXT_ENCODER_QUANT}.safetensors" \
-    VAE_FILE="qwen_image_2.1_vae_bf16.safetensors"
+    VAE_FILE="qwen_image_2.1_vae_bf16.safetensors" \
+    MODEL_VERSION="${QWEN_GGUF_UNCENSORED:+UC }${QWEN_GGUF_QUANT}"
 
 # Download the files (16 concurrent connections each). One RUN per file, so
 # every image layer stays below GHCR's per-layer size limit.

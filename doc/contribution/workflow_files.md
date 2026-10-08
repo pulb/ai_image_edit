@@ -2,7 +2,7 @@
 
 A ComfyUI model is one JSON file in `src/ai_image_edit/data/workflows/`; no Python is
 needed. The files are package data, so they are installed with the app. The file name is the
-backend name (`MODEL_BACKEND=<name>`), and the file is found automatically.
+backend name (`--model <name>` or `MODEL_BACKEND=<name>`), and the file is found automatically. A file anywhere else is run with `--workflow <path>` (or `WORKFLOW_FILE`); its name is then the file name without `.json`.
 
 ```json
 {
@@ -28,7 +28,9 @@ mistyped node id or input name fails when the model loads.
 | Key | Meaning |
 |---|---|
 | `model_name` | Name shown in the UI. |
-| `model_version` | Optional. The version shown after the name, as a string. Transitional: instead of a string, a rule that derives it from the weights file name: `env` (environment variable; `default` is used when it is not set), `regex` (group 1 is the version), `basename`, `ignore_case`, `upper`, and `prefixes` (`[{regex, text}]` prepended when matching). It goes away when the weights are declared in the file. |
+| `model_version` | Optional. The version shown after the name, e.g. `"UC Q4_K_M"`. The `MODEL_VERSION` environment variable overrides it (for weights chosen with the `env` overrides). |
+| `custom_nodes` | `[{name, git, ref}]`: ComfyUI custom nodes installed to `custom_nodes/<name>` if that folder is missing, from the `https://` git repository at the exact commit `ref` (40 hex digits), plus its `requirements.txt`. This is how a patched fork is referenced. An existing folder is left as it is. |
+| `variants` | `{id: {model_version, files: {<set target>: {name, url, sha256, size, license}}}}`: alternatives selected with `--variant id` / `MODEL_VARIANT`. A variant replaces the keys it gives in the `files` entry with that `set` target, and the `model_version`. |
 | `required_nodes`, `missing_nodes_hint` | Node classes ComfyUI must provide, checked on the first generation, and the advice shown if they are missing. |
 | `files` | Weight files, each written to `set`. `name` is the file name relative to `folder` (a folder below the ComfyUI root, e.g. `models/vae`) and `url` where to get it from (`https://`); optional `sha256` and `size` are verified after the download, `license` names an entry of `licenses`. `env` optionally names an environment variable that replaces the file: its value is then used as it is and nothing is downloaded (without `name`, the variable is required). See [Downloads](#downloads). |
 | `licenses` | `{id: {name, url}}` for the licenses the files refer to. |
@@ -52,8 +54,8 @@ itself (a wrong node class or input name): only running it in ComfyUI does.
 
 When the app starts a model, every file in `files` that is not in its folder yet is downloaded
 in the background; ComfyUI is launched when the last one is complete, and generating meanwhile
-fails with a message that says what is being downloaded. A failed download is reported the same
-way and retried on the next start.
+fails with a message that says what is being downloaded. Custom nodes are installed after the downloads, before ComfyUI launches. A failed download or
+install is reported the same way and retried on the next start.
 
 - Files are fetched to `<name>.part` and renamed when complete, so an interrupted download is
   resumed instead of restarted, and a file under its real name is never partial.

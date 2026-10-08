@@ -72,33 +72,46 @@
       "additionalProperties": false,
       "properties": {
         "model_name": {"type": "string", "minLength": 1},
-        "model_version": {
-          "description": "The version shown after the name: a string, or (transitional, until weights are declared in the file) a rule that derives it from an environment variable.",
-          "oneOf": [
-            {"type": "string", "minLength": 1},
-            {
-              "type": "object",
-              "required": ["env", "regex"],
-              "additionalProperties": false,
-              "properties": {
-                "env": {"type": "string"},
-                "default": {"type": "string", "description": "Used when the variable is not set (the name of the default file)."},
-                "regex": {"type": "string", "format": "regex"},
-                "basename": {"type": "boolean"},
-                "ignore_case": {"type": "boolean"},
-                "upper": {"type": "boolean"},
-                "prefixes": {
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "required": ["regex", "text"],
-                    "additionalProperties": false,
-                    "properties": {"regex": {"type": "string"}, "text": {"type": "string"}}
+        "model_version": {"description": "The version shown after the name. MODEL_VERSION overrides it.", "type": "string", "minLength": 1},
+        "custom_nodes": {
+          "description": "ComfyUI custom nodes to install into custom_nodes/<name> if that folder is missing: a git repository at an exact commit.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "git", "ref"],
+            "additionalProperties": false,
+            "properties": {
+              "name": {"type": "string", "pattern": "^[A-Za-z0-9._-]+$"},
+              "git": {"type": "string", "pattern": "^https://"},
+              "ref": {"type": "string", "pattern": "^[0-9a-f]{40}$"}
+            }
+          }
+        },
+        "variants": {
+          "description": "Alternatives chosen with --variant: each replaces keys of file entries (matched by their 'set' target) and optionally the model_version.",
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "model_version": {"type": "string", "minLength": 1},
+              "files": {
+                "type": "object",
+                "propertyNames": {"$ref": "#/$defs/target"},
+                "additionalProperties": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "name": {"type": "string", "minLength": 1},
+                    "url": {"type": "string", "pattern": "^https://"},
+                    "sha256": {"type": "string", "pattern": "^[0-9a-fA-F]{64}$"},
+                    "size": {"type": "integer", "minimum": 1},
+                    "license": {"type": "string"}
                   }
                 }
               }
             }
-          ]
+          }
         },
         "required_nodes": {"type": "array", "items": {"type": "string"}},
         "missing_nodes_hint": {"type": "string"},

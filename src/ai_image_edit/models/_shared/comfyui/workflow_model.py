@@ -13,7 +13,6 @@ import copy
 import json
 import os
 import random
-import re
 import subprocess
 import threading
 import time
@@ -28,7 +27,7 @@ from ai_image_edit.core.types import GenerationParams, GenerationResult, ModelCa
 from ai_image_edit.models.base import ModelBackend
 from ai_image_edit.models._shared.comfyui import client as comfy_client
 from ai_image_edit.models._shared.comfyui.common import SAMPLER_CHOICES, SCHEDULER_CHOICES, configured_file
-from ai_image_edit.models._shared.comfyui import downloads
+from ai_image_edit.models._shared.comfyui import custom_nodes, downloads
 from ai_image_edit.models._shared.comfyui.size_policies import POLICIES, ResolvedSize, SizePolicy
 from ai_image_edit.models._shared.comfyui.workflow_files import read_workflow_file
 
@@ -54,9 +53,9 @@ def _choices(value: Any) -> List[str]:
 class ComfyWorkflowModel(ModelBackend):
     """A model run through a local ComfyUI server, as described by a manifest."""
 
-    def __init__(self, name: str, manifest: dict, workflow: dict) -> None:
+    def __init__(self, name: str, manifest: dict, workflow: dict, variant: Optional[str] = None) -> None:
         self.name = name
-        self._manifest = manifest
+        self._manifest = self._with_variant(name, manifest, variant)
         self._workflow = workflow
         self._process: Optional[subprocess.Popen] = None
         self._nodes_checked = False
@@ -70,11 +69,35 @@ class ComfyWorkflowModel(ModelBackend):
         self._validate()
 
     @classmethod
-    def from_file(cls, path: Path) -> "ComfyWorkflowModel":
+    def from_file(cls, path: Path, variant: Optional[str] = None) -> "ComfyWorkflowModel":
         """The model described by a workflow file; its name is the file name without .json."""
         path = Path(path)
         manifest, workflow = read_workflow_file(path)
-        return cls(path.stem, manifest, workflow)
+        return cls(path.stem, manifest, workflow, variant)
+
+    @staticmethod
+    def _with_variant(name: str, manifest: dict, variant: Optional[str]) -> dict:
+        """
+        The manifest with a variant applied: its files replace the entries of the
+        same 'set' target (only the keys it gives), and its model_version replaces
+        the file's.
+        """
+        variants = manifest.get("variants", {})
+        if not variant:
+            return manifest
+        if variant not in variants:
+            options = ", ".join(variants) or "none"
+            raise ValueError(f"{name}: unknown variant {variant!r} (available: {options})")
+        manifest = copy.deepcopy(manifest)
+        chosen = variants[variant]
+        for target, changes in chosen.get("files", {}).items():
+            matches = [spec for spec in manifest["files"] if spec["set"] == target]
+            if not matches:
+                raise ValueError(f"{name}: variant {variant!r} changes {target!r}, which is not in files")
+            matches[0].update(changes)
+        if "model_version" in chosen:
+            manifest["model_version"] = chosen["model_version"]
+        return manifest
 
     # ------------------------------------------------------------ validation
 
@@ -109,6 +132,10 @@ class ComfyWorkflowModel(ModelBackend):
                 raise ValueError(f"{self.name}: files entry {spec['name']!r} needs a 'url'")
             if spec.get("license") and spec["license"] not in m.get("licenses", {}):
                 raise ValueError(f"{self.name}: files entry {spec['set']!r}: unknown license {spec['license']!r}")
+        for variant, chosen in m.get("variants", {}).items():
+            for target in chosen.get("files", {}):
+                if target not in {spec["set"] for spec in m["files"]}:
+                    raise ValueError(f"{self.name}: variant {variant!r} changes {target!r}, which is not in files")
         need_node(m["images"]["source"], "images.source")
         refs = m["images"].get("references")
         if refs:
@@ -136,22 +163,8 @@ class ComfyWorkflowModel(ModelBackend):
 
     @property
     def model_version(self) -> Optional[str]:
-        spec = self._manifest.get("model_version")
-        if not spec:
-            return None
-        if isinstance(spec, str):
-            return spec
-        # Transitional: derived from the weights file name until the weights are declared in the file.
-        value = os.environ.get(spec["env"], "") or spec.get("default", "")
-        if spec.get("basename"):
-            value = Path(value).name
-        flags = re.IGNORECASE if spec.get("ignore_case") else 0
-        match = re.search(spec["regex"], value, flags)
-        if not match:
-            return None
-        version = match.group(1).upper() if spec.get("upper") else match.group(1)
-        prefix = "".join(p["text"] for p in spec.get("prefixes", []) if re.search(p["regex"], value))
-        return prefix + version
+        """The manifest's (or variant's) version; MODEL_VERSION overrides it, e.g. for weights set by MODEL_FILE."""
+        return os.environ.get("MODEL_VERSION", "").strip() or self._manifest.get("model_version")
 
     @property
     def _max_references(self) -> int:
@@ -226,19 +239,25 @@ class ComfyWorkflowModel(ModelBackend):
     def start(self) -> None:
         # Checked before anything starts, so a missing setting or file fails fast.
         pending = self._pending_downloads()
-        if not pending:
+        nodes = custom_nodes.missing(self._manifest.get("custom_nodes", []))
+        if not pending and not nodes:
             self._process = comfy_client.launch_comfy_process()
             return
         self._check_licenses(pending)
+        status = self._download_status = downloads.DownloadStatus()
 
-        def launch() -> None:
+        def prepare_and_launch() -> None:
+            for spec in nodes:
+                if self._cancel_downloads.is_set():
+                    return
+                status.set_message(f"Installing {spec['name']}")
+                custom_nodes.install(spec)
             if not self._cancel_downloads.is_set():
                 self._process = comfy_client.launch_comfy_process()
 
-        status = self._download_status = downloads.DownloadStatus()
         threading.Thread(
-            target=downloads.run_downloads, args=(pending, status, self._cancel_downloads, launch),
-            name=f"{self.name}-downloads", daemon=True,
+            target=downloads.run_downloads, args=(pending, status, self._cancel_downloads, prepare_and_launch),
+            name=f"{self.name}-setup", daemon=True,
         ).start()
 
     def _check_downloads(self) -> None:
@@ -246,9 +265,9 @@ class ComfyWorkflowModel(ModelBackend):
         if status is None:
             return
         if status.error:
-            raise GenerationError(f"Downloading the model failed: {status.error}. Restart the app to retry.")
+            raise GenerationError(f"Setting up the model failed: {status.error}. Restart the app to retry.")
         if not status.finished.is_set():
-            raise GenerationError(f"The model is still being downloaded. {status.message}".strip())
+            raise GenerationError(f"The model is still being set up. {status.message}".strip())
 
     def shutdown(self) -> None:
         self._cancel_downloads.set()

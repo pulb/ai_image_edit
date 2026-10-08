@@ -2,18 +2,43 @@
   "format_version": 1,
   "manifest": {
     "model_name": "Qwen-Image 2.1 GGUF",
-    "model_version": {
-      "env": "MODEL_FILE",
-      "basename": true,
-      "regex": "(?<![A-Za-z0-9])(Q\\d(?:_[A-Z0-9]+)*|BF16|F16)(?=\\.gguf$)",
-      "ignore_case": true,
-      "upper": true,
-      "prefixes": [{"regex": "(?<![A-Za-z0-9])UC(?![A-Za-z0-9])", "text": "UC "}],
-      "default": "qwen-image-2.1-UC-Q4_K_M.gguf"
-    },
+    "model_version": "UC Q4_K_M",
     "required_nodes": ["UnetLoaderGGUF", "QwenImage21Cache", "TextEncodeQwenImage21"],
     "missing_nodes_hint": "install the ComfyUI-GGUF custom node and use a ComfyUI version that supports Qwen-Image 2.1.",
 
+    "custom_nodes": [
+      {
+        "name": "ComfyUI-GGUF",
+        "git": "https://github.com/pulb/ComfyUI-GGUF",
+        "ref": "c1efb13f15f8368660cf06d7233d5099c2d88ce0"
+      }
+    ],
+    "variants": {
+      "Q4_0": {
+        "model_version": "UC Q4_0",
+        "files": {"1.unet_name": {"name": "qwen-image-2.1-UC-Q4_0.gguf", "url": "https://huggingface.co/abenzerps/Qwen-Image-2.1-Uncensored-GGUF/resolve/main/qwen-image-2.1-UC-Q4_0.gguf?download=true"}}
+      },
+      "Q4_K_M": {
+        "model_version": "UC Q4_K_M",
+        "files": {"1.unet_name": {"name": "qwen-image-2.1-UC-Q4_K_M.gguf", "url": "https://huggingface.co/abenzerps/Qwen-Image-2.1-Uncensored-GGUF/resolve/main/qwen-image-2.1-UC-Q4_K_M.gguf?download=true"}}
+      },
+      "Q5_K_M": {
+        "model_version": "UC Q5_K_M",
+        "files": {"1.unet_name": {"name": "qwen-image-2.1-UC-Q5_K_M.gguf", "url": "https://huggingface.co/abenzerps/Qwen-Image-2.1-Uncensored-GGUF/resolve/main/qwen-image-2.1-UC-Q5_K_M.gguf?download=true"}}
+      },
+      "Q6_K": {
+        "model_version": "UC Q6_K",
+        "files": {"1.unet_name": {"name": "qwen-image-2.1-UC-Q6_K.gguf", "url": "https://huggingface.co/abenzerps/Qwen-Image-2.1-Uncensored-GGUF/resolve/main/qwen-image-2.1-UC-Q6_K.gguf?download=true"}}
+      },
+      "Q8_0": {
+        "model_version": "UC Q8_0",
+        "files": {"1.unet_name": {"name": "qwen-image-2.1-UC-Q8_0.gguf", "url": "https://huggingface.co/abenzerps/Qwen-Image-2.1-Uncensored-GGUF/resolve/main/qwen-image-2.1-UC-Q8_0.gguf?download=true"}}
+      },
+      "BF16": {
+        "model_version": "UC BF16",
+        "files": {"1.unet_name": {"name": "qwen-image-2.1-UC-BF16.gguf", "url": "https://huggingface.co/abenzerps/Qwen-Image-2.1-Uncensored-GGUF/resolve/main/qwen-image-2.1-UC-BF16.gguf?download=true"}}
+      }
+    },
     "licenses": {
       "qwen-research": {
         "name": "Qwen RESEARCH LICENSE AGREEMENT (non-commercial)",

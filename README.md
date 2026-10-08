@@ -27,7 +27,7 @@ front of a pluggable image-generation backend.
 
 ### Backends
 
-Selected with `MODEL_BACKEND`. The [deployments](#deployment) are already
+Selected with `--model NAME` or the `MODEL_BACKEND` variable (`--list-models` prints the names). `--workflow FILE` (or `WORKFLOW_FILE`) runs any [workflow file](doc/contribution/workflow_files.md) instead, and `--variant ID` (`MODEL_VARIANT`) picks one of its variants, e.g. another GGUF quantization. The [deployments](#deployment) are already
 preconfigured with the most suitable backend.
 
 - **`qwen_image21_gguf`** (default) — Qwen-Image-2.1 with quantized

@@ -151,7 +151,7 @@ class ModelStartTests(ServerCase):
         Handler.gate = threading.Event()
         model.start()
         self.launch.assert_not_called()
-        with self.assertRaisesRegex(GenerationError, "still being downloaded"):
+        with self.assertRaisesRegex(GenerationError, "still being set up"):
             model.generate(self.params())
         Handler.gate.set()
         self.assertTrue(model._download_status.finished.wait(10))

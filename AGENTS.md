@@ -96,7 +96,7 @@ Rules for any AI coding agent working in this repository.
   `_shared/` packages (`models/_shared/`, `frontends/_shared/`). The contracts
   and registries (`models/base.py`, `models/__init__.py`,
   `frontends/__init__.py`) stay at the top level of their package.
-- **Default backend**: `src/ai_image_edit/app.py` defaults `MODEL_BACKEND` to
+- **Default backend**: `src/ai_image_edit/app.py` defaults `--model`/`MODEL_BACKEND` to
   `qwen_image21_gguf`; each `deployments/docker/Dockerfile.*` sets
   `MODEL_BACKEND` explicitly.
 - **Masking**: masked generation (crop → infer → composite/color-correct)

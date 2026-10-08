@@ -1,0 +1,177 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""
+Tests the command line / environment selection of the model, workflow variants,
+the version override and the custom node installation (against a local git
+repository, no network):
+
+    PYTHONPATH=src python -m unittest discover -s tests/comfy_models -v
+"""
+import copy
+import json
+import os
+import subprocess
+import sys
+import tempfile
+import types
+import unittest
+from pathlib import Path
+from unittest import mock
+
+try:
+    import websocket  # noqa: F401
+except ImportError:
+    sys.modules["websocket"] = types.ModuleType("websocket")
+
+from ai_image_edit import app
+from ai_image_edit.models import MODEL_LOADERS
+from ai_image_edit.models._shared.comfyui import client, custom_nodes
+from ai_image_edit.models._shared.comfyui.workflow_files import available_workflows, read_workflow_file
+from ai_image_edit.models._shared.comfyui.workflow_model import ComfyWorkflowModel
+
+GGUF = available_workflows()["qwen_image21_gguf"]
+
+
+class SelectionTests(unittest.TestCase):
+    def setUp(self):
+        env = mock.patch.dict(os.environ)
+        env.start()
+        self.addCleanup(env.stop)
+        for name in ("MODEL_BACKEND", "WORKFLOW_FILE", "MODEL_VARIANT", "FRONTEND", "REQUIRE_PASSWORD", "MODEL_VERSION"):
+            os.environ.pop(name, None)
+        self.model = mock.Mock()
+        self.run = mock.patch.object(app, "run_frontend").start()
+        self.get = mock.patch.object(app, "get_model", return_value=self.model).start()
+        self.get_file = mock.patch.object(app, "get_model_from_file", return_value=self.model).start()
+        self.addCleanup(mock.patch.stopall)
+
+    def test_default_is_the_gguf_model(self):
+        app.main([])
+        self.get.assert_called_once_with("qwen_image21_gguf", None)
+        self.model.start.assert_called_once()
+        self.run.assert_called_once_with("nicegui", self.model)
+
+    def test_environment_is_the_fallback(self):
+        os.environ.update(MODEL_BACKEND="x", MODEL_VARIANT="Q8_0", FRONTEND="gradio")
+        app.main([])
+        self.get.assert_called_once_with("x", "Q8_0")
+        self.run.assert_called_once_with("gradio", self.model)
+
+    def test_command_line_beats_environment(self):
+        os.environ.update(MODEL_BACKEND="x", WORKFLOW_FILE="/env.json", MODEL_VARIANT="a")
+        app.main(["--model", "y", "--variant", "b"])
+        self.get.assert_called_once_with("y", "b")
+        self.get_file.assert_not_called()
+        self.get.reset_mock()
+        app.main(["--workflow", "/cli.json"])
+        self.get_file.assert_called_once_with("/cli.json", "a")
+        self.get.assert_not_called()
+
+    def test_workflow_file_from_environment(self):
+        os.environ["WORKFLOW_FILE"] = "/env.json"
+        app.main([])
+        self.get_file.assert_called_once_with("/env.json", None)
+
+    def test_model_and_workflow_exclude_each_other(self):
+        with self.assertRaises(SystemExit):
+            app.parse_args(["--model", "a", "--workflow", "b"])
+
+    def test_list_models(self):
+        with mock.patch("builtins.print") as out:
+            app.main(["--list-models"])
+        self.assertEqual(out.call_args[0][0].split("\n"), sorted(MODEL_LOADERS))
+        self.get.assert_not_called()
+
+    def test_bad_model_is_a_clean_exit(self):
+        self.get.side_effect = ValueError("Unknown model backend 'z'")
+        with self.assertRaisesRegex(SystemExit, "Unknown model backend"):
+            app.main(["--model", "z"])
+
+
+class VariantTests(unittest.TestCase):
+    def test_variant_replaces_file_and_version(self):
+        model = ComfyWorkflowModel.from_file(GGUF, "Q8_0")
+        unet = model._manifest["files"][0]
+        self.assertEqual(unet["name"], "qwen-image-2.1-UC-Q8_0.gguf")
+        self.assertTrue(unet["url"].endswith("qwen-image-2.1-UC-Q8_0.gguf?download=true"))
+        self.assertEqual(unet["license"], "qwen-research")  # keys the variant does not give are kept
+        self.assertEqual(model.model_version, "UC Q8_0")
+        self.assertEqual(ComfyWorkflowModel.from_file(GGUF).model_version, "UC Q4_K_M")
+
+    def test_variants_do_not_change_the_shared_manifest(self):
+        manifest, workflow = read_workflow_file(GGUF)
+        before = copy.deepcopy(manifest)
+        ComfyWorkflowModel("x", manifest, workflow, "Q8_0")
+        self.assertEqual(manifest, before)
+
+    def test_unknown_variant_lists_the_options(self):
+        with self.assertRaisesRegex(ValueError, r"unknown variant 'nope' \(available: Q4_0"):
+            ComfyWorkflowModel.from_file(GGUF, "nope")
+        with self.assertRaisesRegex(ValueError, "available: none"):
+            ComfyWorkflowModel.from_file(available_workflows()["qwen_image_edit_2511_aio"], "x")
+
+    def test_variant_must_change_an_existing_file(self):
+        manifest, workflow = read_workflow_file(GGUF)
+        manifest["variants"]["bad"] = {"files": {"9.nothing": {"name": "x"}}}
+        with self.assertRaisesRegex(ValueError, "not in files"):
+            ComfyWorkflowModel("x", manifest, workflow)
+
+    def test_version_environment_override(self):
+        with mock.patch.dict(os.environ, {"MODEL_VERSION": "custom"}):
+            self.assertEqual(ComfyWorkflowModel.from_file(GGUF).model_version, "custom")
+
+
+class CustomNodeTests(unittest.TestCase):
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.tmp = Path(self._tmp.name)
+        self.addCleanup(self._tmp.cleanup)
+        repo = self.tmp / "repo"
+        repo.mkdir()
+        git = ["git", "-c", "user.name=t", "-c", "user.email=t@example.org", "-C", str(repo)]
+        subprocess.run([*git, "init", "-q"], check=True)
+        (repo / "node.py").write_text("one")
+        subprocess.run([*git, "add", "."], check=True)
+        subprocess.run([*git, "commit", "-qm", "one"], check=True)
+        self.first = subprocess.check_output([*git, "rev-parse", "HEAD"], text=True).strip()
+        (repo / "node.py").write_text("two")
+        subprocess.run([*git, "commit", "-qam", "two"], check=True)
+        self.spec = {"name": "My-Node", "git": str(repo), "ref": self.first}
+        self.root = self.tmp / "custom_nodes"
+        self.root.mkdir()
+
+    def test_installs_the_pinned_commit(self):
+        self.assertEqual(custom_nodes.missing([self.spec], self.root), [self.spec])
+        with mock.patch.object(subprocess, "run", wraps=subprocess.run):
+            custom_nodes.install(self.spec, self.root)
+        self.assertEqual((self.root / "My-Node/node.py").read_text(), "one")
+        self.assertEqual(custom_nodes.missing([self.spec], self.root), [])
+        self.assertEqual([p.name for p in self.root.iterdir()], ["My-Node"])
+
+    def test_failed_install_leaves_nothing(self):
+        with self.assertRaises(RuntimeError):
+            custom_nodes.install({**self.spec, "ref": "0" * 40}, self.root)
+        self.assertEqual(list(self.root.iterdir()), [])
+
+    def test_model_installs_before_launching_comfy(self):
+        manifest, workflow = read_workflow_file(available_workflows()["qwen_image_edit_2511_aio"])
+        manifest["custom_nodes"] = [self.spec]
+        manifest["files"] = [{"name": "w.safetensors", "url": "https://example.org/w", "folder": "models/checkpoints",
+                              "set": "1.ckpt_name"}]
+        (self.tmp / "models/checkpoints").mkdir(parents=True)
+        (self.tmp / "models/checkpoints/w.safetensors").touch()
+        model = ComfyWorkflowModel("t", manifest, workflow)
+        old = os.getcwd()
+        os.chdir(self.tmp)
+        try:
+            with mock.patch.object(client, "launch_comfy_process") as launch:
+                launch.side_effect = lambda: self.assertTrue((Path("custom_nodes/My-Node/node.py")).is_file()) or mock.Mock()
+                model.start()
+                self.assertTrue(model._download_status.finished.wait(20))
+                self.assertIsNone(model._download_status.error)
+                launch.assert_called_once()
+        finally:
+            os.chdir(old)
+
+
+if __name__ == "__main__":
+    unittest.main()
