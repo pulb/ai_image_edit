@@ -12,9 +12,9 @@ your own and, if your registry is private, add registry credentials (see
 
 | Backend | Image | Weights |
 |---|---|---|
-| `qwen_image21` | [`qwen_image21`](../docker/DEPLOY.md#qwen_image21-image) | downloaded from the Hugging Face Hub at startup |
-| `qwen_image_edit_2511_aio` | [`qwen_image_edit_2511_aio`](../docker/DEPLOY.md#qwen_image_edit_2511_aio-image) | checkpoint and LoRAs baked into the image |
 | `qwen_image21_gguf` | [`qwen_image21_gguf`](../docker/DEPLOY.md#qwen_image21_gguf-image) | quantized GGUF weights baked into the image, chosen with build arguments |
+| `qwen_image_edit_2511_aio` | [`qwen_image_edit_2511_aio`](../docker/DEPLOY.md#qwen_image_edit_2511_aio-image) | checkpoint and LoRAs baked into the image |
+| `qwen_image21` | [`qwen_image21`](../docker/DEPLOY.md#qwen_image21-image) | downloaded from the Hugging Face Hub at startup |
 
 Environment variables, including the ComfyUI arguments for each GPU size, are
 set as Pod environment variables and are described per image in

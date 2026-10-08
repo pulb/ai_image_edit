@@ -7,8 +7,8 @@ image.
 
 | Dockerfile | Backend | Frontend | Use |
 |---|---|---|---|
-| `Dockerfile.qwen_image_edit_2511_aio` | `qwen_image_edit_2511_aio` | `nicegui` | all-in-one checkpoint run through ComfyUI |
 | `Dockerfile.qwen_image21_gguf` | `qwen_image21_gguf` | `nicegui` | quantized Qwen-Image-2.1 run through ComfyUI, for low-VRAM GPUs |
+| `Dockerfile.qwen_image_edit_2511_aio` | `qwen_image_edit_2511_aio` | `nicegui` | all-in-one checkpoint run through ComfyUI |
 | `Dockerfile.qwen_image21` | `qwen_image21` | `nicegui` | diffusers pipeline, weights downloaded at startup |
 
 ## Image storage
