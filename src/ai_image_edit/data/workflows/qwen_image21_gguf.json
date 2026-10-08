@@ -17,7 +17,7 @@
     "licenses": {
       "qwen-research": {
         "name": "Qwen RESEARCH LICENSE AGREEMENT (non-commercial)",
-        "url": "https://huggingface.co/abenzerps/Qwen-Image-2.1-Uncensored-GGUF"
+        "url": "https://huggingface.co/Qwen/Qwen-Image-2.1/raw/main/LICENSE"
       }
     },
     "files": [
