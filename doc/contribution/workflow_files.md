@@ -28,9 +28,10 @@ mistyped node id or input name fails when the model loads.
 | Key | Meaning |
 |---|---|
 | `model_name` | Name shown in the UI. |
-| `model_version` | Optional. The version shown after the name, as a string. Transitional: instead of a string, a rule that derives it from the weights file name: `env` (environment variable), `regex` (group 1 is the version), `basename`, `ignore_case`, `upper`, and `prefixes` (`[{regex, text}]` prepended when matching). It goes away when the weights are declared in the file. |
+| `model_version` | Optional. The version shown after the name, as a string. Transitional: instead of a string, a rule that derives it from the weights file name: `env` (environment variable; `default` is used when it is not set), `regex` (group 1 is the version), `basename`, `ignore_case`, `upper`, and `prefixes` (`[{regex, text}]` prepended when matching). It goes away when the weights are declared in the file. |
 | `required_nodes`, `missing_nodes_hint` | Node classes ComfyUI must provide, checked on the first generation, and the advice shown if they are missing. |
-| `files` | Weight files: `env` names a variable holding a path relative to `folder`; the path is written to `set`. Existence is checked at startup. |
+| `files` | Weight files, each written to `set`. `name` is the file name relative to `folder` (a folder below the ComfyUI root, e.g. `models/vae`) and `url` where to get it from (`https://`); optional `sha256` and `size` are verified after the download, `license` names an entry of `licenses`. `env` optionally names an environment variable that replaces the file: its value is then used as it is and nothing is downloaded (without `name`, the variable is required). See [Downloads](#downloads). |
+| `licenses` | `{id: {name, url}}` for the licenses the files refer to. |
 | `bind` | Where each app input goes: `prompt`, `seed`, `steps`, `sampler`, `scheduler` (required), `cfg`, `denoise`, `negative_prompt` (optional). An input that is not bound is not offered in the UI (`cfg`, `denoise`, `negative_prompt`). |
 | `constants` | Fixed values written into the workflow: `{target: value}`. |
 | `seed` | `min`, `max` of random seeds; `wrap` reduces a chosen seed modulo `max + 1`. |
@@ -46,3 +47,21 @@ mistyped node id or input name fails when the model loads.
 maximum number of reference images, and checks they are well formed. The schema tests need
 `pip install jsonschema` and are skipped without it. The tests cannot check the workflow
 itself (a wrong node class or input name): only running it in ComfyUI does.
+
+## Downloads
+
+When the app starts a model, every file in `files` that is not in its folder yet is downloaded
+in the background; ComfyUI is launched when the last one is complete, and generating meanwhile
+fails with a message that says what is being downloaded. A failed download is reported the same
+way and retried on the next start.
+
+- Files are fetched to `<name>.part` and renamed when complete, so an interrupted download is
+  resumed instead of restarted, and a file under its real name is never partial.
+- Folders are relative to the directory the app runs in (the ComfyUI root). To keep the weights
+  elsewhere, mount a volume at `<ComfyUI root>/models`.
+- `HF_TOKEN` is sent as a bearer token to huggingface.co only.
+- A file with a `license` is only downloaded if `ACCEPT_LICENSES` (comma-separated ids, or `all`)
+  lists it; otherwise starting the model fails with the license's name and URL. Read the license
+  and set the variable only if you accept it.
+- `sha256` and `size` are optional; use them for files you have checked, so a corrupt or replaced
+  file is rejected.

@@ -2,11 +2,15 @@
   "format_version": 1,
   "manifest": {
     "model_name": "Qwen-Image-Edit Rapid-AIO",
-    "model_version": {"env": "MODEL_FILE", "regex": "-(v\\d+)(?=\\.|-|_|$)"},
+    "model_version": {"env": "MODEL_FILE", "regex": "-(v\\d+)(?=\\.|-|_|$)", "default": "Qwen/Qwen-Rapid-AIO-v23.safetensors"},
     "required_nodes": [],
 
     "files": [
-      {"env": "MODEL_FILE", "folder": "models/checkpoints", "set": "1.ckpt_name"}
+      {
+        "name": "Qwen/Qwen-Rapid-AIO-v23.safetensors", "env": "MODEL_FILE",
+        "url": "https://huggingface.co/Phr00t/Qwen-Image-Edit-Rapid-AIO/resolve/main/v23/Qwen-Rapid-AIO-NSFW-v23.safetensors?download=true",
+        "folder": "models/checkpoints", "set": "1.ckpt_name"
+      }
     ],
 
     "bind": {

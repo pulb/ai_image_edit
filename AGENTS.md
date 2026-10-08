@@ -86,9 +86,10 @@ Rules for any AI coding agent working in this repository.
   Output-size schemes are `size_policies.py`; a model with a new one adds a
   policy class there.
 - **ComfyUI backends**: `models/_shared/comfyui/` holds what the ComfyUI-based
-  models share (`client.py`, `common.py`). Each model's main weights file
-  is named by the `MODEL_FILE` environment variable (a path relative to its
-  folder under ComfyUI's `models/`), set in the backend's Dockerfile.
+  models share (`client.py`, `common.py`, `downloads.py`). Weight files are
+  listed in the workflow file's `files` and downloaded when missing; an
+  environment variable such as `MODEL_FILE` can point to a local file instead
+  (the Dockerfiles still bake the weights in and set it).
   Qwen-Image-2.1 output sizes shared by `qwen_image21` and `qwen_image21_gguf`
   live in `models/_shared/qwen21_size.py`.
 - **Shared code**: helpers used by several backends or frontends live in

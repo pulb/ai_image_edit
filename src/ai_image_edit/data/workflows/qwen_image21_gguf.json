@@ -8,17 +8,35 @@
       "regex": "(?<![A-Za-z0-9])(Q\\d(?:_[A-Z0-9]+)*|BF16|F16)(?=\\.gguf$)",
       "ignore_case": true,
       "upper": true,
-      "prefixes": [{"regex": "(?<![A-Za-z0-9])UC(?![A-Za-z0-9])", "text": "UC "}]
+      "prefixes": [{"regex": "(?<![A-Za-z0-9])UC(?![A-Za-z0-9])", "text": "UC "}],
+      "default": "qwen-image-2.1-UC-Q4_K_M.gguf"
     },
     "required_nodes": ["UnetLoaderGGUF", "QwenImage21Cache", "TextEncodeQwenImage21"],
     "missing_nodes_hint": "install the ComfyUI-GGUF custom node and use a ComfyUI version that supports Qwen-Image 2.1.",
 
+    "licenses": {
+      "qwen-research": {
+        "name": "Qwen RESEARCH LICENSE AGREEMENT (non-commercial)",
+        "url": "https://huggingface.co/abenzerps/Qwen-Image-2.1-Uncensored-GGUF"
+      }
+    },
     "files": [
-      {"env": "MODEL_FILE",        "folder": "models/diffusion_models", "set": "1.unet_name"},
-      {"env": "TEXT_ENCODER_FILE", "folder": "models/text_encoders",    "set": "2.clip_name"},
-      {"env": "VAE_FILE",          "folder": "models/vae",              "set": "3.vae_name"}
+      {
+        "name": "qwen-image-2.1-UC-Q4_K_M.gguf", "license": "qwen-research", "env": "MODEL_FILE",
+        "url": "https://huggingface.co/abenzerps/Qwen-Image-2.1-Uncensored-GGUF/resolve/main/qwen-image-2.1-UC-Q4_K_M.gguf?download=true",
+        "folder": "models/diffusion_models", "set": "1.unet_name"
+      },
+      {
+        "name": "qwen3vl_8b_int8_convrot.safetensors", "license": "qwen-research", "env": "TEXT_ENCODER_FILE",
+        "url": "https://huggingface.co/abenzerps/Qwen-Image-2.1-Uncensored-GGUF/resolve/main/text_encoders/qwen3vl_8b_int8_convrot.safetensors?download=true",
+        "folder": "models/text_encoders", "set": "2.clip_name"
+      },
+      {
+        "name": "qwen_image_2.1_vae_bf16.safetensors", "license": "qwen-research", "env": "VAE_FILE",
+        "url": "https://huggingface.co/abenzerps/Qwen-Image-2.1-Uncensored-GGUF/resolve/main/vae/qwen_image_2.1_vae_bf16.safetensors?download=true",
+        "folder": "models/vae", "set": "3.vae_name"
+      }
     ],
-
     "bind": {
       "prompt":          "5.prompt",
       "negative_prompt": "5.negative_prompt",

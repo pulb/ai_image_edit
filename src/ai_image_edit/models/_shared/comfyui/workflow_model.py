@@ -15,6 +15,7 @@ import os
 import random
 import re
 import subprocess
+import threading
 import time
 import uuid
 from pathlib import Path
@@ -27,6 +28,7 @@ from ai_image_edit.core.types import GenerationParams, GenerationResult, ModelCa
 from ai_image_edit.models.base import ModelBackend
 from ai_image_edit.models._shared.comfyui import client as comfy_client
 from ai_image_edit.models._shared.comfyui.common import SAMPLER_CHOICES, SCHEDULER_CHOICES, configured_file
+from ai_image_edit.models._shared.comfyui import downloads
 from ai_image_edit.models._shared.comfyui.size_policies import POLICIES, ResolvedSize, SizePolicy
 from ai_image_edit.models._shared.comfyui.workflow_files import read_workflow_file
 
@@ -58,6 +60,8 @@ class ComfyWorkflowModel(ModelBackend):
         self._workflow = workflow
         self._process: Optional[subprocess.Popen] = None
         self._nodes_checked = False
+        self._download_status: Optional[downloads.DownloadStatus] = None
+        self._cancel_downloads = threading.Event()
 
         size = manifest["size"]
         if size["policy"] not in POLICIES:
@@ -99,6 +103,12 @@ class ComfyWorkflowModel(ModelBackend):
             need_node(target, "constants")
         for spec in m.get("files", []):
             need_node(spec["set"], "files")
+            if "name" not in spec and "env" not in spec:
+                raise ValueError(f"{self.name}: files entry for {spec['set']!r} needs 'name' or 'env'")
+            if "name" in spec and "url" not in spec and "env" not in spec:
+                raise ValueError(f"{self.name}: files entry {spec['name']!r} needs a 'url'")
+            if spec.get("license") and spec["license"] not in m.get("licenses", {}):
+                raise ValueError(f"{self.name}: files entry {spec['set']!r}: unknown license {spec['license']!r}")
         need_node(m["images"]["source"], "images.source")
         refs = m["images"].get("references")
         if refs:
@@ -132,7 +142,7 @@ class ComfyWorkflowModel(ModelBackend):
         if isinstance(spec, str):
             return spec
         # Transitional: derived from the weights file name until the weights are declared in the file.
-        value = os.environ.get(spec["env"], "")
+        value = os.environ.get(spec["env"], "") or spec.get("default", "")
         if spec.get("basename"):
             value = Path(value).name
         flags = re.IGNORECASE if spec.get("ignore_case") else 0
@@ -178,13 +188,70 @@ class ComfyWorkflowModel(ModelBackend):
 
     # ------------------------------------------------------------ lifecycle
 
-    def start(self) -> None:
-        # Checked before ComfyUI starts, so a missing setting or file fails fast.
+    def _file_value(self, spec: dict) -> str:
+        """
+        The file name (relative to its folder) for a files entry: the environment
+        variable if it is set (that file is used as it is and never downloaded),
+        otherwise the manifest's name.
+        """
+        if spec.get("env") and os.environ.get(spec["env"], "").strip():
+            return configured_file(spec["env"], Path(spec["folder"]))
+        if "name" not in spec:
+            return configured_file(spec["env"], Path(spec["folder"]))  # raises: not set
+        return spec["name"]
+
+    def _pending_downloads(self) -> List[dict]:
+        pending = []
         for spec in self._manifest.get("files", []):
-            configured_file(spec["env"], Path(spec["folder"]))
-        self._process = comfy_client.launch_comfy_process()
+            dest = Path(spec["folder"]) / self._file_value(spec)
+            if not dest.is_file():
+                pending.append({
+                    "url": spec["url"], "dest": dest, "sha256": spec.get("sha256"), "size": spec.get("size"),
+                    "license": spec.get("license"),
+                })
+        return pending
+
+    def _check_licenses(self, pending: List[dict]) -> None:
+        """Downloading a file whose license needs accepting requires ACCEPT_LICENSES to name it."""
+        accepted = {part.strip() for part in os.environ.get("ACCEPT_LICENSES", "").split(",")}
+        for item in pending:
+            lic = item["license"]
+            if lic and lic not in accepted and "all" not in accepted:
+                info = self._manifest["licenses"][lic]
+                raise RuntimeError(
+                    f"{self.name} needs {item['dest'].name}, which is under the {info['name']} ({info['url']}). "
+                    f"Read it and, if you accept it, set ACCEPT_LICENSES={lic} to let the app download the file."
+                )
+
+    def start(self) -> None:
+        # Checked before anything starts, so a missing setting or file fails fast.
+        pending = self._pending_downloads()
+        if not pending:
+            self._process = comfy_client.launch_comfy_process()
+            return
+        self._check_licenses(pending)
+
+        def launch() -> None:
+            if not self._cancel_downloads.is_set():
+                self._process = comfy_client.launch_comfy_process()
+
+        status = self._download_status = downloads.DownloadStatus()
+        threading.Thread(
+            target=downloads.run_downloads, args=(pending, status, self._cancel_downloads, launch),
+            name=f"{self.name}-downloads", daemon=True,
+        ).start()
+
+    def _check_downloads(self) -> None:
+        status = self._download_status
+        if status is None:
+            return
+        if status.error:
+            raise GenerationError(f"Downloading the model failed: {status.error}. Restart the app to retry.")
+        if not status.finished.is_set():
+            raise GenerationError(f"The model is still being downloaded. {status.message}".strip())
 
     def shutdown(self) -> None:
+        self._cancel_downloads.set()
         if self._process is not None:
             self._process.terminate()
 
@@ -258,7 +325,7 @@ class ComfyWorkflowModel(ModelBackend):
             wf[node]["inputs"][key] = value
 
         for spec in m.get("files", []):
-            put(spec["set"], configured_file(spec["env"], Path(spec["folder"])))
+            put(spec["set"], self._file_value(spec))
         for target, value in m.get("constants", {}).items():
             put(target, value)
 
@@ -341,6 +408,7 @@ class ComfyWorkflowModel(ModelBackend):
         the generation size first, so the output matches; reference images are
         passed as they are.
         """
+        self._check_downloads()
         prompt = (params.prompt or "").strip()
         if not prompt:
             raise GenerationError("Please enter a prompt.")

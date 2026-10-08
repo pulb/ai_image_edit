@@ -82,6 +82,7 @@
               "additionalProperties": false,
               "properties": {
                 "env": {"type": "string"},
+                "default": {"type": "string", "description": "Used when the variable is not set (the name of the default file)."},
                 "regex": {"type": "string", "format": "regex"},
                 "basename": {"type": "boolean"},
                 "ignore_case": {"type": "boolean"},
@@ -101,14 +102,30 @@
         },
         "required_nodes": {"type": "array", "items": {"type": "string"}},
         "missing_nodes_hint": {"type": "string"},
+        "licenses": {
+          "description": "Licenses a file can refer to. Downloading a file with a license requires the user to accept it (ACCEPT_LICENSES=<id>).",
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "required": ["name", "url"],
+            "additionalProperties": false,
+            "properties": {"name": {"type": "string"}, "url": {"type": "string"}}
+          }
+        },
         "files": {
-          "description": "Weight files: the variable holds a path relative to folder, which is written to 'set'.",
+          "description": "Weight files, as names relative to 'folder' (a folder below the ComfyUI root), written to 'set'. A file that is missing is downloaded from 'url'. 'env' optionally names an environment variable that overrides the file (its value is then used as it is, nothing is downloaded); without 'name' it is required.",
           "type": "array",
           "items": {
             "type": "object",
-            "required": ["env", "folder", "set"],
+            "required": ["folder", "set"],
+            "anyOf": [{"required": ["name", "url"]}, {"required": ["env"]}],
             "additionalProperties": false,
             "properties": {
+              "name": {"type": "string", "minLength": 1},
+              "url": {"type": "string", "pattern": "^https://"},
+              "sha256": {"type": "string", "pattern": "^[0-9a-fA-F]{64}$"},
+              "size": {"type": "integer", "minimum": 1},
+              "license": {"type": "string"},
               "env": {"type": "string"},
               "folder": {"type": "string"},
               "set": {"$ref": "#/$defs/target"}
