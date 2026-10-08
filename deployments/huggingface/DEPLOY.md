@@ -44,11 +44,13 @@ Optional variables are the same as for the `qwen_image21` image (see
 
 ### Paid GPU
 
-- Pick a GPU under **Settings → Space hardware**. Recommended: A100 or L40S.
+- Pick a GPU under **Settings → Space hardware**. For `qwen_image21` it needs
+  at least 48 GB of VRAM.
 - `FRONTEND` can be `gradio` or `nicegui`. `nicegui` is the snappier
   frontend and also runs under the Gradio SDK, because the Space just runs
   `app.py` on port `7860`.
-- To run it as a Docker Space instead, see
-  [`../docker/DEPLOY.md`](../docker/DEPLOY.md): the same image works, with
-  `sdk: docker` in the card and the Dockerfile copied to the Space root as
-  `Dockerfile`.
+- A paid GPU Space can also run any of the images
+  ([`../docker/DEPLOY.md`](../docker/DEPLOY.md)) as a Docker Space: use
+  `sdk: docker` in the card and copy the image's Dockerfile to the Space root
+  as `Dockerfile`. The GPU needs at least 16 GB of VRAM for
+  `qwen_image21_gguf` and at least 48 GB for `qwen_image21`.

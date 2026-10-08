@@ -10,9 +10,9 @@
 # Builds an image for the NiceGUI frontend + qwen_image21 backend only (the
 # direct diffusers pipeline, no ComfyUI). Meant for RunPod (a GPU pod
 # exposing port 7860) and Hugging Face (a Dockerfile-type Space, which
-# also expects port 7860). Unlike the sibling Dockerfile (which deploys
-# qwen_image_edit_2511_aio), this installs no ComfyUI, no gradio, and no
-# aria2-fetched checkpoints/LoRAs — qwen_image21 loads its weights from the
+# also expects port 7860). Unlike the ComfyUI-based Dockerfiles
+# (qwen_image_edit_2511_aio, qwen_image21_gguf), this installs no ComfyUI, no
+# gradio, and no aria2-fetched checkpoints/LoRAs — qwen_image21 loads its weights from the
 # Hugging Face Hub at startup instead (see ai_image_edit_qwen's
 # pipeline.load()), so nothing needs to be baked into the image beyond
 # Python deps.

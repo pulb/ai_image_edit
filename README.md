@@ -35,13 +35,10 @@ preconfigured with the most suitable backend.
   plus a curated set of LoRAs, driven through [ComfyUI](https://github.com/comfyanonymous/ComfyUI).
 - **`qwen_image21_gguf`** — Qwen-Image-2.1 with quantized
   [GGUF weights](https://huggingface.co/abenzerps/Qwen-Image-2.1-Uncensored-GGUF),
-  driven through ComfyUI and the
-  [ComfyUI-GGUF](https://github.com/leejet/ComfyUI-GGUF) node. Meant for
-  low-VRAM GPUs, on RunPod or in self-hosted setups: it needs far less GPU memory than
-  `qwen_image21` (the default Q4_K_M quantization is a 4.6 GB file), at some
-  cost in quality. Quantization, uncensored or unmodified model and text
-  encoder precision are build arguments of its Dockerfile. The weights are
-  under the Qwen RESEARCH LICENSE AGREEMENT (see [License](#license)).
+  driven through ComfyUI. Meant for low-VRAM GPUs, on RunPod or in
+  self-hosted setups: it needs far less GPU memory than `qwen_image21`, at
+  some cost in quality. The weights are under the Qwen RESEARCH LICENSE
+  AGREEMENT (see [License](#license)).
 - **`qwen_image21`** — a direct [diffusers](https://github.com/huggingface/diffusers)
   pipeline for Qwen-Image-2.1. Needs the separately licensed
   [`ai-image-edit-qwen`](https://github.com/pulb/ai_image_edit_qwen)
@@ -63,7 +60,7 @@ The UI is served on port `7860`.
 | Target | Backend | Frontend | Guide |
 |---|---|---|---|
 | ⭐ **RunPod GPU Pod** (recommended) | `qwen_image_edit_2511_aio`, `qwen_image21_gguf`, `qwen_image21` (one image each) | NiceGUI only | [`deployments/runpod`](deployments/runpod/DEPLOY.md) |
-| Hugging Face Space | `qwen_image21` | Gradio (ZeroGPU), Gradio or NiceGUI (paid GPU) | [`deployments/huggingface`](deployments/huggingface/DEPLOY.md) |
+| Hugging Face Space | `qwen_image21` (ZeroGPU or paid GPU); on a paid GPU, any image as a Docker Space | Gradio (ZeroGPU), Gradio or NiceGUI (paid GPU) | [`deployments/huggingface`](deployments/huggingface/DEPLOY.md) |
 | Docker (self-hosted) | `qwen_image_edit_2511_aio`, `qwen_image21_gguf`, `qwen_image21` (one image each) | NiceGUI only | [`deployments/docker`](deployments/docker/DEPLOY.md) |
 
 ### Generation times

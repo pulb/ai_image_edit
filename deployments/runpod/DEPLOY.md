@@ -24,16 +24,19 @@ RunPod can pull from.
 
 ## Pod setup
 
-1. Create a Pod from the image (for `qwen_image21`:
-   `ghcr.io/<owner>/<repo>-qwen-image21:<tag>`), exposing HTTP port `7860`.
-   Recommended GPUs: A100 or L40S.
+1. Create a Pod from the image, exposing HTTP port `7860`. For example
+   `ghcr.io/<owner>/<repo>-qwen-image21:<tag>` for `qwen_image21`, or
+   `ghcr.io/<owner>/<repo>-qwen-image21-gguf:<tag>` (for example `uc-q4_k_m`)
+   for `qwen_image21_gguf`. Choose one of the GPUs the template recommends
+   that has enough memory: at least 48 GB of VRAM for `qwen_image21`, at least
+   16 GB for `qwen_image21_gguf`.
 2. If the registry package is private (GHCR packages are by default), add a
    registry credential under **Settings → Container Registry Auth** in the
    RunPod console. For GHCR that is your GitHub username and a PAT with
    `read:packages`; making the package public skips this.
-3. `qwen_image21` only: attach a network volume (a Pod mounts it at
-   `/workspace`) and set `HF_HUB_CACHE=/workspace/hf-cache`, so the multi-GB
-   weights download once instead of on every fresh container.
+3. Optional, `qwen_image21` only: attach a network volume (a Pod mounts it
+   at `/workspace`) and set `HF_HUB_CACHE=/workspace/hf-cache`, so the
+   multi-GB weights download once instead of on every fresh container.
 
 ## Image storage
 

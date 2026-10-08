@@ -69,8 +69,10 @@ docker run -p 7860:7860 --gpus all --shm-size=640m -e APP_PASSWORD=... ai-image-
 Qwen-Image-2.1 with quantized GGUF weights, run through ComfyUI and the
 [ComfyUI-GGUF](https://github.com/leejet/ComfyUI-GGUF) node, which needs far
 less GPU memory than the `qwen_image21` image. This backend and image are
-meant for low-VRAM GPUs, on RunPod or in self-hosted environments (tested on a
-16 GB GPU). The weights are baked into the image; choose them with build arguments:
+meant for low-VRAM GPUs, on RunPod or in self-hosted environments; the GPU
+needs at least 16 GB of VRAM. The weights are under the Qwen RESEARCH LICENSE
+AGREEMENT (non-commercial use only): keep the image and its registry package
+private. They are baked into the image; choose them with build arguments:
 
 | Build argument | Default | Meaning |
 |---|---|---|
@@ -96,7 +98,9 @@ for slow GPUs.
 ### ComfyUI arguments (`COMFY_EXTRA_ARGS`)
 
 Set `COMFY_EXTRA_ARGS` at run time to pass arguments to ComfyUI, for example
-`-e COMFY_EXTRA_ARGS="--highvram --disable-dynamic-vram"`:
+`-e COMFY_EXTRA_ARGS="--highvram --disable-dynamic-vram"`. The variable also
+applies to the `qwen_image_edit_2511_aio` image, but the advice below was
+tested only with this one:
 
 | Arguments | Use when |
 |---|---|
@@ -113,19 +117,21 @@ probably too small. The image runs without the flags on a 16 GB GPU (tested).
 If you want to try the flags on a smaller GPU, check the peak with
 `nvidia-smi` during a generation.
 
-ComfyUI (`COMFYUI_REF`) and ComfyUI-GGUF (`COMFYUI_GGUF_REF`) are pinned to tested
-commits. ComfyUI-GGUF is also patched at build time
+### Pinned versions
+
+ComfyUI (`COMFYUI_REF`) and ComfyUI-GGUF (`COMFYUI_GGUF_REF`) are pinned to
+tested commits. ComfyUI-GGUF is also patched at build time
 (`patches/comfyui_gguf_input_act.py`): ComfyUI 0.39 passes new keyword
 arguments such as `input_act` to every Linear layer, which upstream does not
 accept yet. The build fails if the patch no longer applies.
-The weights are under the Qwen RESEARCH LICENSE AGREEMENT
-(non-commercial use only).
+
+### CI build
 
 `.github/workflows/docker-qwen-image21-gguf.yml` builds the image (about
 15 GB with its weights) on manual runs, where quantization, uncensored or
 unmodified model and text encoder precision are inputs, and on `v*` tags. It
 pushes `ghcr.io/<owner>/<repo>-qwen-image21-gguf` tagged with the variant, for
-example `uc-q4_k_m`. Keep the package private for the same reason.
+example `uc-q4_k_m`.
 
 ## qwen_image21 image
 
@@ -134,6 +140,8 @@ startup (no ComfyUI). It installs the separately licensed
 [`ai-image-edit-qwen`](https://github.com/pulb/ai_image_edit_qwen) package, so
 it combines GPL and Qwen-licensed code: keep it private (see the
 [License](../../README.md#license) section).
+
+The GPU needs at least 48 GB of VRAM.
 
 ```bash
 docker build -f deployments/docker/Dockerfile.qwen_image21 -t ai-image-edit-qwen .
