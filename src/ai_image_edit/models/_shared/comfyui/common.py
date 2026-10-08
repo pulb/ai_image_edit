@@ -3,10 +3,6 @@
 import os
 from pathlib import Path
 
-# The main weights file of a backend, as a path relative to that backend's own
-# folder under ComfyUI's models/ directory. Set in the Dockerfile.
-MODEL_FILE_ENV = "MODEL_FILE"
-
 
 def configured_file(env_var: str, folder: Path) -> str:
     """
