@@ -36,6 +36,11 @@ preconfigured with the most suitable backend.
   self-hosted setups: it needs far less GPU memory than `qwen_image21`, at
   some cost in quality. The weights are under the Qwen RESEARCH LICENSE
   AGREEMENT (see [License](#license)).
+- **`qwen_image21_official`** — Qwen-Image-2.1 with the
+  [official ComfyUI weights](https://huggingface.co/Comfy-Org/Qwen-Image-2.1)
+  (bf16, or `--variant int8`), driven through ComfyUI. The unquantized
+  counterpart of `qwen_image21_gguf`, for GPUs with plenty of memory. The
+  weights are under the Qwen RESEARCH LICENSE AGREEMENT (see [License](#license)).
 - **`qwen_image_edit_2511_aio`** — Qwen-Image-Edit 2511
   ([Phr00t's AIO merge](https://huggingface.co/Phr00t/Qwen-Image-Edit-Rapid-AIO))
   plus a curated set of LoRAs, driven through [ComfyUI](https://github.com/comfyanonymous/ComfyUI).

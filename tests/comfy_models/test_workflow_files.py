@@ -76,10 +76,12 @@ class ManifestModelTests(unittest.TestCase):
         """The model, with the weight files its manifest names created as empty placeholders."""
         model = ComfyWorkflowModel.from_file(path)
         for spec in model._manifest.get("files", []):
-            name = f"{spec['env'].lower()}.bin"
+            # A file with an env override is exercised through it; the others by their own name.
+            name = f"{spec['env'].lower()}.bin" if "env" in spec else spec["name"]
             (self.tmp / spec["folder"] / name).parent.mkdir(parents=True, exist_ok=True)
             (self.tmp / spec["folder"] / name).touch()
-            os.environ[spec["env"]] = name
+            if "env" in spec:
+                os.environ[spec["env"]] = name
         return model
 
     def build(self, model: ComfyWorkflowModel, n_refs: int) -> dict:
