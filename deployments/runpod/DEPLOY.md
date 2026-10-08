@@ -18,9 +18,8 @@ your own and, if your registry is private, add registry credentials (see
 
 Environment variables, including the ComfyUI arguments for each GPU size, are
 set as Pod environment variables and are described per image in
-[Docker](../docker/DEPLOY.md). There is no CI build for the
-`qwen_image_edit_2511_aio` image: build it yourself and push it to a registry
-RunPod can pull from.
+[Docker](../docker/DEPLOY.md), together with the GitHub workflows that build
+the images.
 
 ## Pod setup
 

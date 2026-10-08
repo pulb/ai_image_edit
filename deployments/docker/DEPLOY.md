@@ -64,6 +64,10 @@ docker build -f deployments/docker/Dockerfile.qwen_image_edit_2511_aio -t ai-ima
 docker run -p 7860:7860 --gpus all --shm-size=640m -e APP_PASSWORD=... ai-image-edit
 ```
 
+`.github/workflows/docker-qwen-image-edit-2511-aio.yml` builds the image on
+manual runs only and pushes `ghcr.io/<owner>/<repo>-qwen-image-edit-2511-aio`
+tagged `latest` and the short commit SHA.
+
 ## qwen_image21_gguf image
 
 Qwen-Image-2.1 with quantized GGUF weights, run through ComfyUI and the
