@@ -5,10 +5,12 @@ Tests the weight downloads against a local HTTP server (no internet):
     PYTHONPATH=src python -m unittest discover -s tests/comfy_models -v
 """
 import hashlib
+import json
 import os
 import sys
 import tempfile
 import threading
+import time
 import types
 import unittest
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -31,24 +33,44 @@ PAYLOAD = bytes(range(256)) * 4000  # ~1 MB
 class Handler(BaseHTTPRequestHandler):
     hits = []
     gate = None  # an Event the response waits for, to keep a download "in progress"
+    ranges = True  # False: behave like a server that ignores Range
+    fail_once = set()  # range starts whose first request is answered with a 500
+    delay = 0.0  # seconds each ranged response takes
+    active = peak = 0  # requests being served at once, and the most there have been
+    lock = threading.Lock()
 
     def log_message(self, *args):
         pass
 
     def do_GET(self):
-        Handler.hits.append((self.path, self.headers.get("Range"), self.headers.get("Authorization")))
+        rng = self.headers.get("Range")
+        Handler.hits.append((self.path, rng, self.headers.get("Authorization")))
         if self.path.startswith("/missing"):
             self.send_error(404)
             return
-        start = 0
-        rng = self.headers.get("Range")
-        if rng:
-            start = int(rng.split("=")[1].rstrip("-"))
-        body = PAYLOAD[start:]
-        self.send_response(206 if rng else 200)
+        if rng and Handler.ranges and rng != "bytes=0-0":
+            with Handler.lock:
+                Handler.active += 1
+                Handler.peak = max(Handler.peak, Handler.active)
+            time.sleep(Handler.delay)
+            with Handler.lock:
+                Handler.active -= 1
+        if rng and Handler.ranges:
+            first, _, last = rng.split("=")[1].partition("-")
+            first, last = int(first), int(last) if last else len(PAYLOAD) - 1
+            if first in Handler.fail_once:
+                Handler.fail_once.discard(first)
+                self.send_error(500)
+                return
+            body = PAYLOAD[first:last + 1]
+            self.send_response(206)
+            self.send_header("Content-Range", f"bytes {first}-{first + len(body) - 1}/{len(PAYLOAD)}")
+        else:
+            body = PAYLOAD
+            self.send_response(200)
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
-        if Handler.gate is not None:
+        if Handler.gate is not None and len(body) > 1:
             self.wfile.write(body[:1000])
             self.wfile.flush()
             Handler.gate.wait(10)
@@ -73,7 +95,11 @@ class ServerCase(unittest.TestCase):
         self.tmp = Path(self._tmp.name)
         self._cwd = os.getcwd()
         os.chdir(self.tmp)
-        Handler.hits, Handler.gate = [], None
+        Handler.hits, Handler.gate, Handler.ranges, Handler.fail_once = [], None, True, set()
+        Handler.delay, Handler.active, Handler.peak = 0.0, 0, 0
+        patch = mock.patch.object(downloads, "PART_SIZE", 100_000)  # ~11 parts of the test payload
+        patch.start()
+        self.addCleanup(patch.stop)
 
     def tearDown(self):
         os.chdir(self._cwd)
@@ -94,12 +120,53 @@ class DownloadTests(ServerCase):
         downloads.download_file(self.url + "/f", dest)
         self.assertEqual(Handler.hits, [])
 
-    def test_resumes_partial_file(self):
+    def test_file_is_fetched_in_parts_over_several_connections(self):
         dest = self.tmp / "b.bin"
-        dest.with_name("b.bin.part").write_bytes(PAYLOAD[:5000])
         downloads.download_file(self.url + "/f", dest, sha256=hashlib.sha256(PAYLOAD).hexdigest())
         self.assertEqual(dest.read_bytes(), PAYLOAD)
-        self.assertEqual(Handler.hits[0][1], "bytes=5000-")
+        ranges = [h[1] for h in Handler.hits if h[1] != "bytes=0-0"]
+        self.assertEqual(len(ranges), -(-len(PAYLOAD) // 100_000))
+        self.assertEqual(sorted(downloads.os.listdir(self.tmp)), ["b.bin"])  # no .part or .json left
+
+    def test_parts_are_fetched_at_the_same_time(self):
+        Handler.delay = 0.2
+        with mock.patch.dict(os.environ, {"DOWNLOAD_CONNECTIONS": "4"}):
+            downloads.download_file(self.url + "/f", self.tmp / "b.bin")
+        self.assertEqual(Handler.peak, 4)
+
+    def test_progress_reaches_the_total(self):
+        seen = []
+        downloads.download_file(self.url + "/f", self.tmp / "b.bin", progress=lambda done, total: seen.append((done, total)))
+        self.assertEqual(max(seen), (len(PAYLOAD), len(PAYLOAD)))
+
+    def test_continues_with_the_missing_parts(self):
+        dest, part = self.tmp / "b.bin", self.tmp / "b.bin.part"
+        with open(part, "wb") as f:  # the first three parts are there, the rest is zeros
+            f.write(PAYLOAD[:300_000])
+            f.truncate(len(PAYLOAD))
+        part.with_name("b.bin.part.json").write_text(
+            json.dumps({"total": len(PAYLOAD), "part_size": 100_000, "done": [0, 1, 2]}))
+        downloads.download_file(self.url + "/f", dest, sha256=hashlib.sha256(PAYLOAD).hexdigest())
+        self.assertEqual(dest.read_bytes(), PAYLOAD)
+        starts = {int(h[1].split("=")[1].split("-")[0]) for h in Handler.hits if h[1] != "bytes=0-0"}
+        self.assertEqual(min(starts), 300_000)
+
+    def test_stale_partial_file_starts_over(self):
+        part = self.tmp / "b.bin.part"
+        part.write_bytes(b"junk")
+        downloads.download_file(self.url + "/f", self.tmp / "b.bin")
+        self.assertEqual((self.tmp / "b.bin").read_bytes(), PAYLOAD)
+
+    def test_a_failed_part_is_retried(self):
+        Handler.fail_once = {200_000}
+        with mock.patch.object(downloads.time, "sleep"):
+            downloads.download_file(self.url + "/f", self.tmp / "b.bin", sha256=hashlib.sha256(PAYLOAD).hexdigest())
+        self.assertEqual((self.tmp / "b.bin").read_bytes(), PAYLOAD)
+
+    def test_server_without_range_support_is_fetched_in_one_piece(self):
+        Handler.ranges = False
+        downloads.download_file(self.url + "/f", self.tmp / "b.bin", sha256=hashlib.sha256(PAYLOAD).hexdigest())
+        self.assertEqual((self.tmp / "b.bin").read_bytes(), PAYLOAD)
 
     def test_wrong_checksum_or_size_leaves_no_file(self):
         dest = self.tmp / "b.bin"
@@ -112,6 +179,7 @@ class DownloadTests(ServerCase):
     def test_http_error(self):
         with self.assertRaisesRegex(downloads.DownloadError, "404"):
             downloads.download_file(self.url + "/missing", self.tmp / "b.bin")
+        self.assertEqual(len(Handler.hits), 1)  # not retried
 
     def test_token_only_goes_to_huggingface(self):
         with mock.patch.dict(os.environ, {"HF_TOKEN": "secret"}):
