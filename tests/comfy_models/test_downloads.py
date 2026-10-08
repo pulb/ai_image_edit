@@ -126,6 +126,7 @@ class ModelStartTests(ServerCase):
         from ai_image_edit.models._shared.comfyui.workflow_files import available_workflows, read_workflow_file
         manifest, workflow = read_workflow_file(available_workflows()["qwen_image_edit_2511_aio"])
         manifest["loras"]["files"] = []
+        manifest["custom_nodes"] = []
         manifest["licenses"] = {"lic": {"name": "Test License", "url": "https://example.org/lic"}}
         manifest["files"] = [dict(
             name="w.safetensors", url=self.url + "/f", folder="models/checkpoints", set="1.ckpt_name",

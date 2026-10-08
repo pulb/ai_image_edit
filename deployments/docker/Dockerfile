@@ -14,7 +14,7 @@
 # system CUDA toolkit is needed since nothing here compiles CUDA code.
 FROM python:3.11-slim
 
-# git: the app installs custom nodes with it, and this file installs the app.
+# git: the app installs custom nodes with it (the workflow files list them), and this file installs the app.
 RUN apt-get update && apt-get install -y git libgl1 libglib2.0-0 build-essential \
     && rm -rf /var/lib/apt/lists/*
 
@@ -59,14 +59,6 @@ RUN pip install --no-cache-dir torch==${TORCH_VERSION} torchvision==${TORCHVISIO
 
 # ComfyUI's own Python dependencies, from the git clone above.
 RUN pip install --no-cache-dir -r requirements.txt
-
-# The text encode node the qwen_image_edit_2511_aio workflow is meant to run
-# with. The workflow file's "custom_nodes" cannot install it yet (it is a
-# folder inside a Hugging Face repo, and unpinned here); drop this step once it
-# can.
-RUN GIT_LFS_SKIP_SMUDGE=1 git clone https://huggingface.co/Phr00t/Qwen-Image-Edit-Rapid-AIO /tmp/qwen_repo && \
-    mv /tmp/qwen_repo/fixed-textencode-node custom_nodes/ && \
-    rm -rf /tmp/qwen_repo
 
 # Generations on smaller GPUs can take minutes (weights are offloaded to RAM).
 ENV COMFY_GENERATION_TIMEOUT=600

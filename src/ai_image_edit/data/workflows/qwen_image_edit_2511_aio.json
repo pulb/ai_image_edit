@@ -3,6 +3,14 @@
   "manifest": {
     "model_name": "Qwen-Image-Edit Rapid-AIO",
     "model_version": "v23",
+    "custom_nodes": [
+      {
+        "name": "fixed-textencode-node",
+        "git": "https://huggingface.co/Phr00t/Qwen-Image-Edit-Rapid-AIO",
+        "ref": "691024f438640508f8aa86414863fc15edfb8a84",
+        "subdir": "fixed-textencode-node"
+      }
+    ],
     "required_nodes": [],
 
     "files": [

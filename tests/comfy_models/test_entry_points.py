@@ -130,6 +130,8 @@ class CustomNodeTests(unittest.TestCase):
         git = ["git", "-c", "user.name=t", "-c", "user.email=t@example.org", "-C", str(repo)]
         subprocess.run([*git, "init", "-q"], check=True)
         (repo / "node.py").write_text("one")
+        (repo / "pack").mkdir()
+        (repo / "pack/inner.py").write_text("inner")
         subprocess.run([*git, "add", "."], check=True)
         subprocess.run([*git, "commit", "-qm", "one"], check=True)
         self.first = subprocess.check_output([*git, "rev-parse", "HEAD"], text=True).strip()
@@ -146,6 +148,30 @@ class CustomNodeTests(unittest.TestCase):
         self.assertEqual((self.root / "My-Node/node.py").read_text(), "one")
         self.assertEqual(custom_nodes.missing([self.spec], self.root), [])
         self.assertEqual([p.name for p in self.root.iterdir()], ["My-Node"])
+
+    def test_installs_only_a_subfolder(self):
+        custom_nodes.install({**self.spec, "name": "inner-node", "subdir": "pack"}, self.root)
+        self.assertEqual([p.name for p in (self.root / "inner-node").iterdir()], ["inner.py"])
+        self.assertEqual([p.name for p in self.root.iterdir()], ["inner-node"])
+
+    def test_subdir_must_exist_and_stay_inside(self):
+        with self.assertRaisesRegex(RuntimeError, "not a folder"):
+            custom_nodes.install({**self.spec, "subdir": "nope"}, self.root)
+        with self.assertRaisesRegex(ValueError, "inside the repository"):
+            custom_nodes.install({**self.spec, "subdir": "../x"}, self.root)
+        self.assertEqual(list(self.root.iterdir()), [])
+
+    def test_falls_back_to_a_full_fetch(self):
+        real = custom_nodes._run
+
+        def refuse_shallow(*cmd, cwd=None):
+            if "--depth" in cmd:
+                raise RuntimeError("server does not allow fetching by hash")
+            real(*cmd, cwd=cwd)
+
+        with mock.patch.object(custom_nodes, "_run", refuse_shallow):
+            custom_nodes.install(self.spec, self.root)
+        self.assertEqual((self.root / "My-Node/node.py").read_text(), "one")
 
     def test_failed_install_leaves_nothing(self):
         with self.assertRaises(RuntimeError):

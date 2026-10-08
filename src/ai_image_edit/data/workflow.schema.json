@@ -74,7 +74,7 @@
         "model_name": {"type": "string", "minLength": 1},
         "model_version": {"description": "The version shown after the name. MODEL_VERSION overrides it.", "type": "string", "minLength": 1},
         "custom_nodes": {
-          "description": "ComfyUI custom nodes to install into custom_nodes/<name> if that folder is missing: a git repository at an exact commit.",
+          "description": "ComfyUI custom nodes to install into custom_nodes/<name> if that folder is missing: a git repository (or one folder of it) at an exact commit.",
           "type": "array",
           "items": {
             "type": "object",
@@ -83,7 +83,8 @@
             "properties": {
               "name": {"type": "string", "pattern": "^[A-Za-z0-9._-]+$"},
               "git": {"type": "string", "pattern": "^https://"},
-              "ref": {"type": "string", "pattern": "^[0-9a-f]{40}$"}
+              "ref": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+              "subdir": {"description": "Install only this folder of the repository.", "type": "string", "pattern": "^[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)*$"}
             }
           }
         },
