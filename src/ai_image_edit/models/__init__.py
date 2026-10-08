@@ -19,17 +19,17 @@ ModelBackend (models/base.py) and adding one small loader function + one line
 in MODEL_LOADERS. Nothing else in the app needs to change.
 """
 from pathlib import Path
-from typing import Callable, Dict
+from typing import Callable, Dict, Optional
 
 from ai_image_edit.models.base import ModelBackend
 from ai_image_edit.models._shared.comfyui.workflow_files import available_workflows
 
 
-def _workflow_file_loader(path: Path) -> Callable[[], ModelBackend]:
-    def load() -> ModelBackend:
+def _workflow_file_loader(path: Path) -> Callable[..., ModelBackend]:
+    def load(variant: Optional[str] = None) -> ModelBackend:
         from ai_image_edit.models._shared.comfyui.workflow_model import ComfyWorkflowModel
 
-        return ComfyWorkflowModel.from_file(path)
+        return ComfyWorkflowModel.from_file(path, variant)
 
     return load
 
@@ -48,7 +48,7 @@ def _load_qwen_image21() -> ModelBackend:
     return QwenImage21Model()
 
 
-MODEL_LOADERS: Dict[str, Callable[[], ModelBackend]] = {
+MODEL_LOADERS: Dict[str, Callable[..., ModelBackend]] = {
     "qwen_image21": _load_qwen_image21,
 }
 # Every workflow file is a ComfyUI model, named after the file.
@@ -56,7 +56,8 @@ for _name, _path in available_workflows().items():
     MODEL_LOADERS[_name] = _workflow_file_loader(_path)
 
 
-def get_model(name: str) -> ModelBackend:
+def get_model(name: str, variant: Optional[str] = None) -> ModelBackend:
+    """The backend registered as `name`; `variant` selects one of a workflow file's variants."""
     try:
         loader = MODEL_LOADERS[name]
     except KeyError:
@@ -64,4 +65,13 @@ def get_model(name: str) -> ModelBackend:
             f"Unknown model backend '{name}'. Available: {', '.join(sorted(MODEL_LOADERS))}. "
             "ComfyUI models are the files in ai_image_edit/data/workflows/."
         )
-    return loader()
+    if variant is None:
+        return loader()
+    if name not in available_workflows():
+        raise ValueError(f"Model '{name}' has no variants.")
+    return loader(variant)
+
+
+def get_model_from_file(path: Path, variant: Optional[str] = None) -> ModelBackend:
+    """A ComfyUI model from any workflow file (see doc/contribution/workflow_files.md)."""
+    return _workflow_file_loader(Path(path))(variant)
