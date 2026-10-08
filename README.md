@@ -27,7 +27,7 @@ front of a pluggable image-generation backend.
 
 ### Backends
 
-Selected with `MODEL_BACKEND`. The [deployments](#deployment) are already
+Selected with `MODEL_BACKEND`. The [deployments](#deployments) are already
 preconfigured with the most suitable backend.
 
 - **`qwen_image21_gguf`** (default) — Qwen-Image-2.1 with quantized
@@ -46,7 +46,7 @@ preconfigured with the most suitable backend.
 
 ### Frontends
 
-Selected with `FRONTEND`. The [deployments](#deployment) are already
+Selected with `FRONTEND`. The [deployments](#deployments) are already
 preconfigured with the most suitable frontend.
 
 - **[NiceGUI](https://nicegui.io/)** (default) — the snappier frontend.
@@ -55,7 +55,7 @@ preconfigured with the most suitable frontend.
 
 The UI is served on port `7860`.
 
-## Deployment
+## Deployments
 
 | Target | Backend | Frontend | Guide |
 |---|---|---|---|
@@ -63,13 +63,13 @@ The UI is served on port `7860`.
 | Hugging Face Space | `qwen_image21` (ZeroGPU or paid GPU); on a paid GPU, any image as a Docker Space | Gradio (ZeroGPU), Gradio or NiceGUI (paid GPU) | [`deployments/huggingface`](deployments/huggingface/DEPLOY.md) |
 | Docker (self-hosted) | `qwen_image21_gguf`, `qwen_image_edit_2511_aio`, `qwen_image21` (one image each) | NiceGUI only | [`deployments/docker`](deployments/docker/DEPLOY.md) |
 
-### Generation times
+## Generation times
 
 Approximate generation times by output resolution in megapixels (MP), at the
 default of 40 steps. They are rough figures from single runs, not benchmarks,
 and will vary with the step count and reference images.
 
-#### RunPod GPUs
+### RunPod GPUs
 
 The `qwen_image21` backend (Qwen-Image-2.1) on the datacenter GPUs available on RunPod.
 
@@ -79,7 +79,7 @@ The `qwen_image21` backend (Qwen-Image-2.1) on the datacenter GPUs available on 
 | NVIDIA A100 | ~20 s | ~2 min |
 | NVIDIA L40S | ~23 s | insufficient mem |
 
-#### Consumer hardware
+### Consumer hardware
 
 The `qwen_image21_gguf` backend with the default `uc-q4_k_m` image on GPUs you
 may have at home. The RTX 4090 figures were measured with
