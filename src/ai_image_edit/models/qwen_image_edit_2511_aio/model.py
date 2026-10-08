@@ -4,7 +4,7 @@ ModelBackend implementation for Phr00t's Qwen-Image-Edit-Rapid-AIO,
 served through a local ComfyUI instance:
 https://huggingface.co/Phr00t/Qwen-Image-Edit-Rapid-AIO
 
-All ComfyUI wire-protocol details live in models/comfyui/client.py; pixel-level
+All ComfyUI wire-protocol details live in models/_shared/comfyui/client.py; pixel-level
 color-matching/compositing lives in core/imaging.py, shared with every
 other model that does external crop/mask/composite around inference. This
 module owns workflow construction (building the ComfyUI graph for one
@@ -29,8 +29,8 @@ from ai_image_edit.core.errors import GenerationError
 from ai_image_edit.core.result_cache import cached_infer
 from ai_image_edit.core.types import GenerationParams, GenerationResult, ModelCapabilities, RangeSpec
 from ai_image_edit.models.base import ModelBackend
-from ai_image_edit.models.comfyui import client as comfy_client
-from ai_image_edit.models.comfyui.common import MODEL_FILE_ENV, SAMPLER_CHOICES, SCHEDULER_CHOICES, configured_file
+from ai_image_edit.models._shared.comfyui import client as comfy_client
+from ai_image_edit.models._shared.comfyui.common import MODEL_FILE_ENV, SAMPLER_CHOICES, SCHEDULER_CHOICES, configured_file
 
 LORA_DIR = "models/loras"
 

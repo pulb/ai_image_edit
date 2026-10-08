@@ -29,7 +29,7 @@ from ai_image_edit.core.errors import GenerationError
 from ai_image_edit.core.paths import WORK_DIR
 from ai_image_edit.core.types import GenerationParams, GenerationResult, ModelCapabilities, RangeSpec
 from ai_image_edit.models.base import ModelBackend
-from ai_image_edit.models.qwen21_size import (
+from ai_image_edit.models._shared.qwen21_size import (
     ASPECT_RATIOS,
     AUTO_ASPECT_RATIO,
     DEFAULT_MEGAPIXELS,

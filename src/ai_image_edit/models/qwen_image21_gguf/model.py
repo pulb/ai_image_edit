@@ -11,8 +11,8 @@ weights come from three environment variables set in the Dockerfile, each a
 path relative to its folder under ComfyUI's models/:
 MODEL_FILE (diffusion_models), TEXT_ENCODER_FILE (text_encoders), VAE_FILE (vae).
 
-ComfyUI wire-protocol details live in models/comfyui/client.py; output sizes
-are shared with the qwen_image21 backend (qwen21_size.py); crop/composite is
+ComfyUI wire-protocol details live in models/_shared/comfyui/client.py; output sizes
+are shared with the qwen_image21 backend (models/_shared/qwen21_size.py); crop/composite is
 core/imaging.py.
 """
 import json
@@ -30,9 +30,9 @@ from ai_image_edit.core.errors import GenerationError
 from ai_image_edit.core.result_cache import cached_infer
 from ai_image_edit.core.types import GenerationParams, GenerationResult, ModelCapabilities, RangeSpec
 from ai_image_edit.models.base import ModelBackend
-from ai_image_edit.models.comfyui import client as comfy_client
-from ai_image_edit.models.comfyui.common import MODEL_FILE_ENV, SAMPLER_CHOICES, SCHEDULER_CHOICES, configured_file
-from ai_image_edit.models.qwen21_size import (
+from ai_image_edit.models._shared.comfyui import client as comfy_client
+from ai_image_edit.models._shared.comfyui.common import MODEL_FILE_ENV, SAMPLER_CHOICES, SCHEDULER_CHOICES, configured_file
+from ai_image_edit.models._shared.qwen21_size import (
     ASPECT_RATIOS,
     AUTO_ASPECT_RATIO,
     DEFAULT_CFG,

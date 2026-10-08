@@ -24,7 +24,7 @@ from PIL import Image
 
 from ai_image_edit.core.paths import WORK_DIR, trim_work_dir
 from ai_image_edit.core.types import DEFAULT_SEED, FEATHER_RANGE, ORIGINAL_ASPECT_RATIO
-from ai_image_edit.frontends.common import (
+from ai_image_edit.frontends._shared.common import (
     HOST,
     PORT,
     PRIMARY_COLOR,

@@ -76,12 +76,16 @@ Rules for any AI coding agent working in this repository.
   (https://github.com/pulb/ai_image_edit_qwen) under the Qwen Research
   License, not the GPL. `src/ai_image_edit/models/qwen_image21/model.py` only imports it.
   Never copy Qwen-licensed or Space-derived code into this repo.
-- **ComfyUI backends**: `models/comfyui/` holds what the ComfyUI-based
+- **ComfyUI backends**: `models/_shared/comfyui/` holds what the ComfyUI-based
   backends share (`client.py`, `common.py`). Each backend's main weights file
   is named by the `MODEL_FILE` environment variable (a path relative to its
   folder under ComfyUI's `models/`), set in the backend's Dockerfile.
   Qwen-Image-2.1 output sizes shared by `qwen_image21` and `qwen_image21_gguf`
-  live in `models/qwen21_size.py`.
+  live in `models/_shared/qwen21_size.py`.
+- **Shared code**: helpers used by several backends or frontends live in
+  `_shared/` packages (`models/_shared/`, `frontends/_shared/`). The contracts
+  and registries (`models/base.py`, `models/__init__.py`,
+  `frontends/__init__.py`) stay at the top level of their package.
 - **Default backend**: `src/ai_image_edit/app.py` defaults `MODEL_BACKEND` to
   `qwen_image_edit_2511_aio`; each `deployments/docker/Dockerfile.*` sets
   `MODEL_BACKEND` explicitly.

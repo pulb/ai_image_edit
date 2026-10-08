@@ -31,7 +31,7 @@ from ai_image_edit.core.paths import WORK_DIR, to_url, from_url, trim_work_dir
 from ai_image_edit.core.types import (
     ANNOTATION_COLORS, DEFAULT_SEED, FEATHER_RANGE, ORIGINAL_ASPECT_RATIO, RangeSpec,
 )
-from ai_image_edit.frontends.common import (
+from ai_image_edit.frontends._shared.common import (
     HOST,
     PORT,
     PRIMARY_COLOR,
