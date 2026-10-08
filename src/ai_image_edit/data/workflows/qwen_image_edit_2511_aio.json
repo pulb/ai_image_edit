@@ -36,6 +36,26 @@
 
     "loras": {
       "dir": "models/loras",
+      "files": [
+        {"dir": "Multiple-Angles", "name": "镜头转换.safetensors",
+         "url": "https://huggingface.co/dx8152/Qwen-Edit-2509-Multiple-angles/resolve/main/%E9%95%9C%E5%A4%B4%E8%BD%AC%E6%8D%A2.safetensors?download=true"},
+        {"dir": "Style-Transfer", "name": "Style Transfer-Alpha-V0.1.safetensors",
+         "url": "https://huggingface.co/zooeyy/Style-Transfer/resolve/main/Style%20Transfer-Alpha-V0.1.safetensors?download=true"},
+        {"dir": "Anything2Real", "name": "anything2real_2601.safetensors",
+         "url": "https://huggingface.co/lrzjason/Anything2Real_2601/resolve/main/anything2real_2601.safetensors?download=true"},
+        {"dir": "Polaroid-Photo", "name": "Qwen-Image-Edit-2511-Polaroid-Photo.safetensors",
+         "url": "https://huggingface.co/prithivMLmods/Qwen-Image-Edit-2511-Polaroid-Photo/resolve/main/Qwen-Image-Edit-2511-Polaroid-Photo.safetensors?download=true"},
+        {"dir": "Unblur-Anything", "name": "Qwen-Image-Edit-Unblur-Upscale_15.safetensors",
+         "url": "https://huggingface.co/prithivMLmods/Qwen-Image-Edit-2511-Unblur-Upscale/resolve/main/Qwen-Image-Edit-Unblur-Upscale_15.safetensors?download=true"},
+        {"dir": "Pixar-Inspired-3D", "name": "PI3_20.safetensors",
+         "url": "https://huggingface.co/prithivMLmods/Qwen-Image-Edit-2511-Pixar-Inspired-3D/resolve/main/PI3_20.safetensors?download=true"},
+        {"dir": "Noir-Comic-Book", "name": "Noir-Comic-Book-Panel_20.safetensors",
+         "url": "https://huggingface.co/prithivMLmods/Qwen-Image-Edit-2511-Noir-Comic-Book-Panel/resolve/main/Noir-Comic-Book-Panel_20.safetensors?download=true"},
+        {"dir": "AnyPose", "name": "2511-AnyPose-base-000006250.safetensors",
+         "url": "https://huggingface.co/lilylilith/AnyPose/resolve/main/2511-AnyPose-base-000006250.safetensors?download=true"},
+        {"dir": "AnyPose", "name": "2511-AnyPose-helper-00006000.safetensors",
+         "url": "https://huggingface.co/lilylilith/AnyPose/resolve/main/2511-AnyPose-helper-00006000.safetensors?download=true"}
+      ],
       "loader_class": "LoraLoader",
       "first_id": 100,
       "from": {"model": ["1", 0], "clip": ["1", 1]},

@@ -125,6 +125,7 @@ class ModelStartTests(ServerCase):
     def model(self, **file_extra) -> ComfyWorkflowModel:
         from ai_image_edit.models._shared.comfyui.workflow_files import available_workflows, read_workflow_file
         manifest, workflow = read_workflow_file(available_workflows()["qwen_image_edit_2511_aio"])
+        manifest["loras"]["files"] = []
         manifest["licenses"] = {"lic": {"name": "Test License", "url": "https://example.org/lic"}}
         manifest["files"] = [dict(
             name="w.safetensors", url=self.url + "/f", folder="models/checkpoints", set="1.ckpt_name",
@@ -194,6 +195,19 @@ class ModelStartTests(ServerCase):
         self.launch.assert_not_called()
         with self.assertRaisesRegex(GenerationError, "failed.*404"):
             model.generate(self.params())
+
+    def test_lora_files_are_downloaded_into_their_folders(self):
+        model = self.model()
+        model._manifest["files"] = []
+        model._manifest["loras"]["files"] = [
+            {"dir": "Pack", "name": "a b.safetensors", "url": self.url + "/f"},
+            {"dir": "Pack", "name": "c.safetensors", "url": self.url + "/f"},
+        ]
+        model.start()
+        self.assertTrue(model._download_status.finished.wait(10))
+        self.assertIsNone(model._download_status.error)
+        self.assertEqual(sorted(model.list_loras()), ["Pack"])
+        self.assertEqual(model.list_loras()["Pack"], ["Pack/a b.safetensors", "Pack/c.safetensors"])
 
     def test_unknown_license_is_rejected_at_load(self):
         with self.assertRaisesRegex(ValueError, "unknown license"):

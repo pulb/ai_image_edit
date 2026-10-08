@@ -232,6 +232,23 @@
           "additionalProperties": false,
           "properties": {
             "dir": {"type": "string"},
+            "files": {
+              "description": "LoRA files to download if missing: each goes to <dir>/<dir of the entry>/<name>; the subfolder is the LoRA's display name (a LoRA with several files shares one).",
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["dir", "name", "url"],
+                "additionalProperties": false,
+                "properties": {
+                  "dir": {"type": "string", "minLength": 1},
+                  "name": {"type": "string", "minLength": 1},
+                  "url": {"type": "string", "pattern": "^https://"},
+                  "sha256": {"type": "string", "pattern": "^[0-9a-fA-F]{64}$"},
+                  "size": {"type": "integer", "minimum": 1},
+                  "license": {"type": "string"}
+                }
+              }
+            },
             "loader_class": {"type": "string"},
             "first_id": {"type": "integer", "minimum": 0},
             "from": {"type": "object", "minProperties": 1, "additionalProperties": {"$ref": "#/$defs/link"}},

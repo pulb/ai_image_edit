@@ -151,6 +151,9 @@ class ComfyWorkflowModel(ModelBackend):
             need_node(target, f"size.bind.{key}")
         loras = m.get("loras")
         if loras:
+            for spec in loras.get("files", []):
+                if spec.get("license") and spec["license"] not in m.get("licenses", {}):
+                    raise ValueError(f"{self.name}: loras.files {spec['name']!r}: unknown license {spec['license']!r}")
             for targets in loras["feeds"].values():
                 for target in targets:
                     need_node(target, "loras.feeds")
@@ -217,6 +220,15 @@ class ComfyWorkflowModel(ModelBackend):
         pending = []
         for spec in self._manifest.get("files", []):
             dest = Path(spec["folder"]) / self._file_value(spec)
+            if not dest.is_file():
+                pending.append({
+                    "url": spec["url"], "dest": dest, "sha256": spec.get("sha256"), "size": spec.get("size"),
+                    "license": spec.get("license"),
+                })
+        # LoRA files: each goes into its own subfolder of loras.dir (the subfolder is the display name).
+        loras = self._manifest.get("loras", {})
+        for spec in loras.get("files", []):
+            dest = Path(loras["dir"]) / spec["dir"] / spec["name"]
             if not dest.is_file():
                 pending.append({
                     "url": spec["url"], "dest": dest, "sha256": spec.get("sha256"), "size": spec.get("size"),

@@ -154,6 +154,7 @@ class CustomNodeTests(unittest.TestCase):
 
     def test_model_installs_before_launching_comfy(self):
         manifest, workflow = read_workflow_file(available_workflows()["qwen_image_edit_2511_aio"])
+        manifest["loras"]["files"] = []
         manifest["custom_nodes"] = [self.spec]
         manifest["files"] = [{"name": "w.safetensors", "url": "https://example.org/w", "folder": "models/checkpoints",
                               "set": "1.ckpt_name"}]

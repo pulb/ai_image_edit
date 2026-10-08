@@ -57,6 +57,9 @@ def main(argv: Optional[List[str]] = None) -> None:
     except (ValueError, OSError) as exc:
         raise SystemExit(str(exc))
     print(f"Starting model backend '{model_name}' in the background...", flush=True)
-    model.start()
+    try:
+        model.start()
+    except RuntimeError as exc:  # a missing file, an unaccepted license: a message is enough
+        raise SystemExit(str(exc))
 
     run_frontend(frontend, model)
