@@ -76,13 +76,15 @@ Rules for any AI coding agent working in this repository.
   (https://github.com/pulb/ai_image_edit_qwen) under the Qwen Research
   License, not the GPL. `src/ai_image_edit/models/qwen_image21/model.py` only imports it.
   Never copy Qwen-licensed or Space-derived code into this repo.
-- **ComfyUI models are data**: a ComfyUI model is a folder under `models/`
-  with a `workflow_api.json` and a `manifest.json`, run by the generic
+- **ComfyUI models are data**: a ComfyUI model is one JSON file in
+  `src/ai_image_edit/data/workflows/` (`format_version`, `manifest`, `workflow`; package
+  data, installed with the app), run by the generic
   `ComfyWorkflowModel` (`models/_shared/comfyui/workflow_model.py`); there is
-  no per-model Python class. `models/__init__.py` registers every folder with a
-  manifest automatically. The manifest format is documented in
-  `doc/contribution/comfy_manifest.md`. Output-size schemes are
-  `size_policies.py`; a model with a new one adds a policy class there.
+  no per-model Python class. `models/__init__.py` registers every file there
+  by its name. The format is documented in
+  `doc/contribution/workflow_files.md` and defined by `src/ai_image_edit/data/workflow.schema.json`.
+  Output-size schemes are `size_policies.py`; a model with a new one adds a
+  policy class there.
 - **ComfyUI backends**: `models/_shared/comfyui/` holds what the ComfyUI-based
   models share (`client.py`, `common.py`). Each model's main weights file
   is named by the `MODEL_FILE` environment variable (a path relative to its
@@ -120,7 +122,8 @@ Rules for any AI coding agent working in this repository.
   it's easy to break that pairing with a careless insertion.
 - The ComfyUI models have tests (`tests/comfy_models/`, no GPU or ComfyUI needed):
   `PYTHONPATH=src python -m unittest discover -s tests/comfy_models`. They load every
-  `models/*/manifest.json` and check it against its workflow. Run them after touching
-  `models/_shared/comfyui/`, a manifest or a workflow.
+  workflow file and check it against the JSON Schema and the code
+  that runs it (the schema tests need `pip install jsonschema`). Run them after touching
+  `models/_shared/comfyui/`, the schema or a workflow file.
 - There is no other automated test suite in this repo yet; sanity-check changes
   by reading the affected code paths end to end rather than assuming.

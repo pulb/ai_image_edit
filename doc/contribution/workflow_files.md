@@ -1,27 +1,34 @@
-# ComfyUI model manifests
+# Workflow files
 
-A ComfyUI model is a folder under `models/` with two files; no Python is needed:
+A ComfyUI model is one JSON file in `src/ai_image_edit/data/workflows/`; no Python is
+needed. The files are package data, so they are installed with the app. The file name is the
+backend name (`MODEL_BACKEND=<name>`), and the file is found automatically.
 
+```json
+{
+  "format_version": 1,
+  "manifest": { ... how the app's inputs map onto the workflow ... },
+  "workflow": { ... the workflow, exported from ComfyUI with "Save (API Format)" ... }
+}
 ```
-models/<name>/workflow_api.json   the workflow, exported from ComfyUI with "Save (API Format)"
-models/<name>/manifest.json       how the app's inputs map onto that workflow
-```
 
-The folder name is the backend name (`MODEL_BACKEND=<name>`). The folder is
-found automatically (`models/__init__.py`), and `ComfyWorkflowModel` loads it.
-Mistakes such as a target that names a node missing from the workflow fail at
-load time.
+The structure is defined by [`workflow.schema.json`](../../src/ai_image_edit/data/workflow.schema.json) (JSON
+Schema), which the tests check every file against. `format_version` changes only when the
+format changes incompatibly; the app refuses files of another version.
 
-A **target** is `"<node id>.<input name>"`, e.g. `"6.seed"`. The input name may
-contain dots (`"5.images.image_2"`). Every target the app fills in (everything
-except the reference image slots) must already exist in the workflow with a
-placeholder value, so a mistyped node id or input name fails when the model loads.
+## Targets
+
+A **target** is `"<node id>.<input name>"`, e.g. `"6.seed"`. The input name may contain
+dots (`"5.images.image_2"`). Every target the app fills in (everything except the reference
+image slots) must already exist in the `workflow` section with a placeholder value, so a
+mistyped node id or input name fails when the model loads.
+
+## Manifest
 
 | Key | Meaning |
 |---|---|
 | `model_name` | Name shown in the UI. |
-| `model_version` | Optional. `env` (environment variable), `regex` (group 1 is the version), `basename`, `ignore_case`, `upper`, and `prefixes` (`[{regex, text}]` prepended when matching). |
-| `workflow` | Workflow file, default `workflow_api.json`. |
+| `model_version` | Optional. The version shown after the name, as a string. Transitional: instead of a string, a rule that derives it from the weights file name: `env` (environment variable), `regex` (group 1 is the version), `basename`, `ignore_case`, `upper`, and `prefixes` (`[{regex, text}]` prepended when matching). It goes away when the weights are declared in the file. |
 | `required_nodes`, `missing_nodes_hint` | Node classes ComfyUI must provide, checked on the first generation, and the advice shown if they are missing. |
 | `files` | Weight files: `env` names a variable holding a path relative to `folder`; the path is written to `set`. Existence is checked at startup. |
 | `bind` | Where each app input goes: `prompt`, `seed`, `steps`, `sampler`, `scheduler` (required), `cfg`, `denoise`, `negative_prompt` (optional). An input that is not bound is not offered in the UI (`cfg`, `denoise`, `negative_prompt`). |
@@ -32,7 +39,10 @@ placeholder value, so a mistyped node id or input name fails when the model load
 | `loras` | Omit if the model has none. Chains one `loader_class` node per selected file from `first_id`; `from` are the links it starts from, `outputs` the names of its outputs, `feeds` the targets that receive the final links, `strength_inputs` the inputs that get the strength. `dir` is searched for LoRA files. |
 | `capabilities` | What the UI offers: `supports_inpainting`, `num_annotation_colors`, `sampler`/`scheduler` (`default`, optional `choices`), and ranges (`min`, `max`, `default`, `step`) for `steps`, `cfg`, `denoise`, `lora_strength`. |
 
-Tests: `PYTHONPATH=src python -m unittest discover -s tests/comfy_models`
-loads every manifest it finds, builds workflows with 0, 1 and the maximum number of
-reference images, and checks they are well formed. It cannot check the workflow
+## Tests
+
+`PYTHONPATH=src python -m unittest discover -s tests/comfy_models` checks every file in
+`src/ai_image_edit/data/workflows/` against the schema and loads it, builds workflows with 0, 1 and the
+maximum number of reference images, and checks they are well formed. The schema tests need
+`pip install jsonschema` and are skipped without it. The tests cannot check the workflow
 itself (a wrong node class or input name): only running it in ComfyUI does.
