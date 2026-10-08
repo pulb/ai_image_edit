@@ -49,8 +49,8 @@ Optional variables are the same as for the `qwen_image21` image (see
 - `FRONTEND` can be `gradio` or `nicegui`. `nicegui` is the snappier
   frontend and also runs under the Gradio SDK, because the Space just runs
   `app.py` on port `7860`.
-- A paid GPU Space can also run any of the images
+- A paid GPU Space can also run either image
   ([`../docker/DEPLOY.md`](../docker/DEPLOY.md)) as a Docker Space: use
   `sdk: docker` in the card and copy the image's Dockerfile to the Space root
-  as `Dockerfile`. The GPU needs at least 16 GB of VRAM for
+  as `Dockerfile` (for the ComfyUI image, set `MODEL_BACKEND` and, if needed, `ACCEPT_LICENSES` as Space variables). The GPU needs at least 16 GB of VRAM for
   `qwen_image21_gguf` and at least 48 GB for `qwen_image21`.

@@ -59,16 +59,16 @@ The UI is served on port `7860`.
 
 | Target | Backend | Frontend | Guide |
 |---|---|---|---|
-| ⭐ **RunPod GPU Pod** (recommended) | `qwen_image21_gguf`, `qwen_image_edit_2511_aio`, `qwen_image21` (one image each) | NiceGUI only | [`deployments/runpod`](deployments/runpod/DEPLOY.md) |
+| ⭐ **RunPod GPU Pod** (recommended) | `qwen_image21_gguf`, `qwen_image_edit_2511_aio` (one ComfyUI image), `qwen_image21` | NiceGUI only | [`deployments/runpod`](deployments/runpod/DEPLOY.md) |
 | Hugging Face Space | `qwen_image21` (ZeroGPU or paid GPU); on a paid GPU, any image as a Docker Space | Gradio (ZeroGPU), Gradio or NiceGUI (paid GPU) | [`deployments/huggingface`](deployments/huggingface/DEPLOY.md) |
-| Docker (self-hosted) | `qwen_image21_gguf`, `qwen_image_edit_2511_aio`, `qwen_image21` (one image each) | NiceGUI only | [`deployments/docker`](deployments/docker/DEPLOY.md) |
+| Docker (self-hosted) | `qwen_image21_gguf`, `qwen_image_edit_2511_aio` (one ComfyUI image), `qwen_image21` | NiceGUI only | [`deployments/docker`](deployments/docker/DEPLOY.md) |
 
 ### Generation times
 
 Approximate generation times for the `qwen_image21` and `qwen_image21_gguf`
 backends (Qwen-Image-2.1) on common GPUs, by output resolution in megapixels
 (MP), at the default of 40 steps. The GGUF figures are for the default
-`uc-q4_k_m` image; the RTX 4090 figures were measured with
+`UC Q4_K_M` variant; the RTX 4090 figures were measured with
 `--highvram --disable-dynamic-vram` (see [Docker](deployments/docker/DEPLOY.md#comfyui-arguments-comfy_extra_args)),
 the RTX 2000 Ada figures without. They are rough figures from single runs, not benchmarks,
 and will vary with the step count and reference images. A dash means not

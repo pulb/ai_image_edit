@@ -12,8 +12,7 @@ your own and, if your registry is private, add registry credentials (see
 
 | Backend | Image | Weights |
 |---|---|---|
-| `qwen_image21_gguf` | [`qwen_image21_gguf`](../docker/DEPLOY.md#qwen_image21_gguf-image) | quantized GGUF weights baked into the image, chosen with build arguments |
-| `qwen_image_edit_2511_aio` | [`qwen_image_edit_2511_aio`](../docker/DEPLOY.md#qwen_image_edit_2511_aio-image) | checkpoint and LoRAs baked into the image |
+| `qwen_image21_gguf`, `qwen_image_edit_2511_aio` (`MODEL_BACKEND`) | [ComfyUI image](../docker/DEPLOY.md#comfyui-image-dockerfile) | downloaded on first start (see [Pod setup](#pod-setup)) |
 | `qwen_image21` | [`qwen_image21`](../docker/DEPLOY.md#qwen_image21-image) | downloaded from the Hugging Face Hub at startup |
 
 Environment variables, including the ComfyUI arguments for each GPU size, are
@@ -24,18 +23,21 @@ the images.
 ## Pod setup
 
 1. Create a Pod from the image, exposing HTTP port `7860`. For example
-   `ghcr.io/<owner>/<repo>-qwen-image21:<tag>` for `qwen_image21`, or
-   `ghcr.io/<owner>/<repo>-qwen-image21-gguf:<tag>` (for example `uc-q4_k_m`)
-   for `qwen_image21_gguf`. Choose one of the GPUs the template recommends
+   `ghcr.io/<owner>/<repo>:latest` for the ComfyUI models (select the model
+   with `MODEL_BACKEND` and, for `qwen_image21_gguf`, `ACCEPT_LICENSES=qwen-research`),
+   or `ghcr.io/<owner>/<repo>-qwen-image21:<tag>` for `qwen_image21`. Choose one of the GPUs the template recommends
    that has enough memory: at least 48 GB of VRAM for `qwen_image21`, at least
    16 GB for `qwen_image21_gguf`.
 2. If the registry package is private (GHCR packages are by default), add a
    registry credential under **Settings → Container Registry Auth** in the
    RunPod console. For GHCR that is your GitHub username and a PAT with
    `read:packages`; making the package public skips this.
-3. Optional, `qwen_image21` only: attach a network volume (a Pod mounts it
-   at `/workspace`) and set `HF_HUB_CACHE=/workspace/hf-cache`, so the
-   multi-GB weights download once instead of on every fresh container.
+3. Optional: attach a network volume (a Pod mounts it at `/workspace`) so the
+   multi-GB weights download once instead of on every fresh container. For
+   the ComfyUI image, mount it at `/home/user/app/models` if the Pod
+   lets you choose the mount path (otherwise the weights are stored on the
+   Pod's disk); for
+   `qwen_image21`, set `HF_HUB_CACHE=/workspace/hf-cache`.
 
 ## Image storage
 

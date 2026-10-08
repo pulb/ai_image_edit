@@ -89,7 +89,7 @@ Rules for any AI coding agent working in this repository.
   models share (`client.py`, `common.py`, `downloads.py`). Weight files are
   listed in the workflow file's `files` and downloaded when missing; an
   environment variable such as `MODEL_FILE` can point to a local file instead
-  (the Dockerfiles still bake the weights in and set it).
+  (the image no longer bakes the weights in).
   Qwen-Image-2.1 output sizes shared by `qwen_image21` and `qwen_image21_gguf`
   live in `models/_shared/qwen21_size.py`.
 - **Shared code**: helpers used by several backends or frontends live in
@@ -97,8 +97,8 @@ Rules for any AI coding agent working in this repository.
   and registries (`models/base.py`, `models/__init__.py`,
   `frontends/__init__.py`) stay at the top level of their package.
 - **Default backend**: `src/ai_image_edit/app.py` defaults `--model`/`MODEL_BACKEND` to
-  `qwen_image21_gguf`; each `deployments/docker/Dockerfile.*` sets
-  `MODEL_BACKEND` explicitly.
+  `qwen_image21_gguf`; `deployments/docker/Dockerfile.qwen_image21` sets
+  `MODEL_BACKEND` explicitly, the ComfyUI `Dockerfile` leaves the default.
 - **Masking**: masked generation (crop → infer → composite/color-correct)
   is handled externally via `core/imaging.py`'s `run_masked_generation()`,
   shared by every backend that supports inpainting. A model backend does

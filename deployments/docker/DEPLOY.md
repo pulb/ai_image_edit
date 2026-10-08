@@ -1,15 +1,13 @@
 # Docker
 
-Three images, all built from the repo root. The app serves on port `7860`.
-Each image sets its own `MODEL_BACKEND` and uses `FRONTEND=nicegui`, so no
-backend or frontend configuration is needed: pick the backend by choosing the
-image.
+Two images. The app serves on port `7860`.
 
-| Dockerfile | Backend | Frontend | Use |
-|---|---|---|---|
-| `Dockerfile.qwen_image21_gguf` | `qwen_image21_gguf` | `nicegui` | quantized Qwen-Image-2.1 run through ComfyUI, for low-VRAM GPUs |
-| `Dockerfile.qwen_image_edit_2511_aio` | `qwen_image_edit_2511_aio` | `nicegui` | all-in-one checkpoint run through ComfyUI |
-| `Dockerfile.qwen_image21` | `qwen_image21` | `nicegui` | diffusers pipeline, weights downloaded at startup |
+| Dockerfile | Models | Weights |
+|---|---|---|
+| `Dockerfile` | every ComfyUI model (`qwen_image21_gguf`, `qwen_image_edit_2511_aio`, and any [workflow file](../../doc/contribution/workflow_files.md) of your own) | not in the image: downloaded on first start |
+| `Dockerfile.qwen_image21` | `qwen_image21` (diffusers pipeline) | downloaded at startup |
+
+Both use the NiceGUI frontend.
 
 ## Image storage
 
@@ -50,54 +48,53 @@ logs everyone out. Either way this is a single shared password without real rate
 limiting. For stronger protection, don't expose the port and use an
 SSH tunnel or Tailscale.
 
-## qwen_image_edit_2511_aio image
+## ComfyUI image (`Dockerfile`)
 
-Clones ComfyUI, installs PyTorch, downloads the model checkpoint and a set of
-LoRAs, then starts the app. The checkpoint is set by two variables near the top
-of the Dockerfile: `MODEL_FILE_URL` (where it is downloaded from) and
-`MODEL_FILE` (its path under ComfyUI's `models/checkpoints` folder).
-The app loads the file `MODEL_FILE` names and refuses to start if it
-is empty or the file does not exist.
-
-```bash
-docker build -f deployments/docker/Dockerfile.qwen_image_edit_2511_aio -t ai-image-edit .
-docker run -p 7860:7860 --gpus all --shm-size=640m -e APP_PASSWORD=... ai-image-edit
-```
-
-`.github/workflows/docker-qwen-image-edit-2511-aio.yml` builds the image on
-manual runs only and pushes `ghcr.io/<owner>/<repo>-qwen-image-edit-2511-aio`
-tagged `latest` and the short commit SHA.
-
-## qwen_image21_gguf image
-
-Qwen-Image-2.1 with quantized GGUF weights, run through ComfyUI and the
-[ComfyUI-GGUF](https://github.com/leejet/ComfyUI-GGUF) node, which needs far
-less GPU memory than the `qwen_image21` image. This backend and image are
-meant for low-VRAM GPUs, on RunPod or in self-hosted environments; the GPU
-needs at least 16 GB of VRAM. The weights are under the Qwen RESEARCH LICENSE
-AGREEMENT (non-commercial use only): keep the image and its registry package
-private. They are baked into the image; choose them with build arguments:
-
-| Build argument | Default | Meaning |
-|---|---|---|
-| `QWEN_GGUF_REPO` | `abenzerps/Qwen-Image-2.1-Uncensored-GGUF` | Hugging Face repo with the GGUF, text encoder and VAE files |
-| `QWEN_GGUF_UNCENSORED` | `1` | non-empty: third-party uncensored version; empty: the unmodified model |
-| `QWEN_GGUF_QUANT` | `Q4_K_M` | `Q4_0`, `Q4_K_M`, `Q5_K_M`, `Q6_K`, `Q8_0`, or `BF16` (uncensored only); larger is better and needs more memory |
-| `QWEN_TEXT_ENCODER_QUANT` | `int8_convrot` | `int8_convrot` (9.4 GB) or `bf16` (17.5 GB) |
+ComfyUI, PyTorch and the app, without model weights. Which model runs is
+chosen when the container starts, and its weights, LoRAs and custom nodes
+are fetched on first start as its workflow file lists them (see
+[Downloads](../../doc/contribution/workflow_files.md#downloads)). While that
+runs the app is already up and says what is being downloaded when you try to
+generate; ComfyUI starts when everything is there. Nothing is baked in, so the
+image is small and, as it contains no weights, can be public.
 
 ```bash
-docker build -f deployments/docker/Dockerfile.qwen_image21_gguf -t ai-image-edit-gguf .
-# unmodified model, Q8_0:
-docker build -f deployments/docker/Dockerfile.qwen_image21_gguf \
-    --build-arg QWEN_GGUF_UNCENSORED= --build-arg QWEN_GGUF_QUANT=Q8_0 -t ai-image-edit-gguf .
-docker run -p 7860:7860 --gpus all --shm-size=640m -e APP_PASSWORD=... ai-image-edit-gguf
+docker build -f deployments/docker/Dockerfile -t ai-image-edit deployments/docker
+docker run -p 7860:7860 --gpus all --shm-size=640m \
+    -v ai-image-edit-models:/home/user/app/models \
+    -e APP_PASSWORD=... -e ACCEPT_LICENSES=qwen-research ai-image-edit
 ```
 
-The image sets `MODEL_FILE`, `TEXT_ENCODER_FILE` and `VAE_FILE` (paths under
-ComfyUI's `models/diffusion_models`, `models/text_encoders` and `models/vae`)
-to the files it downloaded; override them to use other files that exist in
-the container. `COMFY_GENERATION_TIMEOUT` (seconds, default 600 here) is
-for slow GPUs.
+| Variable | Meaning |
+|---|---|
+| `MODEL_BACKEND` | Model: `qwen_image21_gguf` (default) or `qwen_image_edit_2511_aio`. |
+| `MODEL_VARIANT` | Variant of the model, e.g. `Q8_0` for `qwen_image21_gguf` (`Q4_0`, `Q4_K_M` (default), `Q5_K_M`, `Q6_K`, `Q8_0`, `BF16`). Larger is better and needs more memory. |
+| `WORKFLOW_FILE` | Path of a workflow file in the container to run instead (mount it). |
+| `ACCEPT_LICENSES` | Licenses you accept, comma-separated (`all` for every one). A model whose files have a license is not downloaded without it; the error names the license and its URL. `qwen_image21_gguf` needs `qwen-research`. |
+| `HF_TOKEN` | Hugging Face token, if a file needs a login. Sent to Hugging Face only. |
+
+The same can be given as arguments: `docker run ... ai-image-edit python -m
+ai_image_edit --model qwen_image21_gguf --variant Q8_0`.
+
+The model folders are below `/home/user/app/models`. **Mount a volume there**
+(as above), or the weights (about 15 GB for `qwen_image21_gguf`) are
+downloaded again by every new container. Any other location works the same
+way: it is just the volume you mount. `MODEL_FILE`, `TEXT_ENCODER_FILE` and
+`VAE_FILE` (paths under `models/diffusion_models`, `models/text_encoders`
+and `models/vae`) can still name other files that exist in the container
+instead of the ones from the workflow file; set `MODEL_VERSION` to label them.
+`COMFY_GENERATION_TIMEOUT` (seconds, default 600) is for slow GPUs.
+
+The GPU needs at least 16 GB of VRAM for `qwen_image21_gguf`.
+
+The Qwen-Image-2.1 weights are under the Qwen RESEARCH LICENSE AGREEMENT
+(non-commercial use only), which is why they are not in the image and why you
+accept it with `ACCEPT_LICENSES` when you run it.
+
+Build arguments: `APP_REPO` and `APP_REF` (where the app is installed from:
+`pulb/ai_image_edit` at `main` by default; the image is not built from the
+build context, so to try a change, push it to a branch and pass its name),
+`COMFYUI_REF`, and the PyTorch versions.
 
 ### ComfyUI arguments (`COMFY_EXTRA_ARGS`)
 
@@ -123,19 +120,20 @@ If you want to try the flags on a smaller GPU, check the peak with
 
 ### Pinned versions
 
-ComfyUI (`COMFYUI_REF`) and ComfyUI-GGUF (`COMFYUI_GGUF_REF`) are pinned to
-tested commits. ComfyUI-GGUF is also patched at build time
-(`patches/comfyui_gguf_input_act.py`): ComfyUI 0.39 passes new keyword
+ComfyUI (`COMFYUI_REF`) is pinned to a tested commit. Custom nodes are pinned
+in the workflow files: `qwen_image21_gguf` installs the
+[ComfyUI-GGUF](https://github.com/pulb/ComfyUI-GGUF) fork at an exact commit,
+which fixes an incompatibility with ComfyUI 0.39 (it passes new keyword
 arguments such as `input_act` to every Linear layer, which upstream does not
-accept yet. The build fails if the patch no longer applies.
+accept yet).
 
 ### CI build
 
-`.github/workflows/docker-qwen-image21-gguf.yml` builds the image (about
-15 GB with its weights) on manual runs, where quantization, uncensored or
-unmodified model and text encoder precision are inputs, and on `v*` tags. It
-pushes `ghcr.io/<owner>/<repo>-qwen-image21-gguf` tagged with the variant, for
-example `uc-q4_k_m`.
+`.github/workflows/docker.yml` builds the image on pushes to `main` that touch
+the Dockerfile, `pyproject.toml` or `src/`, on `v*` tags and on manual runs. It
+installs the app from the commit it was started for and pushes
+`ghcr.io/<owner>/<repo>` tagged `latest`, the git tag and the short commit
+SHA.
 
 ## qwen_image21 image
 
