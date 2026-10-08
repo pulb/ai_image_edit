@@ -1,15 +1,18 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """
-Checks every ComfyUI model under models/*/manifest.json, so a new model is
-covered without adding a test:
+Checks every workflow file in src/ai_image_edit/data/workflows/ against the JSON Schema and
+against the code that runs it, so a new file is covered without adding a test:
 
     PYTHONPATH=src python -m unittest discover -s tests/comfy_models -v
 
 No ComfyUI, GPU or network is needed: image uploads are stubbed and the weight
 files are empty placeholders in a temporary folder. What this cannot catch is a
 mistake inside the workflow itself (a wrong node class or input name); only
-running the workflow in ComfyUI shows that.
+running the workflow in ComfyUI shows that. The schema tests need the
+jsonschema package (pip install jsonschema) and are skipped without it.
 """
+import copy
+import json
 import os
 import random
 import sys
@@ -25,16 +28,21 @@ except ImportError:  # only the ComfyUI client needs it, and these tests never c
 
 from PIL import Image
 
-import ai_image_edit.models as models_package
 from ai_image_edit.core import imaging
 from ai_image_edit.core.errors import GenerationError
 from ai_image_edit.core.types import GenerationParams
 from ai_image_edit.models import MODEL_LOADERS, get_model
-from ai_image_edit.models._shared.comfyui import client
+from ai_image_edit.models._shared.comfyui import client, workflow_files
 from ai_image_edit.models._shared.comfyui.workflow_model import ComfyWorkflowModel
 
-MODELS_DIR = Path(models_package.__file__).parent
-MANIFESTS = sorted(MODELS_DIR.glob("*/manifest.json"))
+try:
+    import jsonschema
+except ImportError:
+    jsonschema = None
+
+DATA_DIR = Path(__file__).resolve().parents[2] / "src" / "ai_image_edit" / "data"
+SCHEMA_PATH = DATA_DIR / "workflow.schema.json"
+MANIFESTS = sorted((DATA_DIR / "workflows").glob("*.json"))
 LORAS = ["a.safetensors", "pack/unet.safetensors", "pack/clip.safetensors"]
 
 
@@ -64,9 +72,9 @@ class ManifestModelTests(unittest.TestCase):
         os.environ.update(cls._old_env)
         cls._tmp.cleanup()
 
-    def load(self, manifest_path: Path) -> ComfyWorkflowModel:
+    def load(self, path: Path) -> ComfyWorkflowModel:
         """The model, with the weight files its manifest names created as empty placeholders."""
-        model = ComfyWorkflowModel.from_manifest(manifest_path)
+        model = ComfyWorkflowModel.from_file(path)
         for spec in model._manifest.get("files", []):
             name = f"{spec['env'].lower()}.bin"
             (self.tmp / spec["folder"] / name).parent.mkdir(parents=True, exist_ok=True)
@@ -83,17 +91,65 @@ class ManifestModelTests(unittest.TestCase):
             sampler="euler", scheduler="simple", lora_files=LORAS if m.get("loras") else [], size_values=size_values,
         )
 
-    def test_manifests_exist_and_are_registered(self):
-        self.assertTrue(MANIFESTS, "no manifest.json found")
+    def test_workflow_files_exist_and_are_registered(self):
+        self.assertTrue(MANIFESTS, "no workflow file found in ai_image_edit/data/workflows")
         for path in MANIFESTS:
-            self.assertIn(path.parent.name, MODEL_LOADERS)
+            self.assertIn(path.stem, MODEL_LOADERS)
+
+    @unittest.skipUnless(jsonschema, "pip install jsonschema")
+    def test_files_match_the_schema(self):
+        schema = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
+        jsonschema.Draft202012Validator.check_schema(schema)
+        validator = jsonschema.Draft202012Validator(schema, format_checker=jsonschema.FormatChecker())
+        for path in MANIFESTS:
+            with self.subTest(file=path.name):
+                data = json.loads(path.read_text(encoding="utf-8"))
+                errors = sorted(validator.iter_errors(data), key=lambda e: list(e.path))
+                self.assertEqual([], [f"{'/'.join(map(str, e.path))}: {e.message}" for e in errors])
+
+    @unittest.skipUnless(jsonschema, "pip install jsonschema")
+    def test_schema_rejects_mistakes(self):
+        schema = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
+        validator = jsonschema.Draft202012Validator(schema)
+        good = json.loads(next(p for p in MANIFESTS if "aio" in p.stem).read_text(encoding="utf-8"))
+        self.assertTrue(validator.is_valid(good))
+
+        def broken(mutate):
+            data = copy.deepcopy(good)
+            mutate(data)
+            return data
+
+        mistakes = {
+            "unknown format version": lambda d: d.update(format_version=2),
+            "no workflow": lambda d: d.pop("workflow"),
+            "unknown manifest key": lambda d: d["manifest"].update(modle_name="x"),
+            "no name": lambda d: d["manifest"].pop("model_name"),
+            "no prompt binding": lambda d: d["manifest"]["bind"].pop("prompt"),
+            "unknown binding": lambda d: d["manifest"]["bind"].update(temperature="1.name"),
+            "target without input name": lambda d: d["manifest"]["bind"].update(seed="2"),
+            "unknown size policy": lambda d: d["manifest"]["size"].update(policy="whatever"),
+            "size without width/height": lambda d: d["manifest"]["size"].update(bind={"width": "9.width"}),
+            "node without class": lambda d: d["workflow"]["1"].pop("class_type"),
+            "range without default": lambda d: d["manifest"]["capabilities"]["steps"].pop("default"),
+            "references without loader ids": lambda d: d["manifest"]["images"]["references"].pop("loader_ids"),
+            "loras without strength range": lambda d: d["manifest"]["capabilities"].pop("lora_strength"),
+        }
+        for what, mutate in mistakes.items():
+            with self.subTest(what):
+                self.assertFalse(validator.is_valid(broken(mutate)), f"accepted: {what}")
+
+    def test_format_version_is_checked_when_loading(self):
+        path = self.tmp / "wrong_version.json"
+        path.write_text(json.dumps({"format_version": 99, "manifest": {}, "workflow": {}}), encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "unsupported format_version 99"):
+            workflow_files.read_workflow_file(path)
 
     def test_workflows_are_well_formed_for_every_number_of_references(self):
         for path in MANIFESTS:
             model = self.load(path)
             refs = model._manifest["images"].get("references")
             for n in sorted({0, 1, refs["max"] if refs else 0}):
-                with self.subTest(model=path.parent.name, references=n):
+                with self.subTest(model=path.stem, references=n):
                     wf = self.build(model, n)
                     for node_id, node in wf.items():
                         self.assertIn("class_type", node, f"node {node_id}")
@@ -111,7 +167,7 @@ class ManifestModelTests(unittest.TestCase):
 
     def test_capabilities_and_listing_work(self):
         for path in MANIFESTS:
-            with self.subTest(model=path.parent.name):
+            with self.subTest(model=path.stem):
                 model = self.load(path)
                 caps = model.capabilities
                 refs = model._manifest["images"].get("references")
@@ -130,7 +186,7 @@ class ManifestModelTests(unittest.TestCase):
             cfg = model._manifest.get("loras")
             if not cfg:
                 continue
-            with self.subTest(model=path.parent.name):
+            with self.subTest(model=path.stem):
                 wf = self.build(model, 0)
                 last = str(cfg["first_id"] + len(LORAS) - 1)
                 self.assertEqual(wf[last]["class_type"], cfg["loader_class"])
@@ -155,7 +211,7 @@ class ManifestModelTests(unittest.TestCase):
             for path in MANIFESTS:
                 model = self.load(path)
                 spec = model._manifest.get("seed", {"min": 0, "max": 2 ** 32 - 1})
-                with self.subTest(model=path.parent.name):
+                with self.subTest(model=path.stem):
                     seen = []
                     random.randint = lambda a, b: seen.append((a, b)) or a
                     self.run_generate(model, randomize_seed=True)
@@ -172,7 +228,7 @@ class ManifestModelTests(unittest.TestCase):
             model = self.load(path)
             refs = model._manifest["images"].get("references")
             limit = refs["max"] if refs else 0
-            with self.subTest(model=path.parent.name):
+            with self.subTest(model=path.stem):
                 with self.assertRaisesRegex(GenerationError, f"Up to {limit + 1} input images"):
                     self.run_generate(model, reference_images=[f"/x/r{i}.png" for i in range(limit + 1)])
 
