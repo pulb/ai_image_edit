@@ -13,7 +13,7 @@ package load would mean a comfy-only deployment breaks at startup unless it
 each deployment only needs the one model it actually selected to be installed.
 
 Add a ComfyUI model by creating a folder here with a workflow_api.json and a
-manifest.json (see models/_shared/comfyui/MANIFEST.md) — it is picked up
+manifest.json (see doc/contribution/comfy_manifest.md) — it is picked up
 automatically. Add any other kind of model by writing a class that implements
 ModelBackend (models/base.py) and adding one small loader function + one line
 in MODEL_LOADERS. Nothing else in the app needs to change.

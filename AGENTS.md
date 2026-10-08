@@ -81,7 +81,7 @@ Rules for any AI coding agent working in this repository.
   `ComfyWorkflowModel` (`models/_shared/comfyui/workflow_model.py`); there is
   no per-model Python class. `models/__init__.py` registers every folder with a
   manifest automatically. The manifest format is documented in
-  `models/_shared/comfyui/MANIFEST.md`. Output-size schemes are
+  `doc/contribution/comfy_manifest.md`. Output-size schemes are
   `size_policies.py`; a model with a new one adds a policy class there.
 - **ComfyUI backends**: `models/_shared/comfyui/` holds what the ComfyUI-based
   models share (`client.py`, `common.py`). Each model's main weights file

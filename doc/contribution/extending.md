@@ -10,7 +10,7 @@ A model that runs through ComfyUI needs no Python. Create a folder under
 
 The folder is registered automatically, and `<name>` is the value for
 `MODEL_BACKEND`. The manifest format is described in
-[`MANIFEST.md`](../src/ai_image_edit/models/_shared/comfyui/MANIFEST.md). Run the tests
+[the manifest reference](comfy_manifest.md). Run the tests
 (`PYTHONPATH=src python -m unittest discover -s tests/comfy_models`): they pick up the new
 model automatically and check the manifest against the workflow.
 

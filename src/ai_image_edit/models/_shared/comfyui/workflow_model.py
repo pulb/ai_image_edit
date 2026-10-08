@@ -8,7 +8,7 @@ how the app's inputs map onto that workflow.
     models/<name>/workflow_api.json
 
 A model is registered by creating such a folder (see models/__init__.py). The
-manifest format is documented in models/_shared/comfyui/MANIFEST.md.
+manifest format is documented in doc/contribution/comfy_manifest.md.
 
 Workflow targets are written "<node id>.<input name>", e.g. "6.seed"; the
 input name may itself contain dots ("5.images.image_2").
