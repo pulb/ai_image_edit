@@ -62,7 +62,7 @@ Rules for any AI coding agent working in this repository.
   `ModelBackend` interface (`models/base.py`): `capabilities`, `start()`,
   `generate()`, with `shutdown()`, `list_loras()`, `model_name` and
   `model_version` optional. Register a
-  new backend in `models/__init__.py`'s `MODEL_LOADERS`.
+  new non-ComfyUI backend in `models/__init__.py`'s `MODEL_LOADERS`.
 - **Lazy model imports**: `models/__init__.py` imports each backend's
   module lazily, inside its loader function, not at module top level.
   The shipped backends (`qwen_image21` vs. the ComfyUI-based
@@ -76,8 +76,15 @@ Rules for any AI coding agent working in this repository.
   (https://github.com/pulb/ai_image_edit_qwen) under the Qwen Research
   License, not the GPL. `src/ai_image_edit/models/qwen_image21/model.py` only imports it.
   Never copy Qwen-licensed or Space-derived code into this repo.
+- **ComfyUI models are data**: a ComfyUI model is a folder under `models/`
+  with a `workflow_api.json` and a `manifest.json`, run by the generic
+  `ComfyWorkflowModel` (`models/_shared/comfyui/workflow_model.py`); there is
+  no per-model Python class. `models/__init__.py` registers every folder with a
+  manifest automatically. The manifest format is documented in
+  `models/_shared/comfyui/MANIFEST.md`. Output-size schemes are
+  `size_policies.py`; a model with a new one adds a policy class there.
 - **ComfyUI backends**: `models/_shared/comfyui/` holds what the ComfyUI-based
-  backends share (`client.py`, `common.py`). Each backend's main weights file
+  models share (`client.py`, `common.py`). Each model's main weights file
   is named by the `MODEL_FILE` environment variable (a path relative to its
   folder under ComfyUI's `models/`), set in the backend's Dockerfile.
   Qwen-Image-2.1 output sizes shared by `qwen_image21` and `qwen_image21_gguf`
@@ -111,5 +118,9 @@ Rules for any AI coding agent working in this repository.
   (`python -m py_compile <file>` or `ast.parse`) — several files start
   with a header comment followed immediately by a module docstring, and
   it's easy to break that pairing with a careless insertion.
-- There is no automated test suite in this repo yet; sanity-check changes
+- The ComfyUI models have tests (`tests/comfy_models/`, no GPU or ComfyUI needed):
+  `PYTHONPATH=src python -m unittest discover -s tests/comfy_models`. They load every
+  `models/*/manifest.json` and check it against its workflow. Run them after touching
+  `models/_shared/comfyui/`, a manifest or a workflow.
+- There is no other automated test suite in this repo yet; sanity-check changes
   by reading the affected code paths end to end rather than assuming.
