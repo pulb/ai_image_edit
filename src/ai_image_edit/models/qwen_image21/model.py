@@ -6,9 +6,9 @@ pipeline (no ComfyUI), in-process on a ZeroGPU worker or any CUDA GPU.
 All of the actual pipeline loading, AOTI-kernel loading, and the
 @spaces.GPU-wrapped diffusion call live in the separately licensed
 ai_image_edit_qwen package (its pipeline module). This module plays
-the same role for this model that qwen_image_edit_2511_aio/model.py plays
-for its own: capability declaration, dimension resolution, and
-orchestrating one generate() call — nothing here touches CUDA directly.
+the same role for this model that ComfyWorkflowModel
+(models/_shared/comfyui/workflow_model.py) plays for the ComfyUI models:
+capability declaration, dimension resolution, and orchestrating one generate() call — nothing here touches CUDA directly.
 
 Masking is handled externally, via core/imaging.py's
 run_masked_generation() — the same crop/composite/color-correct sequence
@@ -132,8 +132,8 @@ class QwenImage21Model(ModelBackend):
         # A mask's coordinates are only meaningful relative to the source
         # image's own framing, so dimensions must come from the source
         # itself whenever a mask is present — mirrors
-        # qwen_image_edit_2511_aio/model.py's identical override (see the
-        # comment in that file's generate()). Frontends
+        # the identical override in ComfyWorkflowModel.generate() (see
+        # models/_shared/comfyui/size_policies.py). Frontends
         # already lock the Aspect ratio control to "Original" while a mask
         # is drawn, but this doesn't rely solely on that: enforcing it here
         # too means a mask always gets correctly-aligned dimensions even if

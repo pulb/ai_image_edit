@@ -65,7 +65,7 @@ RUN aria2c -x 16 -s 16 -k 1M \
     "$MODEL_FILE_URL"
 
 # Download LoRAs. Each goes into its own models/loras/<Name> subfolder —
-# QwenImageEdit2511AIOModel.list_loras() (models/qwen_image_edit_2511_aio/model.py)
+# ComfyWorkflowModel.list_loras() (models/_shared/comfyui/workflow_model.py)
 # uses the subfolder name as the display name and loads every
 # .safetensors/.pt file inside it together, which is why AnyPose (two
 # weight files) gets two -o'd downloads into the same folder.

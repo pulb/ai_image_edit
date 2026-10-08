@@ -1,0 +1,47 @@
+{
+  "model_name": "Qwen-Image 2.1 GGUF",
+  "model_version": {
+    "env": "MODEL_FILE",
+    "basename": true,
+    "regex": "(?<![A-Za-z0-9])(Q\\d(?:_[A-Z0-9]+)*|BF16|F16)(?=\\.gguf$)",
+    "ignore_case": true,
+    "upper": true,
+    "prefixes": [{"regex": "(?<![A-Za-z0-9])UC(?![A-Za-z0-9])", "text": "UC "}]
+  },
+  "workflow": "workflow_api.json",
+  "required_nodes": ["UnetLoaderGGUF", "QwenImage21Cache", "TextEncodeQwenImage21"],
+  "missing_nodes_hint": "install the ComfyUI-GGUF custom node and use a ComfyUI version that supports Qwen-Image 2.1.",
+
+  "files": [
+    {"env": "MODEL_FILE",        "folder": "models/diffusion_models", "set": "1.unet_name"},
+    {"env": "TEXT_ENCODER_FILE", "folder": "models/text_encoders",    "set": "2.clip_name"},
+    {"env": "VAE_FILE",          "folder": "models/vae",              "set": "3.vae_name"}
+  ],
+
+  "bind": {
+    "prompt":          "5.prompt",
+    "negative_prompt": "5.negative_prompt",
+    "seed":            "6.seed",
+    "steps":           "6.steps",
+    "cfg":             "6.cfg",
+    "sampler":         "6.sampler_name",
+    "scheduler":       "6.scheduler"
+  },
+  "seed": {"min": 0, "max": 2147483647, "wrap": true},
+
+  "images": {
+    "source": "10.image",
+    "references": {"target": "5.images.image_{n}", "first_n": 2, "loader_id_start": 20, "max": 9}
+  },
+
+  "size": {"policy": "qwen21_tiers", "bind": {"resolution": "5.resolution"}},
+
+  "capabilities": {
+    "supports_inpainting": true,
+    "num_annotation_colors": 3,
+    "sampler": {"default": "euler"},
+    "scheduler": {"default": "simple"},
+    "steps": {"min": 8, "max": 60, "default": 40, "step": 1},
+    "cfg": {"min": 1.0, "max": 10.0, "default": 1.0, "step": 0.1}
+  }
+}

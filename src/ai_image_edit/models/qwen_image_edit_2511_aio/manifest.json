@@ -1,0 +1,52 @@
+{
+  "model_name": "Qwen-Image-Edit Rapid-AIO",
+  "model_version": {"env": "MODEL_FILE", "regex": "-(v\\d+)(?=\\.|-|_|$)"},
+  "workflow": "workflow_api.json",
+  "required_nodes": [],
+
+  "files": [
+    {"env": "MODEL_FILE", "folder": "models/checkpoints", "set": "1.ckpt_name"}
+  ],
+
+  "bind": {
+    "prompt":    "3.prompt",
+    "seed":      "2.seed",
+    "steps":     "2.steps",
+    "cfg":       "2.cfg",
+    "denoise":   "2.denoise",
+    "sampler":   "2.sampler_name",
+    "scheduler": "2.scheduler"
+  },
+  "constants": {
+    "4.prompt": "worst quality, low quality, bad anatomy, bad hands, text, error, missing fingers, extra digit, fewer digits, cropped, jpeg artifacts, signature, watermark, username, blurry"
+  },
+  "seed": {"min": 1, "max": 4294967295, "wrap": false},
+
+  "images": {
+    "source": "7.image",
+    "references": {"target": "3.image{n}", "first_n": 2, "loader_ids": ["8", "10"], "max": 2}
+  },
+
+  "size": {"policy": "fixed_area", "megapixels": [1.0], "multiple": 8, "bind": {"width": "9.width", "height": "9.height"}},
+
+  "loras": {
+    "dir": "models/loras",
+    "loader_class": "LoraLoader",
+    "first_id": 100,
+    "from": {"model": ["1", 0], "clip": ["1", 1]},
+    "outputs": ["model", "clip"],
+    "feeds": {"model": ["2.model"], "clip": ["3.clip", "4.clip"]},
+    "strength_inputs": ["strength_model", "strength_clip"]
+  },
+
+  "capabilities": {
+    "supports_inpainting": true,
+    "num_annotation_colors": 1,
+    "sampler": {"default": "sa_solver"},
+    "scheduler": {"default": "beta"},
+    "steps": {"min": 1, "max": 10, "default": 4, "step": 1},
+    "cfg": {"min": 0.1, "max": 10.0, "default": 1.0, "step": 0.1},
+    "denoise": {"min": 0.0, "max": 1.0, "default": 1.0, "step": 0.01},
+    "lora_strength": {"min": 0.1, "max": 2.0, "default": 0.7, "step": 0.05}
+  }
+}
