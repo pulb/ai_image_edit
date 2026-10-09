@@ -7,6 +7,7 @@ result.
 import json
 import os
 import subprocess
+import sys
 import time
 import urllib.parse
 from typing import List, Optional
@@ -32,6 +33,18 @@ REQUEST_TIMEOUT_SECONDS = 60
 GENERATION_TIMEOUT_SECONDS = int(os.environ.get("COMFY_GENERATION_TIMEOUT", "120"))
 
 
+def _unreachable(error: Exception) -> GenerationError:
+    return GenerationError(
+        f"Cannot reach ComfyUI ({error}). ComfyUI may still be starting or has crashed. Please wait a moment and try again."
+    )
+
+
+def _timeout_error() -> GenerationError:
+    return GenerationError(
+        f"Generation timed out after {GENERATION_TIMEOUT_SECONDS}s waiting for ComfyUI — it may be stuck or stalled. Check the ComfyUI server logs."
+    )
+
+
 def launch_comfy_process(extra_args: Optional[List[str]] = None) -> subprocess.Popen:
     """
     Starts the ComfyUI server in the background with the given extra command
@@ -47,7 +60,7 @@ def launch_comfy_process(extra_args: Optional[List[str]] = None) -> subprocess.P
     for name in ("input", "output", "temp"):
         (comfy_dir / name).mkdir(parents=True, exist_ok=True)
         args += [f"--{name}-directory", str(comfy_dir / name)]
-    return subprocess.Popen(["python", "-u", "main.py", *args])
+    return subprocess.Popen([sys.executable, "-u", "main.py", *args])
 
 
 def missing_nodes(class_names: List[str]) -> List[str]:
@@ -58,9 +71,7 @@ def missing_nodes(class_names: List[str]) -> List[str]:
             if not requests.get(f"http://{SERVER_ADDRESS}/object_info/{name}", timeout=REQUEST_TIMEOUT_SECONDS).json()
         ]
     except (requests.exceptions.RequestException, ValueError) as e:
-        raise GenerationError(
-            f"Cannot reach ComfyUI ({e}). ComfyUI may still be starting or has crashed. Please wait a moment and try again."
-        )
+        raise _unreachable(e)
 
 
 def upload_image(filepath: Optional[str]) -> Optional[str]:
@@ -74,9 +85,7 @@ def upload_image(filepath: Optional[str]) -> Optional[str]:
             res.raise_for_status()
             return res.json()["name"]
     except requests.exceptions.RequestException as e:
-        raise GenerationError(
-            f"Cannot reach ComfyUI ({e}). ComfyUI may still be starting or has crashed. Please wait a moment and try again."
-        )
+        raise _unreachable(e)
 
 
 def _queue_prompt(workflow: dict, client_id: str) -> str:
@@ -114,9 +123,7 @@ def submit_workflow_and_wait(workflow: dict, client_id: str) -> str:
         ws.connect(f"ws://{SERVER_ADDRESS}/ws?clientId={client_id}", timeout=REQUEST_TIMEOUT_SECONDS)
     except (websocket.WebSocketException, OSError) as e:
         ws.close()
-        raise GenerationError(
-            f"Cannot reach ComfyUI ({e}). ComfyUI may still be starting or has crashed. Please wait a moment and try again."
-        )
+        raise _unreachable(e)
     try:
         prompt_id = _queue_prompt(workflow, client_id)
         deadline = time.time() + GENERATION_TIMEOUT_SECONDS
@@ -124,9 +131,7 @@ def submit_workflow_and_wait(workflow: dict, client_id: str) -> str:
         while True:
             remaining = deadline - time.time()
             if remaining <= 0:
-                raise GenerationError(
-                    f"Generation timed out after {GENERATION_TIMEOUT_SECONDS}s waiting for ComfyUI — it may be stuck or stalled. Check the ComfyUI server logs."
-                )
+                raise _timeout_error()
 
             # Re-armed every iteration to the time actually left, not the
             # full budget — a fixed settimeout(GENERATION_TIMEOUT_SECONDS)
@@ -140,9 +145,7 @@ def submit_workflow_and_wait(workflow: dict, client_id: str) -> str:
             try:
                 out = ws.recv()
             except websocket.WebSocketTimeoutException:
-                raise GenerationError(
-                    f"Generation timed out after {GENERATION_TIMEOUT_SECONDS}s waiting for ComfyUI — it may be stuck or stalled. Check the ComfyUI server logs."
-                )
+                raise _timeout_error()
 
             if isinstance(out, str):
                 message = json.loads(out)
@@ -195,7 +198,7 @@ def fetch_generated_image(prompt_id: str) -> str:
                 res.raise_for_status()
                 output_path.write_bytes(res.content)
                 return str(output_path)
-    except Exception as e:
+    except (requests.RequestException, OSError, ValueError, LookupError) as e:
         raise GenerationError(f"Error retrieving generated image: {e}")
 
     raise GenerationError("ComfyUI finished but produced no output image.")
