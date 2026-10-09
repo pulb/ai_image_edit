@@ -4,14 +4,12 @@ Registry + factory for UI frontends.
 
 Mirrors models/__init__.py's pattern: each frontend module is imported
 lazily, inside its loader function, rather than at the top of this file.
-That matters concretely here too — nicegui and gradio have disjoint
-dependency sets, and a given deployment only ever runs one of them, so a
-gradio-only deployment shouldn't need nicegui installed, and vice versa.
+That matters because each frontend has its own dependency set, which a
+deployment only needs when it runs that frontend.
 
 Unlike a model backend, a frontend has no class to instantiate. Instead,
-each frontend module (frontends/nicegui.py, frontends/gradio_ui.py)
-exposes a single function, run(model), which builds and
-launches its UI (ui.run() / demo.queue().launch()) against the given
+each frontend module (e.g. frontends/nicegui.py) exposes a single function, run(model), which builds and
+launches its UI (ui.run()) against the given
 model. Importing a frontend module does nothing by itself; run_frontend()
 below imports the chosen module and calls its run() with the already-built
 model, so app.py doesn't need to know any of that — it just
@@ -21,7 +19,7 @@ picks one by MODEL_WORKFLOW.
 Model selection also happens once, in app.py's main(), rather than each frontend
 module building its own model — run_frontend() takes the already-built
 model and passes it straight to the chosen module's run() as a plain
-function argument, so both frontends stay ordinary, explicit Python:
+function argument, so frontends stay ordinary, explicit Python:
 model is just a parameter of run(), not a value pulled from somewhere else
 at import time.
 
@@ -40,15 +38,8 @@ def _load_nicegui(model: ModelBackend) -> None:
     _frontend.run(model)
 
 
-def _load_gradio_ui(model: ModelBackend) -> None:
-    import ai_image_edit.frontends.gradio_ui as _frontend
-
-    _frontend.run(model)
-
-
 FRONTEND_LOADERS: Dict[str, Callable[[ModelBackend], None]] = {
     "nicegui": _load_nicegui,
-    "gradio": _load_gradio_ui,
 }
 
 

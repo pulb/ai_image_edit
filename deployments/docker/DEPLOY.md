@@ -36,12 +36,10 @@ The app sits behind a password login when `APP_PASSWORD` is set (for example
 files it serves. All images set `REQUIRE_PASSWORD=1` and refuse to start
 without it.
 
-With NiceGUI (the images' frontend), logins survive restarts as long as the
+Logins survive restarts as long as the
 password stays the same; changing it logs everyone out. Set
 `APP_STORAGE_SECRET` to a long random value to keep sessions independent of
-the password. A wrong password is delayed by one second. The Gradio frontend
-also honors `APP_PASSWORD` (any username, shared password), but every restart
-logs everyone out. Either way this is a single shared password without real rate
+the password. A wrong password is delayed by one second. This is a single shared password without real rate
 limiting. For stronger protection, don't expose the port and use an
 SSH tunnel or Tailscale.
 

@@ -12,8 +12,7 @@ import shutil
 from pathlib import Path
 
 # Where uploaded, generated, and composited images live for the lifetime of
-# the process. Shared by both frontends (gradio_ui.py exposes it through
-# allowed_paths=[str(WORK_DIR)]). Served to the browser at /files/<name>
+# the process. Served to the browser at /files/<name>
 # (see frontends/nicegui.py's app.add_static_files) so client-side
 # <canvas>/<img> elements can load them by URL. This also doubles as the
 # single source of truth for "what's the current result" — see

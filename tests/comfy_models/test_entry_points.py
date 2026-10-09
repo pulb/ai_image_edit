@@ -51,10 +51,10 @@ class SelectionTests(unittest.TestCase):
         self.run.assert_called_once_with("nicegui", self.model)
 
     def test_environment_is_the_fallback(self):
-        os.environ.update(MODEL_WORKFLOW="x", MODEL_VARIANT="Q8_0", FRONTEND="gradio")
+        os.environ.update(MODEL_WORKFLOW="x", MODEL_VARIANT="Q8_0", FRONTEND="other")
         app.main([])
         self.get.assert_called_once_with("x", "Q8_0")
-        self.run.assert_called_once_with("gradio", self.model)
+        self.run.assert_called_once_with("other", self.model)
 
     def test_command_line_beats_environment(self):
         os.environ.update(MODEL_WORKFLOW="x", WORKFLOW_FILE="/env.json", MODEL_VARIANT="a")

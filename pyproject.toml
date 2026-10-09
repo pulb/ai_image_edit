@@ -27,7 +27,6 @@ comfy_backend = [
 test = ["jsonschema"]
 # Frontends (FRONTEND)
 nicegui_frontend = ["nicegui==3.18.0"]
-gradio_frontend = ["gradio"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

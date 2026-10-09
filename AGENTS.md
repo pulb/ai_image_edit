@@ -97,7 +97,7 @@ Rules for any AI coding agent working in this repository.
   not need its own mask-blending logic; it only needs to accept a
   (possibly cropped) source path and hand back a result path.
 - **Working directory**: generated/uploaded/composited files live under
-  `core/paths.py`'s `WORK_DIR`, shared by both frontends, served to the
+  `core/paths.py`'s `WORK_DIR`, served to the
   browser at `/files/<name>`. It defaults to a folder under `/dev/shm`
   (RAM-backed), is overridable with `AI_IMAGE_EDIT_WORK_DIR`, and is capped by
   `AI_IMAGE_EDIT_WORK_MAX_SIZE` through `trim_work_dir()`. The ComfyUI backend

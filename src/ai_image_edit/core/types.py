@@ -1,7 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """
-Data contracts shared between the UI layer (frontends/nicegui.py,
-frontends/gradio_ui.py) and every model backend under models/. Deliberately
+Data contracts shared between the UI layer (frontends/nicegui.py) and every model backend under models/. Deliberately
 dependency-free of both frontends/ and models/, so neither side ever needs
 to import from the other.
 """
@@ -27,7 +26,7 @@ class RangeSpec:
 # The "derive the output size from the source image" aspect ratio label.
 ORIGINAL_ASPECT_RATIO = "Original"
 
-# The seed both frontends start with.
+# The seed the frontend starts with.
 DEFAULT_SEED = 65454653
 
 # Inpainting mask edge softness (Gaussian blur radius), shared by the

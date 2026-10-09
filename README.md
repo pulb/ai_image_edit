@@ -2,7 +2,7 @@
 
 A comfortable, responsive, model-agnostic app for AI-assisted image editing
 and generation. It provides a web based UI optimized for mobile devices in
-front of a pluggable image-generation backend.
+front of interchangeable image-generation models.
 
 <p align="center">
   <br>
@@ -23,45 +23,39 @@ front of a pluggable image-generation backend.
 | Aspect ratios | Presets for common, widely used aspect ratios |
 | LoRAs | Optional LoRA support, auto-detected from a local loras folder |
 
-## Backends and frontends
+## Model workflows
 
-### Backends
+Each model is a [workflow file](doc/contribution/workflow_files.md): a ComfyUI
+workflow plus a manifest that lists its weights, custom nodes and variants. They
+run in a ComfyUI process that the app starts, and the weights are downloaded
+when the model starts. Select one with `--model NAME` or the `MODEL_WORKFLOW`
+variable (`--list-models` prints the names). `--workflow FILE` (or
+`WORKFLOW_FILE`) runs any workflow file of your own instead, and `--variant ID`
+(`MODEL_VARIANT`) picks one of its variants, e.g. another GGUF quantization.
+The [deployments](#deployment) are already preconfigured.
 
-Selected with `--model NAME` or the `MODEL_WORKFLOW` variable (`--list-models` prints the names). `--workflow FILE` (or `WORKFLOW_FILE`) runs any [workflow file](doc/contribution/workflow_files.md) instead, and `--variant ID` (`MODEL_VARIANT`) picks one of its variants, e.g. another GGUF quantization. The [deployments](#deployment) are already
-preconfigured with the most suitable backend.
-
-- **`qwen_image21_gguf`** — Qwen-Image-2.1 with quantized
-  [GGUF weights](https://huggingface.co/abenzerps/Qwen-Image-2.1-Uncensored-GGUF),
-  driven through ComfyUI. Meant for low-VRAM GPUs, on RunPod or in
-  self-hosted setups: it needs far less GPU memory than `qwen_image21`, at
-  some cost in quality. The weights are under the Qwen RESEARCH LICENSE
-  AGREEMENT (see [License](#license)).
 - **`qwen_image21`** (default) — Qwen-Image-2.1 with the
   [official ComfyUI weights](https://huggingface.co/Comfy-Org/Qwen-Image-2.1)
-  (bf16, or `--variant int8`), driven through ComfyUI. The unquantized
-  counterpart of `qwen_image21_gguf`, for GPUs with plenty of memory. The
+  (bf16, or `--variant int8`). Meant for GPUs with plenty of memory. The
   weights are under the Qwen RESEARCH LICENSE AGREEMENT (see [License](#license)).
+- **`qwen_image21_gguf`** — Qwen-Image-2.1 with quantized
+  [GGUF weights](https://huggingface.co/abenzerps/Qwen-Image-2.1-Uncensored-GGUF).
+  Meant for low-VRAM GPUs: it needs far less GPU memory than `qwen_image21`, at
+  some cost in quality. The weights are under the Qwen RESEARCH LICENSE
+  AGREEMENT (see [License](#license)).
 - **`qwen_image_edit_2511_aio`** — Qwen-Image-Edit 2511
   ([Phr00t's AIO merge](https://huggingface.co/Phr00t/Qwen-Image-Edit-Rapid-AIO))
-  plus a curated set of LoRAs, driven through [ComfyUI](https://github.com/comfyanonymous/ComfyUI).
-
-### Frontends
-
-Selected with `FRONTEND`. The [deployments](#deployment) are already
-preconfigured with the most suitable frontend.
-
-- **[NiceGUI](https://nicegui.io/)** (default) — the snappier frontend.
-- **[Gradio](https://www.gradio.app/)** — fallback frontend.
+  plus a curated set of LoRAs.
 
 The UI is served on port `7860`.
 
 ## Deployment
 
-| Target | Backend | Frontend | Guide |
-|---|---|---|---|
-| ⭐ **RunPod GPU Pod** (recommended) | `qwen_image21`, `qwen_image21_gguf`, `qwen_image_edit_2511_aio` (one ComfyUI image) | NiceGUI only | [`deployments/runpod`](deployments/runpod/DEPLOY.md) |
-| Hugging Face Space | the ComfyUI image as a Docker Space on a paid GPU | NiceGUI | [`deployments/huggingface`](deployments/huggingface/DEPLOY.md) |
-| Docker (self-hosted) | `qwen_image21`, `qwen_image21_gguf`, `qwen_image_edit_2511_aio` (one ComfyUI image) | NiceGUI only | [`deployments/docker`](deployments/docker/DEPLOY.md) |
+| Target | Model workflows | Guide |
+|---|---|---|
+| ⭐ **RunPod GPU Pod** (recommended) | all (one ComfyUI image) | [`deployments/runpod`](deployments/runpod/DEPLOY.md) |
+| Hugging Face Space | the ComfyUI image as a Docker Space on a paid GPU | [`deployments/huggingface`](deployments/huggingface/DEPLOY.md) |
+| Docker (self-hosted) | all (one ComfyUI image) | [`deployments/docker`](deployments/docker/DEPLOY.md) |
 
 ### Generation times
 
@@ -86,15 +80,23 @@ an A100, but it was not re-measured on the other GPUs.
 
 ## License
 
-Licensed under the GNU General Public License v3.0 or later
-(GPL-3.0-or-later). See [`LICENSE`](LICENSE) for the full text.
+The code in this repository is licensed under the GNU General Public License
+v3.0 or later (GPL-3.0-or-later). See [`LICENSE`](LICENSE) for the full text.
 
-The Qwen-Image-2.1 weights used by the `qwen_image21` and `qwen_image21_gguf` backends are under the
-Qwen RESEARCH LICENSE AGREEMENT (non-commercial use only); the GGUF files are third-party
-conversions, and the default uncensored variant is a third-party modified version of the model.
+The model weights are not part of this repository and are not under the GPL.
+They are downloaded from their publishers when a model starts, and each has its
+own license:
 
-The weights are downloaded when a model starts, after you accept their license
-(`ACCEPT_LICENSES`); this repository contains no code under that license.
+- The Qwen-Image-2.1 weights used by `qwen_image21` and `qwen_image21_gguf` are
+  under the Qwen RESEARCH LICENSE AGREEMENT (non-commercial use only). The GGUF
+  files are third-party conversions, and the default `qwen_image21_gguf`
+  variant is a third-party modified (uncensored) version of the model.
+- The weights and LoRAs of `qwen_image_edit_2511_aio` come from third parties;
+  check the licenses of the linked repositories before use.
+
+A model whose files carry a license that must be accepted is not downloaded
+until you accept it with `ACCEPT_LICENSES`; the error names the license and its
+URL. Custom nodes installed for a workflow keep their own licenses.
 
 Copyright (C) 2026 AI Image Edit authors
 
