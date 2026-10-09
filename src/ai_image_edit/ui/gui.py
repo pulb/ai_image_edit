@@ -280,14 +280,13 @@ async def build_editor_card(model: WorkflowModel, caps: ModelCapabilities) -> Ed
             if ORIGINAL_ASPECT_RATIO not in caps.supported_aspect_ratios:
                 return
             if has_mask:
-                if aspect_ratio.value != ORIGINAL_ASPECT_RATIO:
-                    previous_aspect_ratio = aspect_ratio.value
+                previous_aspect_ratio = aspect_ratio.value
+                previous_megapixels = megapixels.value
                 aspect_ratio.value = ORIGINAL_ASPECT_RATIO
                 aspect_ratio.disable()
                 # Shows the tier the model will use: it follows the image.
                 source_mp = model.megapixels_for_source(editor_holder["path"]) if editor_holder["path"] else None
                 if source_mp is not None:
-                    previous_megapixels = megapixels.value
                     megapixels.value = source_mp
                 megapixels.disable()
             else:
