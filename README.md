@@ -42,11 +42,11 @@ each workflow, its variants and licenses are in [doc/models.md](doc/models.md).
 
 ## Deployments
 
-| Target | Model workflows | Guide |
-|---|---|---|
-| ⭐ **RunPod GPU Pod** (recommended) | all (one ComfyUI image) | [`deployments/runpod`](deployments/runpod/DEPLOY.md) |
-| Hugging Face Space | the ComfyUI image as a Docker Space on a paid GPU | [`deployments/huggingface`](deployments/huggingface/DEPLOY.md) |
-| Docker (self-hosted) | all (one ComfyUI image) | [`deployments/docker`](deployments/docker/DEPLOY.md) |
+| Target | Guide |
+|---|---|
+| ⭐ **RunPod GPU Pod** (recommended) | [`deployments/runpod`](deployments/runpod/DEPLOY.md) |
+| Hugging Face Space (Docker Space on a paid GPU) | [`deployments/huggingface`](deployments/huggingface/DEPLOY.md) |
+| Docker (self-hosted) | [`deployments/docker`](deployments/docker/DEPLOY.md) |
 
 ## Generation times
 
