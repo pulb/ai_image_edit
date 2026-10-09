@@ -1275,7 +1275,10 @@ def run(model: Model) -> None:
         caps = model.capabilities
 
         ui.label("AI Image Edit").classes("text-2xl font-bold text-white w-full text-center")
-        ui.label(f"Model: {model.display_name}").classes("text-sm q-mb-md w-full text-center").style(f"color: {PRIMARY_COLOR}")
+        with ui.column().classes("w-full gap-0 items-center q-mb-md"):
+            ui.label(f"Model: {model.display_name}").classes("text-sm w-full text-center").style(f"color: {PRIMARY_COLOR}")
+            setup_label = ui.label().classes("text-xs w-full text-center")
+            setup_label.set_visibility(False)
 
         with ui.column().classes("w-full gap-3 aie-page"):
             with ui.card().classes(CARD_CLASSES):
@@ -1537,6 +1540,28 @@ def run(model: Model) -> None:
             download_btn.disable()
 
         use_as_input_btn.on_click(use_as_input)
+
+        # While the model sets itself up in the background (weights and LoRAs
+        # downloading, custom nodes installing) show how far it is, and add the
+        # LoRAs to the list as their files arrive.
+        def refresh_setup() -> None:
+            progress = model.setup_progress()
+            text = progress.error or progress.message
+            setup_label.set_text(text)
+            setup_label.set_visibility(bool(text))
+            setup_label.classes(add="text-negative" if progress.error else "text-gray-400",
+                                remove="text-gray-400" if progress.error else "text-negative")
+            if lora_name is not None:
+                found = model.list_loras()
+                if found != available_loras:
+                    available_loras.clear()
+                    available_loras.update(found)
+                    lora_name.set_options(["None"] + list(found), value=lora_name.value if lora_name.value in found else "None")
+            if progress.done:
+                setup_timer.deactivate()
+
+        setup_timer = ui.timer(1.0, refresh_setup)  # stops itself once the setup is done
+        refresh_setup()
 
         async def download_result() -> None:
             after_path = await get_result_after_path()

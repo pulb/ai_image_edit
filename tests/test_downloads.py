@@ -24,6 +24,7 @@ except ImportError:
 
 from ai_image_edit.core.errors import GenerationError
 from ai_image_edit.core.types import GenerationParams
+from ai_image_edit.models.base import SetupProgress
 from ai_image_edit.models._shared.comfyui import client, downloads
 from ai_image_edit.models._shared.comfyui.workflow_model import ComfyWorkflowModel
 
@@ -223,9 +224,16 @@ class ModelStartTests(ServerCase):
         self.launch.assert_not_called()
         with self.assertRaisesRegex(GenerationError, "still being set up"):
             model.generate(self.params())
+        deadline = time.time() + 10
+        while not model.setup_progress().message and time.time() < deadline:
+            time.sleep(0.01)
+        progress = model.setup_progress()
+        self.assertFalse(progress.done)
+        self.assertIn("w.safetensors", progress.message)
         Handler.gate.set()
         self.assertTrue(model._download_status.finished.wait(10))
         self.assertIsNone(model._download_status.error)
+        self.assertEqual(model.setup_progress(), SetupProgress(done=True))
         self.assertEqual((self.tmp / "models/checkpoints/w.safetensors").read_bytes(), PAYLOAD)
         self.launch.assert_called_once()
         model._check_downloads()  # no longer raises
@@ -264,6 +272,20 @@ class ModelStartTests(ServerCase):
         self.launch.assert_not_called()
         with self.assertRaisesRegex(GenerationError, "failed.*404"):
             model.generate(self.params())
+        progress = model.setup_progress()
+        self.assertTrue(progress.done)
+        self.assertRegex(progress.error, "failed.*404")
+
+    def test_no_setup_means_done(self):
+        self.assertEqual(self.model().setup_progress(), SetupProgress(done=True))
+
+    def test_missing_lora_folder_is_warned_about_once(self):
+        model = self.model()
+        model._manifest["loras"]["dir"] = str(self.tmp / "nowhere")
+        with mock.patch("builtins.print") as printed:
+            model.list_loras()
+            model.list_loras()
+        self.assertEqual(printed.call_count, 1)
 
     def test_lora_files_are_downloaded_into_their_folders(self):
         model = self.model()

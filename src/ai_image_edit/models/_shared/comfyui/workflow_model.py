@@ -23,7 +23,7 @@ from ai_image_edit.core import imaging
 from ai_image_edit.core.errors import GenerationError
 from ai_image_edit.core.result_cache import cached_infer
 from ai_image_edit.core.types import GenerationParams, GenerationResult, ModelCapabilities, RangeSpec
-from ai_image_edit.models.base import Model
+from ai_image_edit.models.base import Model, SetupProgress
 from ai_image_edit.models._shared.comfyui import client as comfy_client
 from ai_image_edit.models._shared.comfyui import gpu
 from ai_image_edit.models._shared.comfyui.common import SAMPLER_CHOICES, SCHEDULER_CHOICES, configured_file
@@ -61,6 +61,7 @@ class ComfyWorkflowModel(Model):
         self._nodes_checked = False
         self._download_status: Optional[downloads.DownloadStatus] = None
         self._cancel_downloads = threading.Event()
+        self._lora_warned: set = set()
 
         size = manifest["size"]
         if size["policy"] not in POLICIES:
@@ -286,6 +287,14 @@ class ComfyWorkflowModel(Model):
             name=f"{self.name}-setup", daemon=True,
         ).start()
 
+    def setup_progress(self) -> SetupProgress:
+        status = self._download_status
+        if status is None:
+            return SetupProgress()
+        if status.error:
+            return SetupProgress(done=True, error=f"Setting up the model failed: {status.error}")
+        return SetupProgress(done=status.finished.is_set(), message=status.message)
+
     def _check_downloads(self) -> None:
         status = self._download_status
         if status is None:
@@ -317,7 +326,7 @@ class ComfyWorkflowModel(Model):
             return {}
         lora_dir = loras_cfg["dir"]
         if not os.path.exists(lora_dir):
-            print(f"[WARNING] LoRA folder not found at expected path: {lora_dir}", flush=True)
+            self._warn_once(f"LoRA folder not found at expected path: {lora_dir}")
             return {}
 
         loras: Dict[str, List[str]] = {}
@@ -335,8 +344,14 @@ class ComfyWorkflowModel(Model):
                 loras[entry] = [entry]
 
         if not loras:
-            print(f"[WARNING] No LoRA files found in {lora_dir}", flush=True)
+            self._warn_once(f"No LoRA files found in {lora_dir}")
         return loras
+
+    def _warn_once(self, message: str) -> None:
+        """list_loras() is called repeatedly while the LoRAs are being downloaded."""
+        if message not in self._lora_warned:
+            self._lora_warned.add(message)
+            print(f"[WARNING] {message}", flush=True)
 
     def _check_nodes(self) -> None:
         """

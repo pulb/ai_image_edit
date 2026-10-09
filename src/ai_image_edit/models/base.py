@@ -9,9 +9,19 @@ generation — plus a readable name and version to show. How a model actually ge
 and never leaks into this contract.
 """
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from typing import Dict, List, Optional
 
 from ai_image_edit.core.types import GenerationParams, GenerationResult, ModelCapabilities
+
+
+@dataclass(frozen=True)
+class SetupProgress:
+    """How far the model's background setup (downloads, installs) is."""
+
+    done: bool = True
+    message: str = ""  # what is being done right now, e.g. "Downloading x.safetensors (2/5): 42%"
+    error: Optional[str] = None
 
 
 class Model(ABC):
@@ -45,6 +55,10 @@ class Model(ABC):
 
     def shutdown(self) -> None:
         """Optional cleanup (e.g. terminate a subprocess, free GPU memory). No-op by default."""
+
+    def setup_progress(self) -> SetupProgress:
+        """Progress of the setup that start() continues in the background. Done by default."""
+        return SetupProgress()
 
     def list_loras(self) -> Dict[str, List[str]]:
         """
