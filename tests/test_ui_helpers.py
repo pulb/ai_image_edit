@@ -3,7 +3,7 @@ import os
 import unittest
 from unittest import mock
 
-from ai_image_edit.frontends._shared import common
+from ai_image_edit.ui import helpers as common
 
 
 class StorageSecretTest(unittest.TestCase):

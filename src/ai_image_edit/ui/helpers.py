@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Constants and helpers shared by the frontends."""
+"""Constants and helpers shared by the UI."""
 import hashlib
 import os
 from typing import List, Optional, Sequence
@@ -7,7 +7,7 @@ from typing import List, Optional, Sequence
 from ai_image_edit.core.errors import GenerationError
 from ai_image_edit.core.types import GenerationParams, ModelCapabilities
 
-# This app's one accent colour: the frontend reads its purple from here.
+# This app's one accent colour: the UI reads its purple from here.
 PRIMARY_COLOR = "#7c3aed"
 
 # Newest work-dir files trim_work_dir() never deletes: the files of the

@@ -7,7 +7,7 @@ re-composites without running the model again.
 Currently single-user only: there is one cache for the whole process. With
 several simultaneous users, each one's generation replaces the other's entry
 and identical inputs would share a result file, so proper session handling
-(one cache per session, passed in by the frontend) is needed first.
+(one cache per session, passed in by the UI) is needed first.
 """
 import hashlib
 import json

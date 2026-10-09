@@ -8,16 +8,16 @@ Entry point: builds the model and hands it to the web UI.
 Each option falls back to an environment variable, which is how the container
 images are configured: MODEL_WORKFLOW (a bundled name or a workflow file;
 default qwen_image21) and MODEL_VARIANT. APP_PASSWORD adds a password login
-to the UI. The UI code lives under frontends/, the model code under
-models/; run_frontend() passes the built model straight to the UI's run(model).
+to the UI. The UI code lives in ui/, the model in workflow_model.py; the built
+model is passed straight to the UI's run(model).
 """
 import argparse
 import os
 from typing import List, Optional
 
-from ai_image_edit.frontends import run_frontend
-from ai_image_edit.models import get_model
-from ai_image_edit.models._shared.comfyui.workflow_files import available_workflows
+from ai_image_edit import ui
+from ai_image_edit.workflow_model import get_model
+from ai_image_edit.workflows import available_workflows
 
 
 def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
@@ -52,4 +52,4 @@ def main(argv: Optional[List[str]] = None) -> None:
     except RuntimeError as exc:  # a missing file, an unaccepted license: a message is enough
         raise SystemExit(str(exc))
 
-    run_frontend(model)
+    ui.run(model)

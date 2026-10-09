@@ -1,10 +1,9 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """
-A Model that is described by data instead of code: one JSON file
-(ai_image_edit/data/workflows/<name>.json) with a ComfyUI workflow in API format and a
-manifest that says how the app's inputs map onto that workflow. The file is
-found by its name (see get_model() in models/__init__.py); its format is documented in
-doc/contribution/workflow_files.md.
+The model the app runs: a workflow file (ai_image_edit/data/workflows/<name>.json) with a
+ComfyUI workflow in API format and a manifest that says how the app's inputs map
+onto that workflow. A bundled file is found by its name, any other by its path
+(see get_model()); the format is documented in doc/contribution/workflow_files.md.
 
 Workflow targets are written "<node id>.<input name>", e.g. "6.seed"; the
 input name may itself contain dots ("5.images.image_2").
@@ -16,20 +15,59 @@ import subprocess
 import threading
 import time
 import uuid
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+from ai_image_edit.comfyui import client as comfy_client
+from ai_image_edit.comfyui import custom_nodes, downloads, gpu
 from ai_image_edit.core import imaging
 from ai_image_edit.core.errors import GenerationError
 from ai_image_edit.core.result_cache import cached_infer
 from ai_image_edit.core.types import GenerationParams, GenerationResult, ModelCapabilities, RangeSpec
-from ai_image_edit.models.base import Model, SetupProgress
-from ai_image_edit.models._shared.comfyui import client as comfy_client
-from ai_image_edit.models._shared.comfyui import gpu
-from ai_image_edit.models._shared.comfyui.common import SAMPLER_CHOICES, SCHEDULER_CHOICES, configured_file
-from ai_image_edit.models._shared.comfyui import custom_nodes, downloads
-from ai_image_edit.models._shared.comfyui.size_policies import POLICIES, ResolvedSize, SizePolicy
-from ai_image_edit.models._shared.comfyui.workflow_files import read_workflow_file
+from ai_image_edit.sizes import POLICIES, ResolvedSize, SizePolicy
+from ai_image_edit.workflows import available_workflows, read_workflow_file
+
+def configured_file(env_var: str, folder: Path) -> str:
+    """
+    The path (forward slashes, relative to `folder`) that environment variable
+    `env_var` names. Raises RuntimeError if it is unset or the file does not exist.
+    """
+    value = os.environ.get(env_var, "").strip().replace("\\", "/")
+    if not value:
+        raise RuntimeError(
+            f"{env_var} is not set: set it to the file's path relative to ComfyUI's {folder} folder."
+        )
+    if not (folder / value).is_file():
+        raise RuntimeError(f"File not found: {folder / value} (set by {env_var}).")
+    return value
+
+
+# Valid ComfyUI KSampler scheduler names (from comfy/samplers.py's SCHEDULER_HANDLERS).
+SCHEDULER_CHOICES = ["normal", "karras", "exponential", "simple", "ddim_uniform", "beta", "sgm_uniform", "linear_quadratic", "kl_optimal"]
+
+# Valid ComfyUI KSampler sampler names (comfy/samplers.py's KSAMPLER_NAMES + ["ddim", "uni_pc", "uni_pc_bh2"]).
+SAMPLER_CHOICES = [
+    "euler", "euler_cfg_pp", "euler_ancestral", "euler_ancestral_cfg_pp", "heun", "heunpp2",
+    "exp_heun_2_x0", "exp_heun_2_x0_sde", "dpm_2", "dpm_2_ancestral",
+    "lms", "dpm_fast", "dpm_adaptive", "dpmpp_2s_ancestral", "dpmpp_2s_ancestral_cfg_pp", "dpmpp_sde", "dpmpp_sde_gpu",
+    "dpmpp_2m", "dpmpp_2m_cfg_pp", "dpmpp_2m_sde", "dpmpp_2m_sde_gpu", "dpmpp_2m_sde_heun", "dpmpp_2m_sde_heun_gpu",
+    "dpmpp_3m_sde", "dpmpp_3m_sde_gpu", "ddpm", "lcm",
+    "ipndm", "ipndm_v", "deis", "res_multistep", "res_multistep_cfg_pp", "res_multistep_ancestral", "res_multistep_ancestral_cfg_pp",
+    "gradient_estimation", "gradient_estimation_cfg_pp", "er_sde", "seeds_2", "seeds_3", "sa_solver", "sa_solver_pece",
+    "ddim", "uni_pc", "uni_pc_bh2"
+]
+
+
+@dataclass(frozen=True)
+class SetupProgress:
+    """How far the model's background setup (downloads, installs) is."""
+
+    done: bool = True
+    message: str = ""  # what is being done right now, e.g. "Downloading x.safetensors (2/5): 42%"
+    error: Optional[str] = None
+    fraction: Optional[float] = None  # 0 to 1 over the whole setup, None while that is not known
+
 
 _NAMED_CHOICES = {"comfy_samplers": SAMPLER_CHOICES, "comfy_schedulers": SCHEDULER_CHOICES}
 _BINDABLE = {"prompt", "negative_prompt", "seed", "steps", "cfg", "sampler", "scheduler", "denoise"}
@@ -50,8 +88,15 @@ def _choices(value: Any) -> List[str]:
     return list(_NAMED_CHOICES[value]) if isinstance(value, str) else list(value)
 
 
-class ComfyWorkflowModel(Model):
-    """A model run through a local ComfyUI server, as described by a manifest."""
+class WorkflowModel:
+    """
+    A model run through a local ComfyUI server, as described by a workflow file.
+
+    The UI needs three things from it: what it can do (capabilities), how to
+    start and stop it (start(), shutdown(); setup_progress() reports the
+    downloads start() continues in the background), and how to run one
+    generation (generate()), plus a name and version to show.
+    """
 
     def __init__(self, name: str, manifest: dict, workflow: dict, variant: Optional[str] = None) -> None:
         self.name = name
@@ -70,7 +115,7 @@ class ComfyWorkflowModel(Model):
         self._validate()
 
     @classmethod
-    def from_file(cls, path: Path, variant: Optional[str] = None) -> "ComfyWorkflowModel":
+    def from_file(cls, path: Path, variant: Optional[str] = None) -> "WorkflowModel":
         """The model described by a workflow file; its name is the file name without .json."""
         path = Path(path)
         manifest, workflow = read_workflow_file(path)
@@ -169,6 +214,11 @@ class ComfyWorkflowModel(Model):
     def model_version(self) -> Optional[str]:
         """The manifest's (or variant's) version; MODEL_VERSION overrides it, e.g. for weights set by MODEL_FILE."""
         return os.environ.get("MODEL_VERSION", "").strip() or self._manifest.get("model_version")
+
+    @property
+    def display_name(self) -> str:
+        """model_name followed by model_version, if any."""
+        return f"{self.model_name} {self.model_version}" if self.model_version else self.model_name
 
     @property
     def _max_references(self) -> int:
@@ -511,3 +561,21 @@ class ComfyWorkflowModel(Model):
             params.annotated_image_path,
         )
         return GenerationResult(before_path=params.source_image_path, after_path=final_output_path, actual_seed=seed)
+
+
+def get_model(workflow: str, variant: Optional[str] = None) -> WorkflowModel:
+    """The model of a bundled workflow (by name) or of a workflow file (by path).
+
+    `variant` selects one of the workflow's variants.
+    """
+    bundled = available_workflows()
+    if workflow in bundled:
+        path = bundled[workflow]
+    elif Path(workflow).is_file():
+        path = Path(workflow)
+    else:
+        raise ValueError(
+            f"Unknown workflow '{workflow}'. Available: {', '.join(sorted(bundled))}; "
+            "or give the path of a workflow file."
+        )
+    return WorkflowModel.from_file(path, variant)

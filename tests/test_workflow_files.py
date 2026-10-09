@@ -31,9 +31,10 @@ from PIL import Image
 from ai_image_edit.core import imaging
 from ai_image_edit.core.errors import GenerationError
 from ai_image_edit.core.types import GenerationParams
-from ai_image_edit.models._shared.comfyui.workflow_files import available_workflows
-from ai_image_edit.models._shared.comfyui import client, workflow_files
-from ai_image_edit.models._shared.comfyui.workflow_model import ComfyWorkflowModel
+from ai_image_edit.workflows import available_workflows
+from ai_image_edit import workflows as workflow_files
+from ai_image_edit.comfyui import client
+from ai_image_edit.workflow_model import WorkflowModel
 
 import jsonschema
 
@@ -69,9 +70,9 @@ class ManifestModelTests(unittest.TestCase):
         os.environ.update(cls._old_env)
         cls._tmp.cleanup()
 
-    def load(self, path: Path) -> ComfyWorkflowModel:
+    def load(self, path: Path) -> WorkflowModel:
         """The model, with the weight files its manifest names created as empty placeholders."""
-        model = ComfyWorkflowModel.from_file(path)
+        model = WorkflowModel.from_file(path)
         for spec in model._manifest.get("files", []):
             # A file with an env override is exercised through it; the others by their own name.
             name = f"{spec['env'].lower()}.bin" if "env" in spec else spec["name"]
@@ -81,7 +82,7 @@ class ManifestModelTests(unittest.TestCase):
                 os.environ[spec["env"]] = name
         return model
 
-    def build(self, model: ComfyWorkflowModel, n_refs: int) -> dict:
+    def build(self, model: WorkflowModel, n_refs: int) -> dict:
         m = model._manifest
         size_values = {name: 1024 for name in m["size"].get("bind", {})}
         return model.build_workflow(

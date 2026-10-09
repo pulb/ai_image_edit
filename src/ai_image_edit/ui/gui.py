@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """
-NiceGUI frontend. Entry point is run(model), called by
-app.py — importing this module does nothing by itself.
+NiceGUI UI. Entry point is run(model), called through ui/__init__.py
+— importing this module does nothing by itself.
 
 UI-only: renders controls, collects a GenerationParams, and calls
 model.generate(). Controls (mask editor, before/after slider, reference
@@ -30,7 +30,7 @@ from ai_image_edit.core.paths import WORK_DIR, to_url, from_url, trim_work_dir
 from ai_image_edit.core.types import (
     ANNOTATION_COLORS, DEFAULT_SEED, FEATHER_RANGE, ORIGINAL_ASPECT_RATIO, RangeSpec,
 )
-from ai_image_edit.frontends._shared.common import (
+from ai_image_edit.ui.helpers import (
     HOST,
     PORT,
     PRIMARY_COLOR,
@@ -40,7 +40,7 @@ from ai_image_edit.frontends._shared.common import (
     params_from_ui,
     storage_secret,
 )
-from ai_image_edit.models.base import Model
+from ai_image_edit.workflow_model import WorkflowModel
 
 
 # --- Configuration Constants ---
@@ -1244,11 +1244,11 @@ CLIENT_JS = CLIENT_JS.replace("__ANNOTATION_STROKE__", str(ANNOTATION_STROKE))
 CARD_CLASSES = "w-full q-pa-none"
 
 
-def run(model: Model) -> None:
+def run(model: WorkflowModel) -> None:
     # Everything below is model-dependent, so it lives inside run()
     # rather than at module scope: app.py builds the model once and
-    # calls this through run_frontend()
-    # (see app.py and frontends/__init__.py).
+    # calls this through ui.run()
+    # (see app.py and ui/__init__.py).
 
     @ui.page("/")
     async def main_page() -> None:

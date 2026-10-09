@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """
-Data contracts shared between the UI layer (frontends/nicegui.py) and every model under models/. Deliberately
-dependency-free of both frontends/ and models/, so neither side ever needs
+Data contracts shared between the UI (ui/) and the model (workflow_model.py). Deliberately
+dependency-free of both, so neither side ever needs
 to import from the other.
 """
 from dataclasses import dataclass, field
@@ -26,11 +26,11 @@ class RangeSpec:
 # The "derive the output size from the source image" aspect ratio label.
 ORIGINAL_ASPECT_RATIO = "Original"
 
-# The seed the frontend starts with.
+# The seed the UI starts with.
 DEFAULT_SEED = 65454653
 
 # Inpainting mask edge softness (Gaussian blur radius), shared by the
-# frontends' Feather slider and GenerationParams.feather_amount.
+# UI's Feather slider and GenerationParams.feather_amount.
 FEATHER_RANGE = RangeSpec(0, 16, 3, step=1)
 
 

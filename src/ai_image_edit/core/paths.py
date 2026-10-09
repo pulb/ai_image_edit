@@ -12,10 +12,10 @@ from pathlib import Path
 
 # Where uploaded, generated, and composited images live for the lifetime of
 # the process. Served to the browser at /files/<name>
-# (see frontends/nicegui.py's app.add_static_files) so client-side
+# (see ui/gui.py's app.add_static_files) so client-side
 # <canvas>/<img> elements can load them by URL. This also doubles as the
 # single source of truth for "what's the current result" — see
-# create_compare_slider()'s get_after_path() in frontends/nicegui.py.
+# create_compare_slider()'s get_after_path() in ui/gui.py.
 #
 # Defaults to a folder under /dev/shm (RAM-backed, so images never reach
 # persistent storage) and falls back to ./app_work where /dev/shm is not

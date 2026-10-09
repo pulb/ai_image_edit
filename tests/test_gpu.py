@@ -3,7 +3,7 @@ import os
 import unittest
 from unittest import mock
 
-from ai_image_edit.models._shared.comfyui import gpu
+from ai_image_edit.comfyui import gpu
 
 GIB = gpu.GIB
 

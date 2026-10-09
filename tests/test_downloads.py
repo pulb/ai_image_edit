@@ -24,9 +24,8 @@ except ImportError:
 
 from ai_image_edit.core.errors import GenerationError
 from ai_image_edit.core.types import GenerationParams
-from ai_image_edit.models.base import SetupProgress
-from ai_image_edit.models._shared.comfyui import client, downloads
-from ai_image_edit.models._shared.comfyui.workflow_model import ComfyWorkflowModel
+from ai_image_edit.comfyui import client, downloads
+from ai_image_edit.workflow_model import SetupProgress, WorkflowModel
 
 PAYLOAD = bytes(range(256)) * 4000  # ~1 MB
 
@@ -191,8 +190,8 @@ class DownloadTests(ServerCase):
 
 
 class ModelStartTests(ServerCase):
-    def model(self, **file_extra) -> ComfyWorkflowModel:
-        from ai_image_edit.models._shared.comfyui.workflow_files import available_workflows, read_workflow_file
+    def model(self, **file_extra) -> WorkflowModel:
+        from ai_image_edit.workflows import available_workflows, read_workflow_file
         manifest, workflow = read_workflow_file(available_workflows()["qwen_image_edit_2511_aio"])
         manifest["loras"]["files"] = []
         manifest["custom_nodes"] = []
@@ -201,7 +200,7 @@ class ModelStartTests(ServerCase):
             name="w.safetensors", url=self.url + "/f", folder="models/checkpoints", set="1.ckpt_name",
             env="TEST_WEIGHTS", **file_extra,
         )]
-        return ComfyWorkflowModel("test", manifest, workflow)
+        return WorkflowModel("test", manifest, workflow)
 
     def setUp(self):
         super().setUp()

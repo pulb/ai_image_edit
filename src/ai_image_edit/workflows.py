@@ -15,7 +15,7 @@ import jsonschema
 FORMAT_VERSION = 1
 
 # The workflow files shipped with the app, inside the installed package.
-PACKAGE_DIR = Path(__file__).resolve().parents[3] / "data" / "workflows"
+PACKAGE_DIR = Path(__file__).resolve().parent / "data" / "workflows"
 SCHEMA_PATH = PACKAGE_DIR.parent / "workflow.schema.json"
 
 

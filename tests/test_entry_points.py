@@ -22,9 +22,9 @@ except ImportError:
     sys.modules["websocket"] = types.ModuleType("websocket")
 
 from ai_image_edit import app
-from ai_image_edit.models._shared.comfyui import client, custom_nodes
-from ai_image_edit.models._shared.comfyui.workflow_files import available_workflows, read_workflow_file
-from ai_image_edit.models._shared.comfyui.workflow_model import ComfyWorkflowModel
+from ai_image_edit.comfyui import client, custom_nodes
+from ai_image_edit.workflows import available_workflows, read_workflow_file
+from ai_image_edit.workflow_model import WorkflowModel
 
 GGUF = available_workflows()["qwen_image21_gguf"]
 
@@ -37,7 +37,7 @@ class SelectionTests(unittest.TestCase):
         for name in ("MODEL_WORKFLOW", "MODEL_VARIANT", "REQUIRE_PASSWORD", "MODEL_VERSION"):
             os.environ.pop(name, None)
         self.model = mock.Mock()
-        self.run = mock.patch.object(app, "run_frontend").start()
+        self.run = mock.patch.object(app.ui, "run").start()
         self.get = mock.patch.object(app, "get_model", return_value=self.model).start()
         self.addCleanup(mock.patch.stopall)
 
@@ -72,16 +72,16 @@ class SelectionTests(unittest.TestCase):
 
 class GetModelTests(unittest.TestCase):
     def test_bundled_name_and_file_path(self):
-        from ai_image_edit.models import get_model
+        from ai_image_edit.workflow_model import get_model
 
-        with mock.patch.object(ComfyWorkflowModel, "from_file") as from_file:
+        with mock.patch.object(WorkflowModel, "from_file") as from_file:
             get_model("qwen_image21_gguf", "Q8_0")
             from_file.assert_called_with(available_workflows()["qwen_image21_gguf"], "Q8_0")
             get_model(str(GGUF))
             from_file.assert_called_with(GGUF, None)
 
     def test_unknown_workflow_lists_the_bundled_ones(self):
-        from ai_image_edit.models import get_model
+        from ai_image_edit.workflow_model import get_model
 
         with self.assertRaisesRegex(ValueError, "Unknown workflow 'nope'. Available: qwen_image21,"):
             get_model("nope")
@@ -89,35 +89,35 @@ class GetModelTests(unittest.TestCase):
 
 class VariantTests(unittest.TestCase):
     def test_variant_replaces_file_and_version(self):
-        model = ComfyWorkflowModel.from_file(GGUF, "Q8_0")
+        model = WorkflowModel.from_file(GGUF, "Q8_0")
         unet = model._manifest["files"][0]
         self.assertEqual(unet["name"], "qwen-image-2.1-UC-Q8_0.gguf")
         self.assertTrue(unet["url"].endswith("qwen-image-2.1-UC-Q8_0.gguf?download=true"))
         self.assertEqual(unet["license"], "qwen-research")  # keys the variant does not give are kept
         self.assertEqual(model.model_version, "UC Q8_0")
-        self.assertEqual(ComfyWorkflowModel.from_file(GGUF).model_version, "UC Q4_K_M")
+        self.assertEqual(WorkflowModel.from_file(GGUF).model_version, "UC Q4_K_M")
 
     def test_variants_do_not_change_the_shared_manifest(self):
         manifest, workflow = read_workflow_file(GGUF)
         before = copy.deepcopy(manifest)
-        ComfyWorkflowModel("x", manifest, workflow, "Q8_0")
+        WorkflowModel("x", manifest, workflow, "Q8_0")
         self.assertEqual(manifest, before)
 
     def test_unknown_variant_lists_the_options(self):
         with self.assertRaisesRegex(ValueError, r"unknown variant 'nope' \(available: Q4_0"):
-            ComfyWorkflowModel.from_file(GGUF, "nope")
+            WorkflowModel.from_file(GGUF, "nope")
         with self.assertRaisesRegex(ValueError, "available: none"):
-            ComfyWorkflowModel.from_file(available_workflows()["qwen_image_edit_2511_aio"], "x")
+            WorkflowModel.from_file(available_workflows()["qwen_image_edit_2511_aio"], "x")
 
     def test_variant_must_change_an_existing_file(self):
         manifest, workflow = read_workflow_file(GGUF)
         manifest["variants"]["bad"] = {"files": {"9.nothing": {"name": "x"}}}
         with self.assertRaisesRegex(ValueError, "not in files"):
-            ComfyWorkflowModel("x", manifest, workflow)
+            WorkflowModel("x", manifest, workflow)
 
     def test_version_environment_override(self):
         with mock.patch.dict(os.environ, {"MODEL_VERSION": "custom"}):
-            self.assertEqual(ComfyWorkflowModel.from_file(GGUF).model_version, "custom")
+            self.assertEqual(WorkflowModel.from_file(GGUF).model_version, "custom")
 
 
 class CustomNodeTests(unittest.TestCase):
@@ -186,7 +186,7 @@ class CustomNodeTests(unittest.TestCase):
                               "set": "1.ckpt_name"}]
         (self.tmp / "models/checkpoints").mkdir(parents=True)
         (self.tmp / "models/checkpoints/w.safetensors").touch()
-        model = ComfyWorkflowModel("t", manifest, workflow)
+        model = WorkflowModel("t", manifest, workflow)
         old = os.getcwd()
         os.chdir(self.tmp)
         try:
