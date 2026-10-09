@@ -107,6 +107,6 @@ Rules for any AI coding agent working in this repository.
 - Tests live in `tests/` (no GPU, ComfyUI or network needed):
   `PYTHONPATH=src python -m unittest discover -s tests`. They cover the
   workflow files (schema and the code that runs them), downloads, custom
-  node installation, the entry points and the GPU argument choice. Run them
+  node installation, the entry points, the GPU argument choice, the ComfyUI client, image compositing and the session secret. Run them
   after any change; for code they don't reach (the UI, the ComfyUI client),
   also read the affected code paths end to end.
