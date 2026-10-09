@@ -16,10 +16,10 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from PIL import Image
 
-from ai_image_edit.core.types import GenerationParams
+from ai_image_edit.core.types import ORIGINAL_ASPECT_RATIO, GenerationParams
 from ai_image_edit.models._shared import qwen21_size
 
-ORIGINAL = "Original"
+ORIGINAL = ORIGINAL_ASPECT_RATIO
 
 
 @dataclass
@@ -50,7 +50,7 @@ class SizePolicy:
 class Qwen21Tiers(SizePolicy):
     """Qwen-Image-2.1: resolution tiers (1K/1.5K/2K) and the model card's aspect ratios."""
 
-    def __init__(self, config: dict) -> None:
+    def __init__(self, config: dict) -> None:  # takes no settings; the signature is the policies' common one
         self.aspect_ratios = [qwen21_size.AUTO_ASPECT_RATIO] + list(qwen21_size.ASPECT_RATIOS.keys())
         self.default_aspect_ratio = qwen21_size.AUTO_ASPECT_RATIO
         self.megapixels = list(qwen21_size.SUPPORTED_MEGAPIXELS)
@@ -109,7 +109,7 @@ class FixedArea(SizePolicy):
             with Image.open(params.source_image_path) as img:
                 ratio_w, ratio_h = img.size
         else:
-            ratio_w, ratio_h = self.RATIOS.get(aspect, self.RATIOS["1:1"])
+            ratio_w, ratio_h = self.RATIOS[aspect]
         width, height = self._dimensions_for(ratio_w, ratio_h, target_area)
         return ResolvedSize(width, height, {"width": width, "height": height}, {}, f"mp={params.target_megapixels}")
 

@@ -39,7 +39,7 @@ class Model(ABC):
     def start(self) -> None:
         """
         One-time setup before this model can serve requests: launch a
-        subprocess, load weights onto the GPU, warm up a pipeline —
+        subprocess, load weights onto the GPU —
         whatever this particular model needs. Called once, at app startup.
         """
 

@@ -11,7 +11,7 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 CUSTOM_NODES_DIR = Path("custom_nodes")
 
@@ -20,7 +20,7 @@ def missing(specs: List[dict], root: Path = CUSTOM_NODES_DIR) -> List[dict]:
     return [spec for spec in specs if not (root / spec["name"]).is_dir()]
 
 
-def _run(*cmd: str, cwd: Path = None) -> None:
+def _run(*cmd: str, cwd: Optional[Path] = None) -> None:
     # Large files (git LFS) are never needed for a node's code.
     env = {**os.environ, "GIT_LFS_SKIP_SMUDGE": "1"}
     result = subprocess.run(cmd, cwd=cwd, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)

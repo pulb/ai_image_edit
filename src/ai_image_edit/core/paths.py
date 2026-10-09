@@ -3,9 +3,8 @@
 Shared filesystem/URL plumbing for the app's runtime working directory.
 
 Owned by the UI/app layer, not by any model: it answers "where do
-generated/uploaded files live so the browser can load them", which model
-models are simply handed plain local paths for and never need a URL
-scheme for.
+generated/uploaded files live so the browser can load them", which the models never see:
+they are handed plain local paths.
 """
 import os
 import shutil

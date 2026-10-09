@@ -17,8 +17,6 @@ dependencies = [
     "requests",
     "jsonschema",
     "websocket-client",
-    "sentencepiece",
-    "transformers",
 ]
 
 [tool.setuptools.packages.find]

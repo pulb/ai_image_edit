@@ -250,20 +250,19 @@ def composite_with_soft_transition(orig_img_path: str, gen_img_path: str, mask_i
     never the other way around, since upscaling the generated image would
     soften its detail. Output is at the generated image's resolution.
     """
-    gen = Image.open(gen_img_path).convert("RGB")
+    if not mask_img_path:
+        return gen_img_path
 
+    with Image.open(gen_img_path) as gen_file, Image.open(orig_img_path) as orig_file:
+        gen = gen_file.convert("RGB")
+        orig = orig_file.convert("RGB")
     gen_size = gen.size
-
-    orig = Image.open(orig_img_path).convert("RGB")
     if orig.size != gen_size:
         print(f"[composite_with_soft_transition] Fitting original {orig.size} to {gen_size} for blending (uniform scale + center crop).", flush=True)
         orig = resize_to_cover_and_crop(orig, gen_size[0], gen_size[1], Image.Resampling.LANCZOS)
 
-    if not mask_img_path:
-        return gen_img_path
-
-    mask_img = Image.open(mask_img_path)
-    mask = mask_img.getchannel('A') if mask_img.mode == 'RGBA' else mask_img.convert("L")
+    with Image.open(mask_img_path) as mask_img:
+        mask = mask_img.getchannel('A') if mask_img.mode == 'RGBA' else mask_img.convert("L")
 
     if mask.size != gen_size:
         print(f"[composite_with_soft_transition] Fitting mask {mask.size} to {gen_size} for feathering (uniform scale + center crop).", flush=True)
@@ -333,8 +332,9 @@ def apply_whole_image_color_correction(orig_img_path: str, gen_img_path: str) ->
     don't need matching resolutions here, since correction only uses each
     image's aggregate per-channel mean/std.
     """
-    gen = Image.open(gen_img_path).convert("RGB")
-    orig = Image.open(orig_img_path).convert("RGB")
+    with Image.open(gen_img_path) as gen_file, Image.open(orig_img_path) as orig_file:
+        gen = gen_file.convert("RGB")
+        orig = orig_file.convert("RGB")
 
     corrections = compute_color_correction(gen, orig)
     corrected = apply_color_correction(gen, corrections)

@@ -10,7 +10,6 @@ Workflow targets are written "<node id>.<input name>", e.g. "6.seed"; the
 input name may itself contain dots ("5.images.image_2").
 """
 import copy
-import json
 import os
 import random
 import subprocess

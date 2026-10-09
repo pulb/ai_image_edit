@@ -84,6 +84,7 @@ async def save_uploaded_file(file) -> str:
     await nicegui_run.io_bound(imaging.apply_exif_orientation, str(path))
     return str(path)
 
+
 def save_data_url(data_url: str, filename_hint: str = "mask.png") -> str:
     """
     Decodes a `data:image/png;base64,...` URL — as produced by
@@ -99,6 +100,7 @@ def save_data_url(data_url: str, filename_hint: str = "mask.png") -> str:
     path = WORK_DIR / f"{stem}_{uuid.uuid4().hex}{suffix}"
     path.write_bytes(raw)
     return str(path)
+
 
 def install_password_login(password: str) -> str:
     """
@@ -125,7 +127,7 @@ def install_password_login(password: str) -> str:
         if app.storage.user.get("authenticated"):
             return RedirectResponse("/")
 
-        # Only same-site paths: "//host" and "/\\host" would redirect off-site.
+        # Only same-site paths: "//host" and "/\host" would redirect off-site.
         target = redirect_to if redirect_to.startswith("/") and not redirect_to.startswith("//") and "\\" not in redirect_to else "/"
 
         async def try_login() -> None:
@@ -298,6 +300,7 @@ def create_simple_image_upload(label: str) -> dict:
     holder["clear"] = clear_image
 
     return holder
+
 
 def create_value_slider(spec: RangeSpec) -> ui.slider:
     """
@@ -510,6 +513,7 @@ async def create_mask_editor(
         badge.set_visibility(True)
 
     return holder, get_inputs, set_image
+
 
 async def create_compare_slider() -> Tuple[
     Callable[[str, str], Awaitable[None]],
@@ -1548,8 +1552,8 @@ def run(model: Model) -> None:
     # the browser can reference uploaded/generated files directly by URL.
     app.add_static_files("/files", str(WORK_DIR))
 
-    # Make sure whatever the active model started (a ComfyUI subprocess, a
-    # loaded pipeline, ...) gets torn down on shutdown instead of leaking.
+    # Make sure whatever the active model started (a ComfyUI subprocess, ...)
+    # gets torn down on shutdown instead of leaking.
     app.on_shutdown(model.shutdown)
 
     # APP_PASSWORD turns the login on; without it the app is open. app.py

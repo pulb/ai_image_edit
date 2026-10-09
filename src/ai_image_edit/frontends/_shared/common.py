@@ -15,6 +15,7 @@ RECENT_FILES_KEPT = 8
 HOST = "0.0.0.0"
 PORT = 7860
 
+
 def default_choice(default: Optional[str], choices: Optional[Sequence[str]]) -> Optional[str]:
     """The model's declared default if it is one of `choices`, else the first choice (None if there are none)."""
     if not choices:

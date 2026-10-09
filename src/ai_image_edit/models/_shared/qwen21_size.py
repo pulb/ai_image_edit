@@ -10,6 +10,8 @@ from typing import Dict, Optional, Tuple
 
 from PIL import Image
 
+from ai_image_edit.core.types import ORIGINAL_ASPECT_RATIO
+
 # The aspect ratios the model card lists, at its 2048-base resolution.
 BASE_RESOLUTION = 2048
 ASPECT_RATIOS: Dict[str, Tuple[int, int]] = {
@@ -22,24 +24,18 @@ ASPECT_RATIOS: Dict[str, Tuple[int, int]] = {
     "9:16": (1536, 2752),
 }
 
-# This project's sentinel for "derive dimensions from context rather than
-# force a fixed ratio" is "Original" (e.g. the frontends lock the
-# aspect-ratio dropdown to it while a mask is drawn). For this model it
-# means the pipeline follows the input images' own aspect ratio, or squares
-# up for pure text-to-image.
-AUTO_ASPECT_RATIO = "Original"
+# The "derive dimensions from the source image" aspect ratio (the frontends lock
+# the aspect-ratio dropdown to it while a mask is drawn): the output keeps the
+# source's own aspect ratio.
+AUTO_ASPECT_RATIO = ORIGINAL_ASPECT_RATIO
 
 # Resolution tiers, reusing the "megapixels" field every model's
 # capabilities expose for its resolution choices. Here it's actually this
 # model's own tier (1K/1.5K/2K, i.e. target side length 1024/1536/2048)
-# rather than a literal computed pixel area. See _resolve_dimensions(),
-# which turns the chosen value back into that side length before calling
-# resolve_size().
+# rather than a literal computed pixel area. resolution_for() turns the chosen
+# value back into that side length.
 SUPPORTED_MEGAPIXELS = [1.0, 1.5, 2.0]
 DEFAULT_MEGAPIXELS = 1.0
-
-DEFAULT_STEPS, MIN_STEPS, MAX_STEPS = 40, 8, 60
-DEFAULT_CFG, MIN_CFG, MAX_CFG = 1.0, 1.0, 10.0
 
 
 def round32(v: float) -> int:
@@ -51,11 +47,8 @@ def resolve_size(resolution: int, aspect_ratio: str) -> Tuple[Optional[int], Opt
     """
     Width/height for a resolution tier and a named aspect ratio: the model
     card's size for that ratio, scaled by resolution / BASE_RESOLUTION.
-    Returns (None, None) for AUTO_ASPECT_RATIO — the pipeline then infers
-    dimensions itself (from the input images, or a square default for pure
-    text-to-image) rather than being told a fixed size. Only used when
-    there's no mask — see dimensions_from_source() for the masked case,
-    which needs concrete numbers regardless of aspect_ratio.
+    Returns (None, None) for AUTO_ASPECT_RATIO and for unknown names; use
+    dimensions_from_source() then.
     """
     if not aspect_ratio or aspect_ratio == AUTO_ASPECT_RATIO or aspect_ratio not in ASPECT_RATIOS:
         return None, None
@@ -68,11 +61,8 @@ def dimensions_from_source(source_image_path: str, resolution: int) -> Tuple[int
     """
     Derives concrete (width, height) from the source image's own aspect
     ratio at the given resolution tier. Used whenever resolve_size left
-    width/height unset (AUTO_ASPECT_RATIO, i.e. "Original") — not just while
-    a mask is drawn: imaging.run_masked_generation needs real numbers up
-    front to crop the source to before inference, and passing width=height=
-    None straight through to the pipeline instead doesn't reliably keep the
-    source's own aspect ratio either. Area scales with resolution the same
+    width/height unset (AUTO_ASPECT_RATIO, i.e. "Original"): the generation
+    needs concrete numbers up front, to crop the source to. Area scales with resolution the same
     way ASPECT_RATIOS' entries do (area ~ resolution^2), just computed
     directly from the source's own ratio instead of one of the model card's
     named presets — there's no precomputed table entry for an arbitrary

@@ -7,7 +7,6 @@ repository, no network):
     PYTHONPATH=src python -m unittest discover -s tests -v
 """
 import copy
-import json
 import os
 import subprocess
 import sys
