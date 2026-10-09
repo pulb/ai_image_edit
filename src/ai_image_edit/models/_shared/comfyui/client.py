@@ -10,7 +10,7 @@ import json
 import os
 import subprocess
 import time
-import urllib.request
+import urllib.parse
 from typing import List, Optional
 
 import requests
@@ -19,7 +19,12 @@ import websocket
 from ai_image_edit.core.errors import GenerationError
 from ai_image_edit.core.paths import WORK_DIR
 
-SERVER_ADDRESS = "127.0.0.1:8188"
+PORT = 8188
+SERVER_ADDRESS = f"127.0.0.1:{PORT}"
+
+# Seconds a single HTTP request to ComfyUI may take (the generation itself is
+# waited for separately, see GENERATION_TIMEOUT_SECONDS).
+REQUEST_TIMEOUT_SECONDS = 60
 
 # Safety net for submit_workflow_and_wait's websocket loop — without this, a
 # ComfyUI job that stalls, fails without emitting a proper execution_error
@@ -40,7 +45,7 @@ def launch_comfy_process(extra_args: Optional[List[str]] = None) -> subprocess.P
     # ComfyUI's input/output/temp folders live under WORK_DIR too, so
     # everything the app handles sits in one place (RAM-backed by default).
     comfy_dir = WORK_DIR.resolve() / "comfy"
-    args = ["--port", "8188", *(extra_args or [])]
+    args = ["--port", str(PORT), *(extra_args or [])]
     for name in ("input", "output", "temp"):
         (comfy_dir / name).mkdir(parents=True, exist_ok=True)
         args += [f"--{name}-directory", str(comfy_dir / name)]
@@ -52,7 +57,7 @@ def missing_nodes(class_names: List[str]) -> List[str]:
     try:
         return [
             name for name in class_names
-            if not requests.get(f"http://{SERVER_ADDRESS}/object_info/{name}", timeout=10).json()
+            if not requests.get(f"http://{SERVER_ADDRESS}/object_info/{name}", timeout=REQUEST_TIMEOUT_SECONDS).json()
         ]
     except (requests.exceptions.RequestException, ValueError) as e:
         raise GenerationError(
@@ -67,13 +72,34 @@ def upload_image(filepath: Optional[str]) -> Optional[str]:
     try:
         with open(filepath, "rb") as f:
             files = {"image": f}
-            res = requests.post(f"http://{SERVER_ADDRESS}/upload/image", files=files)
+            res = requests.post(f"http://{SERVER_ADDRESS}/upload/image", files=files, timeout=REQUEST_TIMEOUT_SECONDS)
             res.raise_for_status()
             return res.json()["name"]
     except requests.exceptions.RequestException as e:
         raise GenerationError(
             f"Cannot reach ComfyUI ({e}). ComfyUI may still be starting or has crashed. Please wait a moment and try again."
         )
+
+
+def _queue_prompt(workflow: dict, client_id: str) -> str:
+    """Queues the workflow and returns its prompt_id; ComfyUI's own message if it refuses the workflow."""
+    try:
+        res = requests.post(
+            f"http://{SERVER_ADDRESS}/prompt", json={"prompt": workflow, "client_id": client_id},
+            timeout=REQUEST_TIMEOUT_SECONDS,
+        )
+        body = res.json()
+    except (requests.exceptions.RequestException, ValueError) as e:
+        raise GenerationError(f"Error sending prompt to ComfyUI: {e}")
+    if "prompt_id" not in body:
+        error = body.get("error")
+        message = error.get("message", error) if isinstance(error, dict) else error
+        details = [
+            f"node {node}: {err.get('message', '')} {err.get('details', '')}".strip()
+            for node, info in (body.get("node_errors") or {}).items() for err in info.get("errors", [])
+        ]
+        raise GenerationError(f"ComfyUI rejected the workflow: {'; '.join([str(message or res.status_code)] + details)}")
+    return body["prompt_id"]
 
 
 def submit_workflow_and_wait(workflow: dict, client_id: str) -> str:
@@ -83,16 +109,18 @@ def submit_workflow_and_wait(workflow: dict, client_id: str) -> str:
     GenerationError if submission fails, ComfyUI reports an execution error,
     or the wait times out; returns the prompt_id on success.
     """
-    payload = {"prompt": workflow, "client_id": client_id}
-    try:
-        response = requests.post(f"http://{SERVER_ADDRESS}/prompt", json=payload).json()
-        prompt_id = response["prompt_id"]
-    except Exception as e:
-        raise GenerationError(f"Error sending prompt to ComfyUI: {e}")
-
     ws = websocket.WebSocket()
+    # Connected before the prompt is queued: a job that finishes at once (everything
+    # cached) would otherwise report its end before anyone is listening.
     try:
-        ws.connect(f"ws://{SERVER_ADDRESS}/ws?clientId={client_id}")
+        ws.connect(f"ws://{SERVER_ADDRESS}/ws?clientId={client_id}", timeout=REQUEST_TIMEOUT_SECONDS)
+    except (websocket.WebSocketException, OSError) as e:
+        ws.close()
+        raise GenerationError(
+            f"Cannot reach ComfyUI ({e}). ComfyUI may still be starting or has crashed. Please wait a moment and try again."
+        )
+    try:
+        prompt_id = _queue_prompt(workflow, client_id)
         deadline = time.time() + GENERATION_TIMEOUT_SECONDS
 
         while True:
@@ -104,7 +132,7 @@ def submit_workflow_and_wait(workflow: dict, client_id: str) -> str:
 
             # Re-armed every iteration to the time actually left, not the
             # full budget — a fixed settimeout(GENERATION_TIMEOUT_SECONDS)
-            # here would let recv() block for a fresh 120s on every message
+            # here would let recv() block for a fresh full timeout on every message
             # (e.g. a stream of ComfyUI "progress" events), so a job that
             # keeps sending *something* without ever finishing could stall
             # far past the documented timeout before the deadline check
@@ -157,15 +185,17 @@ def fetch_generated_image(prompt_id: str) -> str:
     history to a local path. Raises GenerationError if none is found.
     """
     try:
-        history = requests.get(f"http://{SERVER_ADDRESS}/history/{prompt_id}").json()
+        history = requests.get(f"http://{SERVER_ADDRESS}/history/{prompt_id}", timeout=REQUEST_TIMEOUT_SECONDS).json()
         outputs = history[prompt_id]["outputs"]
 
         for node_id in outputs:
             if "images" in outputs[node_id]:
                 img_data = outputs[node_id]["images"][0]
-                img_url = f"http://{SERVER_ADDRESS}/view?filename={img_data['filename']}&subfolder={img_data['subfolder']}&type={img_data['type']}"
+                query = urllib.parse.urlencode({k: img_data[k] for k in ("filename", "subfolder", "type")})
                 output_path = WORK_DIR / f"output_{prompt_id}.png"
-                urllib.request.urlretrieve(img_url, output_path)
+                res = requests.get(f"http://{SERVER_ADDRESS}/view?{query}", timeout=REQUEST_TIMEOUT_SECONDS)
+                res.raise_for_status()
+                output_path.write_bytes(res.content)
                 return str(output_path)
     except Exception as e:
         raise GenerationError(f"Error retrieving generated image: {e}")
