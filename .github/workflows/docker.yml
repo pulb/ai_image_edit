@@ -1,17 +1,23 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Builds deployments/docker/Dockerfile.qwen_image_edit_2511_aio (ComfyUI +
-# Qwen-Image-Edit 2511 AIO checkpoint and LoRAs) and pushes it to GHCR. The
-# checkpoint and LoRAs are baked into the image, so this runs only on manual
-# dispatch, not on pushes or tags.
-name: Build qwen_image_edit_2511_aio Docker image
+# Builds deployments/docker/Dockerfile (ComfyUI, PyTorch and the app, without
+# model weights, which the app downloads on first start) and pushes it to
+# GHCR. The app is installed from this commit.
+name: Build Docker image
 
 on:
-  workflow_dispatch:
+  push:
+    branches: [main]
+    tags: ["v*"]
+    paths:
+      - "deployments/docker/Dockerfile"
+      - "pyproject.toml"
+      - "src/**"
+  workflow_dispatch: {}
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}-qwen-image-edit-2511-aio
+  IMAGE_NAME: ${{ github.repository }}
 
 jobs:
   build-and-push:
@@ -20,7 +26,7 @@ jobs:
       contents: read
       packages: write
     steps:
-      # The weights plus PyTorch need far more than the runner's free disk.
+      # PyTorch with its CUDA libraries needs more than the runner's free disk.
       - name: Free disk space
         run: |
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
@@ -46,14 +52,21 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LC }}
           tags: |
-            type=raw,value=latest
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=ref,event=tag
             type=sha
 
-      # No layer cache: the huge weight layers would exceed the Actions cache.
+      # Only the Dockerfile is needed from the checkout: the app comes from
+      # GitHub at this commit, so the context is empty.
       - uses: docker/build-push-action@v6
         with:
-          context: .
-          file: deployments/docker/Dockerfile.qwen_image_edit_2511_aio
+          context: deployments/docker
+          file: deployments/docker/Dockerfile
           push: true
+          build-args: |
+            APP_REPO=${{ github.repository }}
+            APP_REF=${{ github.sha }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

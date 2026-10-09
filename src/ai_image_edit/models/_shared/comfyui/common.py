@@ -1,11 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Settings and helpers shared by the ComfyUI-based model backends."""
+"""Settings and helpers shared by the models' ComfyUI code."""
 import os
 from pathlib import Path
-
-# The main weights file of a backend, as a path relative to that backend's own
-# folder under ComfyUI's models/ directory. Set in the Dockerfile.
-MODEL_FILE_ENV = "MODEL_FILE"
 
 
 def configured_file(env_var: str, folder: Path) -> str:

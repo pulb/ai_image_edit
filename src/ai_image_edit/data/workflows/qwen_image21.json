@@ -1,0 +1,125 @@
+{
+  "format_version": 1,
+  "manifest": {
+    "model_name": "Qwen-Image 2.1",
+    "model_version": "bf16",
+    "required_nodes": ["QwenImage21Cache", "TextEncodeQwenImage21"],
+    "missing_nodes_hint": "use a ComfyUI version that supports Qwen-Image 2.1.",
+
+    "variants": {
+      "int8": {
+        "model_version": "int8",
+        "files": {
+          "1.unet_name": {"name": "qwen_image_2.1_int8_convrot.safetensors", "url": "https://huggingface.co/Comfy-Org/Qwen-Image-2.1/resolve/main/diffusion_models/qwen_image_2.1_int8_convrot.safetensors?download=true"},
+          "2.clip_name": {"name": "qwen3vl_8b_int8_convrot.safetensors", "url": "https://huggingface.co/Comfy-Org/Qwen-Image-2.1/resolve/main/text_encoders/qwen3vl_8b_int8_convrot.safetensors?download=true"}
+        }
+      }
+    },
+    "licenses": {
+      "qwen-research": {
+        "name": "Qwen RESEARCH LICENSE AGREEMENT (non-commercial)",
+        "url": "https://huggingface.co/Qwen/Qwen-Image-2.1/raw/main/LICENSE"
+      }
+    },
+    "files": [
+      {
+        "name": "qwen_image_2.1_bf16.safetensors", "license": "qwen-research",
+        "url": "https://huggingface.co/Comfy-Org/Qwen-Image-2.1/resolve/main/diffusion_models/qwen_image_2.1_bf16.safetensors?download=true",
+        "folder": "models/diffusion_models", "set": "1.unet_name"
+      },
+      {
+        "name": "qwen3vl_8b_bf16.safetensors", "license": "qwen-research",
+        "url": "https://huggingface.co/Comfy-Org/Qwen-Image-2.1/resolve/main/text_encoders/qwen3vl_8b_bf16.safetensors?download=true",
+        "folder": "models/text_encoders", "set": "2.clip_name"
+      },
+      {
+        "name": "qwen_image_2.1_vae_bf16.safetensors", "license": "qwen-research",
+        "url": "https://huggingface.co/Comfy-Org/Qwen-Image-2.1/resolve/main/vae/qwen_image_2.1_vae_bf16.safetensors?download=true",
+        "folder": "models/vae", "set": "3.vae_name"
+      }
+    ],
+
+    "bind": {
+      "prompt":          "5.prompt",
+      "negative_prompt": "5.negative_prompt",
+      "seed":            "6.seed",
+      "steps":           "6.steps",
+      "cfg":             "6.cfg",
+      "sampler":         "6.sampler_name",
+      "scheduler":       "6.scheduler"
+    },
+    "seed": {"min": 0, "max": 2147483647, "wrap": true},
+
+    "images": {
+      "source": "10.image",
+      "references": {"target": "5.images.image_{n}", "first_n": 2, "loader_id_start": 20, "max": 9}
+    },
+
+    "size": {"policy": "qwen21_tiers", "bind": {"resolution": "5.resolution"}},
+
+    "capabilities": {
+      "supports_inpainting": true,
+      "num_annotation_colors": 3,
+      "sampler": {"default": "euler"},
+      "scheduler": {"default": "simple"},
+      "steps": {"min": 8, "max": 60, "default": 40, "step": 1},
+      "cfg": {"min": 1.0, "max": 10.0, "default": 1.0, "step": 0.1}
+    }
+  },
+  "workflow": {
+    "1": {
+      "class_type": "UNETLoader",
+      "inputs": {"unet_name": "", "weight_dtype": "default"}
+    },
+    "2": {
+      "class_type": "CLIPLoader",
+      "inputs": {"clip_name": "", "type": "qwen_image", "device": "default"}
+    },
+    "3": {
+      "class_type": "VAELoader",
+      "inputs": {"vae_name": ""}
+    },
+    "4": {
+      "class_type": "QwenImage21Cache",
+      "inputs": {"model": ["1", 0], "device": "auto", "dtype": "default"}
+    },
+    "5": {
+      "class_type": "TextEncodeQwenImage21",
+      "inputs": {
+        "clip": ["2", 0],
+        "vae": ["3", 0],
+        "prompt": "",
+        "negative_prompt": "",
+        "resolution": 1024,
+        "images.image_1": ["10", 0]
+      }
+    },
+    "6": {
+      "class_type": "KSampler",
+      "inputs": {
+        "model": ["4", 0],
+        "positive": ["5", 0],
+        "negative": ["5", 1],
+        "latent_image": ["5", 2],
+        "seed": 0,
+        "steps": 40,
+        "cfg": 1,
+        "sampler_name": "euler",
+        "scheduler": "simple",
+        "denoise": 1
+      }
+    },
+    "7": {
+      "class_type": "VAEDecode",
+      "inputs": {"samples": ["6", 0], "vae": ["3", 0]}
+    },
+    "8": {
+      "class_type": "SaveImage",
+      "inputs": {"filename_prefix": "ComfyUI", "images": ["7", 0]}
+    },
+    "10": {
+      "class_type": "LoadImage",
+      "inputs": {"image": "", "upload": "image"}
+    }
+  }
+}

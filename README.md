@@ -2,7 +2,7 @@
 
 A comfortable, responsive, model-agnostic app for AI-assisted image editing
 and generation. It provides a web based UI optimized for mobile devices in
-front of a pluggable image-generation backend.
+front of interchangeable image-generation models.
 
 <p align="center">
   <br>
@@ -23,45 +23,30 @@ front of a pluggable image-generation backend.
 | Aspect ratios | Presets for common, widely used aspect ratios |
 | LoRAs | Optional LoRA support, auto-detected from a local loras folder |
 
-## Backends and frontends
+## Model workflows
 
-### Backends
+The models the app runs are interchangeable *model workflows*. You can select
+one of the included workflows or even write your own (see
+[Model workflows](doc/models.md)). The weights are downloaded when a model
+starts. These are included:
 
-Selected with `MODEL_BACKEND`. The [deployments](#deployments) are already
-preconfigured with the most suitable backend.
+- **`qwen_image21`** (default): Qwen-Image-2.1 in full quality, for GPUs with
+  plenty of memory.
+- **`qwen_image21_gguf`**: the same model, quantized, for GPUs with little
+  memory, at some cost in quality.
+- **`qwen_image_edit_2511_aio`**: Qwen-Image-Edit 2511 with a set of LoRAs, for
+  fast edits in just a few steps.
 
-- **`qwen_image21_gguf`** (default) — Qwen-Image-2.1 with quantized
-  [GGUF weights](https://huggingface.co/abenzerps/Qwen-Image-2.1-Uncensored-GGUF),
-  driven through ComfyUI. Meant for low-VRAM GPUs, on RunPod or in
-  self-hosted setups: it needs far less GPU memory than `qwen_image21`, at
-  some cost in quality. The weights are under the Qwen RESEARCH LICENSE
-  AGREEMENT (see [License](#license)).
-- **`qwen_image_edit_2511_aio`** — Qwen-Image-Edit 2511
-  ([Phr00t's AIO merge](https://huggingface.co/Phr00t/Qwen-Image-Edit-Rapid-AIO))
-  plus a curated set of LoRAs, driven through [ComfyUI](https://github.com/comfyanonymous/ComfyUI).
-- **`qwen_image21`** — a direct [diffusers](https://github.com/huggingface/diffusers)
-  pipeline for Qwen-Image-2.1. Needs the separately licensed
-  [`ai-image-edit-qwen`](https://github.com/pulb/ai_image_edit_qwen)
-  package (see [License](#license)).
-
-### Frontends
-
-Selected with `FRONTEND`. The [deployments](#deployments) are already
-preconfigured with the most suitable frontend.
-
-- **[NiceGUI](https://nicegui.io/)** (default) — the snappier frontend.
-- **[Gradio](https://www.gradio.app/)** — fallback frontend, required for
-  Hugging Face ZeroGPU.
-
-The UI is served on port `7860`.
+The [deployments](#deployments) are already preconfigured. More details about
+each workflow, its variants and licenses are in [doc/models.md](doc/models.md).
 
 ## Deployments
 
-| Target | Backend | Frontend | Guide |
-|---|---|---|---|
-| ⭐ **RunPod GPU Pod** (recommended) | `qwen_image21_gguf`, `qwen_image_edit_2511_aio`, `qwen_image21` (one image each) | NiceGUI only | [`deployments/runpod`](deployments/runpod/DEPLOY.md) |
-| Hugging Face Space | `qwen_image21` (ZeroGPU or paid GPU); on a paid GPU, any image as a Docker Space | Gradio (ZeroGPU), Gradio or NiceGUI (paid GPU) | [`deployments/huggingface`](deployments/huggingface/DEPLOY.md) |
-| Docker (self-hosted) | `qwen_image21_gguf`, `qwen_image_edit_2511_aio`, `qwen_image21` (one image each) | NiceGUI only | [`deployments/docker`](deployments/docker/DEPLOY.md) |
+| Target | Use case | Guide |
+|---|---|---|
+| ⭐ **RunPod GPU Pod** | Recommended: the most flexible option, supports all workflows and offers the best cost/performance ratio | [`deployments/runpod`](deployments/runpod/DEPLOY.md) |
+| **Hugging Face Space** | Alternative to RunPod if you already have a Hugging Face account; runs as a Docker Space on a paid GPU | [`deployments/huggingface`](deployments/huggingface/DEPLOY.md) |
+| **Docker** | Self-hosted, on your own machine with a GPU | [`deployments/docker`](deployments/docker/DEPLOY.md) |
 
 ## Generation times
 
@@ -71,7 +56,7 @@ and will vary with the step count and reference images.
 
 ### RunPod GPUs
 
-The `qwen_image21` backend (Qwen-Image-2.1) on the datacenter GPUs available on RunPod.
+The `qwen_image21` model (Qwen-Image-2.1) on the datacenter GPUs available on RunPod.
 
 | GPU | 1 MP | 2 MP |
 |---|---|---|
@@ -81,9 +66,9 @@ The `qwen_image21` backend (Qwen-Image-2.1) on the datacenter GPUs available on 
 
 ### Consumer hardware
 
-The `qwen_image21_gguf` backend with the default `uc-q4_k_m` image on GPUs you
+The `qwen_image21_gguf` model with the default `UC Q4_K_M` variant on GPUs you
 may have at home. The RTX 4090 figures were measured with
-`--highvram --disable-dynamic-vram` (see [Docker](deployments/docker/DEPLOY.md#comfyui-arguments-comfy_extra_args)),
+`--highvram --disable-dynamic-vram` (see [Docker](deployments/docker/DEPLOY.md#comfyui-arguments)),
 the RTX 2000 Ada figures without. `qwen_image21` does not fit on these GPUs.
 
 | GPU | 1 MP | 2 MP |
@@ -93,19 +78,17 @@ the RTX 2000 Ada figures without. `qwen_image21` does not fit on these GPUs.
 
 ## License
 
-Licensed under the GNU General Public License v3.0 or later
-(GPL-3.0-or-later). See [`LICENSE`](LICENSE) for the full text.
+The code in this repository is licensed under the GNU General Public License
+v3.0 or later (GPL-3.0-or-later). See [`LICENSE`](LICENSE) for the full text.
 
-The Qwen-Image-2.1 weights used by the `qwen_image21_gguf` backend are under the
-same agreement (non-commercial use only); the GGUF files are third-party
-conversions, and the default uncensored variant is a third-party modified version of the model.
+The third-party model and LoRA weights are not part of this repository and are
+not under the GPL. They are downloaded from their publishers when a model
+starts, and each has its own license. Check the licenses of the linked
+repositories before use.
 
-The `qwen_image21` backend depends on a separate package,
-[`ai-image-edit-qwen`](https://github.com/pulb/ai_image_edit_qwen), which
-is under the Qwen RESEARCH LICENSE AGREEMENT rather than the GPL, as are
-the Qwen-Image-2.1 weights it loads. That agreement allows non-commercial
-use (research or evaluation) only. This repository contains no code under
-that license.
+A model whose files carry a license that must be accepted is not downloaded
+until you accept it with `ACCEPT_LICENSES`; the error names the license and its
+URL. Custom nodes installed for a workflow keep their own licenses.
 
 Copyright (C) 2026 AI Image Edit authors
 

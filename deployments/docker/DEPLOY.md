@@ -1,15 +1,10 @@
 # Docker
 
-Three images, all built from the repo root. The app serves on port `7860`.
-Each image sets its own `MODEL_BACKEND` and uses `FRONTEND=nicegui`, so no
-backend or frontend configuration is needed: pick the backend by choosing the
-image.
-
-| Dockerfile | Backend | Frontend | Use |
-|---|---|---|---|
-| `Dockerfile.qwen_image21_gguf` | `qwen_image21_gguf` | `nicegui` | quantized Qwen-Image-2.1 run through ComfyUI, for low-VRAM GPUs |
-| `Dockerfile.qwen_image_edit_2511_aio` | `qwen_image_edit_2511_aio` | `nicegui` | all-in-one checkpoint run through ComfyUI |
-| `Dockerfile.qwen_image21` | `qwen_image21` | `nicegui` | diffusers pipeline, weights downloaded at startup |
+One image for every model, built from `deployments/docker/Dockerfile`. The app
+serves the NiceGUI UI on port `7860`. The image holds ComfyUI,
+PyTorch and the app, but no model weights: which model runs is chosen when the
+container starts, and any [workflow file](../../doc/contribution/workflow_files.md)
+of your own works too.
 
 ## Image storage
 
@@ -38,78 +33,84 @@ container's RAM limit.
 
 The app sits behind a password login when `APP_PASSWORD` is set (for example
 `-e APP_PASSWORD=...`), which protects the whole app, including the image
-files it serves. All images set `REQUIRE_PASSWORD=1` and refuse to start
-without it.
+files it serves. The image sets `REQUIRE_PASSWORD=1` and refuses to start
+without it; set `REQUIRE_PASSWORD` to an empty value to run without a password.
 
-With NiceGUI (the images' frontend), logins survive restarts as long as the
+Logins survive restarts as long as the
 password stays the same; changing it logs everyone out. Set
 `APP_STORAGE_SECRET` to a long random value to keep sessions independent of
-the password. A wrong password is delayed by one second. The Gradio frontend
-also honors `APP_PASSWORD` (any username, shared password), but every restart
-logs everyone out. Either way this is a single shared password without real rate
+the password. A wrong password is delayed by one second. This is a single shared password without real rate
 limiting. For stronger protection, don't expose the port and use an
 SSH tunnel or Tailscale.
 
-## qwen_image_edit_2511_aio image
+## Image (`Dockerfile`)
 
-Clones ComfyUI, installs PyTorch, downloads the model checkpoint and a set of
-LoRAs, then starts the app. The checkpoint is set by two variables near the top
-of the Dockerfile: `MODEL_FILE_URL` (where it is downloaded from) and
-`MODEL_FILE` (its path under ComfyUI's `models/checkpoints` folder).
-The app loads the file `MODEL_FILE` names and refuses to start if it
-is empty or the file does not exist.
-
-```bash
-docker build -f deployments/docker/Dockerfile.qwen_image_edit_2511_aio -t ai-image-edit .
-docker run -p 7860:7860 --gpus all --shm-size=640m -e APP_PASSWORD=... ai-image-edit
-```
-
-`.github/workflows/docker-qwen-image-edit-2511-aio.yml` builds the image on
-manual runs only and pushes `ghcr.io/<owner>/<repo>-qwen-image-edit-2511-aio`
-tagged `latest` and the short commit SHA.
-
-## qwen_image21_gguf image
-
-Qwen-Image-2.1 with quantized GGUF weights, run through ComfyUI and the
-[ComfyUI-GGUF](https://github.com/leejet/ComfyUI-GGUF) node, which needs far
-less GPU memory than the `qwen_image21` image. This backend and image are
-meant for low-VRAM GPUs, on RunPod or in self-hosted environments; the GPU
-needs at least 16 GB of VRAM. The weights are under the Qwen RESEARCH LICENSE
-AGREEMENT (non-commercial use only): keep the image and its registry package
-private. They are baked into the image; choose them with build arguments:
-
-| Build argument | Default | Meaning |
-|---|---|---|
-| `QWEN_GGUF_REPO` | `abenzerps/Qwen-Image-2.1-Uncensored-GGUF` | Hugging Face repo with the GGUF, text encoder and VAE files |
-| `QWEN_GGUF_UNCENSORED` | `1` | non-empty: third-party uncensored version; empty: the unmodified model |
-| `QWEN_GGUF_QUANT` | `Q4_K_M` | `Q4_0`, `Q4_K_M`, `Q5_K_M`, `Q6_K`, `Q8_0`, or `BF16` (uncensored only); larger is better and needs more memory |
-| `QWEN_TEXT_ENCODER_QUANT` | `int8_convrot` | `int8_convrot` (9.4 GB) or `bf16` (17.5 GB) |
+ComfyUI, PyTorch and the app, without model weights. Which model runs is
+chosen when the container starts, and its weights, LoRAs and custom nodes
+are fetched on first start as its workflow file lists them (see
+[Downloads](../../doc/contribution/workflow_files.md#downloads)). While that
+runs the app is already up and says what is being downloaded when you try to
+generate; ComfyUI starts when everything is there. Nothing is baked in, so the
+image is small and, as it contains no weights, can be public.
 
 ```bash
-docker build -f deployments/docker/Dockerfile.qwen_image21_gguf -t ai-image-edit-gguf .
-# unmodified model, Q8_0:
-docker build -f deployments/docker/Dockerfile.qwen_image21_gguf \
-    --build-arg QWEN_GGUF_UNCENSORED= --build-arg QWEN_GGUF_QUANT=Q8_0 -t ai-image-edit-gguf .
-docker run -p 7860:7860 --gpus all --shm-size=640m -e APP_PASSWORD=... ai-image-edit-gguf
+docker build -f deployments/docker/Dockerfile -t ai-image-edit deployments/docker
+docker run -p 7860:7860 --gpus all --shm-size=640m \
+    -v ai-image-edit-models:/home/user/app/models \
+    -e APP_PASSWORD=... -e ACCEPT_LICENSES=qwen-research ai-image-edit
 ```
 
-The image sets `MODEL_FILE`, `TEXT_ENCODER_FILE` and `VAE_FILE` (paths under
-ComfyUI's `models/diffusion_models`, `models/text_encoders` and `models/vae`)
-to the files it downloaded; override them to use other files that exist in
-the container. `COMFY_GENERATION_TIMEOUT` (seconds, default 600 here) is
-for slow GPUs.
+| Variable | Meaning |
+|---|---|
+| `MODEL_WORKFLOW` | Model workflow: `qwen_image21` (default; the official bf16 weights, variant `int8`; needs a large GPU), `qwen_image21_gguf` (quantized, for smaller GPUs) or `qwen_image_edit_2511_aio`. A path to a workflow file in the container (mount it) runs that file instead. |
+| `MODEL_VARIANT` | Variant of the model, e.g. `Q8_0` for `qwen_image21_gguf` (`Q4_0`, `Q4_K_M` (default), `Q5_K_M`, `Q6_K`, `Q8_0`, `BF16`: the uncensored third-party version; `standard-Q4_0` to `standard-Q8_0`: the unmodified model). Larger is better and needs more memory. |
+| `ACCEPT_LICENSES` | Licenses you accept, comma-separated (`all` for every one). A model whose files have a license is not downloaded without it; the error names the license and its URL. `qwen_image21_gguf` needs `qwen-research`. |
+| `DOWNLOAD_CONNECTIONS` | Parts of a file downloaded at once (default 8, at most 32). |
+| `HF_TOKEN` | Hugging Face token, if a file needs a login. Sent to Hugging Face only. |
 
-### ComfyUI arguments (`COMFY_EXTRA_ARGS`)
+The same can be given as arguments: `docker run ... ai-image-edit python -m
+ai_image_edit --workflow qwen_image21_gguf --variant Q8_0`.
 
-Set `COMFY_EXTRA_ARGS` at run time to pass arguments to ComfyUI, for example
-`-e COMFY_EXTRA_ARGS="--highvram --disable-dynamic-vram"`. The variable also
-applies to the `qwen_image_edit_2511_aio` image, but the advice below was
-tested only with this one:
+The model folders are below `/home/user/app/models`. **Mount a volume there**
+(as above), or the weights (about 15 GB for `qwen_image21_gguf`) are
+downloaded again by every new container. Any other location works the same
+way: it is just the volume you mount. `MODEL_FILE`, `TEXT_ENCODER_FILE` and
+`VAE_FILE` (paths under `models/diffusion_models`, `models/text_encoders`
+and `models/vae`) can still name other files that exist in the container
+instead of the ones from the workflow file; set `MODEL_VERSION` to label them.
+`COMFY_GENERATION_TIMEOUT` (seconds, default 600) is for slow GPUs.
+
+The GPU needs at least 16 GB of VRAM for `qwen_image21_gguf`. `qwen_image21` with the bf16 weights needs far more; it was tested on an A100, and `MODEL_VARIANT=int8` uses less.
+
+The Qwen-Image-2.1 weights are under the Qwen RESEARCH LICENSE AGREEMENT
+(non-commercial use only), which is why they are not in the image and why you
+accept it with `ACCEPT_LICENSES` when you run it.
+
+Build arguments: `APP_REPO` and `APP_REF` (where the app is installed from:
+`pulb/ai_image_edit` at `main` by default; the image is not built from the
+build context, so to try a change, push it to a branch and pass its name),
+`COMFYUI_REF`, and the PyTorch versions.
+
+### ComfyUI arguments
+
+At start-up the app reads the free GPU memory (`nvidia-smi`) and compares it
+with the size of the model files on disk plus a headroom of 6 GB for the
+generation itself (a workflow can change it with `vram_headroom_gb`). If the
+memory is sufficient, ComfyUI is started with `--highvram --disable-dynamic-vram`
+so the weights stay on the GPU, which saves roughly 10-15 s per generation.
+Otherwise it gets no extra arguments. The decision and its reason are printed
+to the log (`ComfyUI arguments: ...`). The 6 GB is an estimate, not a
+measurement.
+
+Set `COMFY_EXTRA_ARGS` at run time to override this, for example
+`-e COMFY_EXTRA_ARGS="--lowvram"`. If the variable is set, even to an empty
+value, its arguments are used as they are and nothing is chosen automatically.
+The advice below was tested only with `qwen_image21_gguf`:
 
 | Arguments | Use when |
 |---|---|
 | `--lowvram` | The GPU has little memory (about 8 GB or less). |
-| `--highvram --disable-dynamic-vram` | The GPU has about 24 GB or more (estimate; see below). By default ComfyUI re-stages the text encoder for every new prompt, which added roughly 10-15 s per generation in our tests; with these flags the weights stay on the GPU and generation time matches the Diffusers-based backend. `--disable-dynamic-vram` is deprecated in ComfyUI and will be removed. |
+| `--highvram --disable-dynamic-vram` | The GPU has about 24 GB or more (estimate; see below). By default ComfyUI re-stages the text encoder for every new prompt, which added roughly 10-15 s per generation in our tests; with these flags the weights stay on the GPU. `--disable-dynamic-vram` is deprecated in ComfyUI and will be removed. |
 | `--disable-comfy-compiler` | Sampling appears to hang on the first step. |
 
 The weights that `--highvram` keeps resident add up to about 14 GB with the
@@ -123,47 +124,17 @@ If you want to try the flags on a smaller GPU, check the peak with
 
 ### Pinned versions
 
-ComfyUI (`COMFYUI_REF`) and ComfyUI-GGUF (`COMFYUI_GGUF_REF`) are pinned to
-tested commits. ComfyUI-GGUF is also patched at build time
-(`patches/comfyui_gguf_input_act.py`): ComfyUI 0.39 passes new keyword
+ComfyUI (`COMFYUI_REF`) is pinned to a tested commit. Custom nodes are pinned
+in the workflow files: `qwen_image21_gguf` installs the
+[ComfyUI-GGUF](https://github.com/pulb/ComfyUI-GGUF) fork at an exact commit,
+which fixes an incompatibility with ComfyUI 0.39 (it passes new keyword
 arguments such as `input_act` to every Linear layer, which upstream does not
-accept yet. The build fails if the patch no longer applies.
+accept yet).
 
 ### CI build
 
-`.github/workflows/docker-qwen-image21-gguf.yml` builds the image (about
-15 GB with its weights) on manual runs, where quantization, uncensored or
-unmodified model and text encoder precision are inputs, and on `v*` tags. It
-pushes `ghcr.io/<owner>/<repo>-qwen-image21-gguf` tagged with the variant, for
-example `uc-q4_k_m`.
-
-## qwen_image21 image
-
-Diffusers pipeline with the weights downloaded from the Hugging Face Hub at
-startup (no ComfyUI). It installs the separately licensed
-[`ai-image-edit-qwen`](https://github.com/pulb/ai_image_edit_qwen) package, so
-it combines GPL and Qwen-licensed code: keep it private (see the
-[License](../../README.md#license) section).
-
-The GPU needs at least 48 GB of VRAM.
-
-```bash
-docker build -f deployments/docker/Dockerfile.qwen_image21 -t ai-image-edit-qwen .
-docker run -p 7860:7860 --gpus all --shm-size=640m -e APP_PASSWORD=... ai-image-edit-qwen
-```
-
-`--build-arg QWEN_LIB_REF=<branch|tag|commit>` pins the package version
-(default `main`).
-
-Optional environment variables: `HF_TOKEN` (gated weights or a private AOTI
-repo), `QWEN21_AOTI` / `QWEN21_AOTI_REPO` (see
-`src/ai_image_edit/models/qwen_image21/model.py`), `HF_HUB_CACHE`. Point
-`HF_HUB_CACHE` at a volume so the multi-GB weights download once instead of on
-every fresh container.
-
-`.github/workflows/docker-qwen-image21.yml` builds the image on every push to
-`main` that touches the relevant files, on `v*` tags, and on manual runs. It
-pushes `ghcr.io/<owner>/<repo>-qwen-image21` tagged `latest`, the git tag and
-the short commit SHA. Each build uses the newest commit of
-`ai-image-edit-qwen`, resolved when the build starts. Pushes to that package's
-repo don't trigger a build: run the workflow manually to pick them up.
+`.github/workflows/docker.yml` builds the image on pushes to `main` that touch
+the Dockerfile, `pyproject.toml` or `src/`, on `v*` tags and on manual runs. It
+installs the app from the commit it was started for and pushes
+`ghcr.io/<owner>/<repo>` tagged `latest`, the git tag and the short commit
+SHA.

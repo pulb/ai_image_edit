@@ -69,12 +69,12 @@ def cached_infer(
     **derived: Any,
 ) -> Callable[[str], str]:
     """
-    Wraps a backend's infer callback (model input path -> raw output path).
+    Wraps a model's infer callback (model input path -> raw output path).
     The key covers the model, the pixels of the model input image and of the
     reference images, every other GenerationParams field except _NOT_KEYED
-    (so a new parameter is covered automatically; a field the backend does
+    (so a new parameter is covered automatically; a field the model does
     not use at worst causes an extra miss), and `derived`: values the
-    backend computed from params, such as the resolved seed and the final
+    model computed from params, such as the resolved seed and the final
     width and height. The mask is not part of the key: it only affects
     compositing, after inference.
     """

@@ -4,7 +4,7 @@ Shared filesystem/URL plumbing for the app's runtime working directory.
 
 Owned by the UI/app layer, not by any model: it answers "where do
 generated/uploaded files live so the browser can load them", which model
-backends are simply handed plain local paths for and never need a URL
+models are simply handed plain local paths for and never need a URL
 scheme for.
 """
 import os
@@ -12,8 +12,7 @@ import shutil
 from pathlib import Path
 
 # Where uploaded, generated, and composited images live for the lifetime of
-# the process. Shared by both frontends (gradio_ui.py exposes it through
-# allowed_paths=[str(WORK_DIR)]). Served to the browser at /files/<name>
+# the process. Served to the browser at /files/<name>
 # (see frontends/nicegui.py's app.add_static_files) so client-side
 # <canvas>/<img> elements can load them by URL. This also doubles as the
 # single source of truth for "what's the current result" — see

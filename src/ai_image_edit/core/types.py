@@ -1,7 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """
-Data contracts shared between the UI layer (frontends/nicegui.py,
-frontends/gradio_ui.py) and every model backend under models/. Deliberately
+Data contracts shared between the UI layer (frontends/nicegui.py) and every model under models/. Deliberately
 dependency-free of both frontends/ and models/, so neither side ever needs
 to import from the other.
 """
@@ -27,7 +26,7 @@ class RangeSpec:
 # The "derive the output size from the source image" aspect ratio label.
 ORIGINAL_ASPECT_RATIO = "Original"
 
-# The seed both frontends start with.
+# The seed the frontend starts with.
 DEFAULT_SEED = 65454653
 
 # Inpainting mask edge softness (Gaussian blur radius), shared by the
@@ -38,8 +37,8 @@ FEATHER_RANGE = RangeSpec(0, 16, 3, step=1)
 @dataclass(frozen=True)
 class ModelCapabilities:
     """
-    What a model backend supports, declared by the model itself. The UI
-    reads this once (via ModelBackend.capabilities) to decide which
+    What a model supports, declared by the model itself. The UI
+    reads this once (via Model.capabilities) to decide which
     controls to render, instead of hardcoding assumptions about any one
     model — e.g. how many reference-image upload boxes to draw, whether to
     show the LoRA panel, or which sampler/scheduler/aspect-ratio/resolution
@@ -104,7 +103,7 @@ class ModelCapabilities:
 @dataclass
 class GenerationParams:
     """
-    Bundles every input a model backend's generate() needs for one
+    Bundles every input a model's generate() needs for one
     generation. Some fields are meaningless for a given model (e.g. cfg
     for a model whose capabilities.supports_cfg is False) — the model
     ignores what it doesn't use, and the UI only renders/sets a field when
@@ -149,7 +148,7 @@ class GenerationParams:
 
 @dataclass
 class GenerationResult:
-    """What a model backend's generate() hands back to the UI."""
+    """What a model's generate() hands back to the UI."""
 
     before_path: str
     after_path: str

@@ -13,29 +13,21 @@ license-files = ["LICENSE"]
 dependencies = [
     "numpy",
     "pillow",
-]
-
-[project.optional-dependencies]
-# Backends (MODEL_BACKEND)
-qwen_image_backend = [
-    # Separately licensed (Qwen RESEARCH LICENSE AGREEMENT); brings diffusers,
-    # transformers, accelerate, torchvision and `spaces`. torch is assumed to
-    # be installed already.
-    "ai-image-edit-qwen @ git+https://github.com/pulb/ai_image_edit_qwen",
-]
-comfy_backend = [
+    "nicegui==3.18.0",
     "requests",
     "websocket-client",
     "sentencepiece",
     "transformers",
 ]
-# Frontends (FRONTEND)
-nicegui_frontend = ["nicegui==3.18.0"]
-gradio_frontend = ["gradio"]
+
+[project.optional-dependencies]
+# Tests (see AGENTS.md)
+test = ["jsonschema"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.setuptools.package-data]
-"ai_image_edit.models.qwen_image_edit_2511_aio" = ["workflow_api.json"]
-"ai_image_edit.models.qwen_image21_gguf" = ["workflow_api.json"]
+# The workflow files and their JSON Schema are installed with the app.
+"ai_image_edit" = ["data/*.json", "data/workflows/*.json"]
+

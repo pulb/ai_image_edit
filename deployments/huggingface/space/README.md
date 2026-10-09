@@ -3,10 +3,9 @@ title: AI Image Edit
 emoji: 🎨
 colorFrom: indigo
 colorTo: purple
-sdk: gradio
+sdk: docker
+app_port: 7860
 pinned: true
-sdk_version: 6.29.1
-python_version: '3.12'
 ---
 
 Check out the configuration reference at https://huggingface.co/docs/hub/spaces-config-reference

@@ -1,64 +1,33 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """
-Registry + factory for model backends.
+Finding and building models.
 
-Each model's module is imported lazily, inside its loader function, rather
-than at the top of this file. That matters concretely here:
-the ComfyUI backends (qwen_image_edit_2511_aio, qwen_image21_gguf) and
-qwen_image21 have almost disjoint dependency sets (ComfyUI's own stack vs. the
-separately installed ai-image-edit-qwen package with torch/diffusers/spaces),
-and a given deployment only ever runs one of them. Importing all eagerly at
-package load would mean a comfy-only deployment breaks at startup unless it
-*also* installs diffusers/spaces/torch, and vice versa — with lazy imports,
-each deployment only needs the one model it actually selected to be installed.
-
-Add a new model by writing a class that implements ModelBackend
-(models/base.py) and adding one small loader function + one line in
-MODEL_LOADERS — nothing else in the app needs to change.
+Every model is a workflow file (see doc/contribution/workflow_files.md). The
+ones in ai_image_edit/data/workflows/ ship with the app and are picked up
+automatically, under the file's name; any other file can be run by its path.
 """
-from typing import Callable, Dict
+from pathlib import Path
+from typing import Optional
 
-from ai_image_edit.models.base import ModelBackend
-
-
-def _load_qwen_image_edit_2511_aio() -> ModelBackend:
-    from ai_image_edit.models.qwen_image_edit_2511_aio import QwenImageEdit2511AIOModel
-
-    return QwenImageEdit2511AIOModel()
+from ai_image_edit.models.base import Model
+from ai_image_edit.models._shared.comfyui.workflow_files import available_workflows
 
 
-def _load_qwen_image21_gguf() -> ModelBackend:
-    from ai_image_edit.models.qwen_image21_gguf import QwenImage21GGUFModel
+def get_model(workflow: str, variant: Optional[str] = None) -> Model:
+    """The model of a bundled workflow (by name) or of a workflow file (by path).
 
-    return QwenImage21GGUFModel()
-
-
-def _load_qwen_image21() -> ModelBackend:
-    try:
-        from ai_image_edit.models.qwen_image21 import QwenImage21Model
-    except ModuleNotFoundError as exc:
-        if (exc.name or "").split(".")[0] != "ai_image_edit_qwen":
-            raise
-        raise RuntimeError(
-            "Backend 'qwen_image21' needs the ai-image-edit-qwen package: "
-            "pip install git+https://github.com/pulb/ai_image_edit_qwen"
-        ) from exc
-
-    return QwenImage21Model()
-
-
-MODEL_LOADERS: Dict[str, Callable[[], ModelBackend]] = {
-    "qwen_image_edit_2511_aio": _load_qwen_image_edit_2511_aio,
-    "qwen_image21_gguf": _load_qwen_image21_gguf,
-    "qwen_image21": _load_qwen_image21,
-}
-
-
-def get_model(name: str) -> ModelBackend:
-    try:
-        loader = MODEL_LOADERS[name]
-    except KeyError:
+    `variant` selects one of the workflow's variants.
+    """
+    bundled = available_workflows()
+    if workflow in bundled:
+        path = bundled[workflow]
+    elif Path(workflow).is_file():
+        path = Path(workflow)
+    else:
         raise ValueError(
-            f"Unknown model backend '{name}'. Available: {', '.join(sorted(MODEL_LOADERS))}"
+            f"Unknown workflow '{workflow}'. Available: {', '.join(sorted(bundled))}; "
+            "or give the path of a workflow file."
         )
-    return loader()
+    from ai_image_edit.models._shared.comfyui.workflow_model import ComfyWorkflowModel
+
+    return ComfyWorkflowModel.from_file(path, variant)

@@ -40,66 +40,59 @@ Rules for any AI coding agent working in this repository.
   naming that state and nothing else, e.g. `git hook: you have uncommitted
   changes`, `git hook: you have untracked files`, `git hook: you have
   unpushed commits`. Do not commit, push, or amend in response.
-- When making any change, check whether it also applies to the qwen_image21
-  backend repository (`ai_image_edit_qwen`,
-  https://github.com/pulb/ai_image_edit_qwen) — interface, naming,
-  packaging, docs or workflow changes may need a matching change there.
 
 ## Project conventions
 
 - **Package layout**: the app is the `ai_image_edit` package under
   `src/` (`app.py`, `core/`, `frontends/`, `models/`), started with
   `python -m ai_image_edit`. Imports are absolute (`from ai_image_edit.core
-  import …`). Dependencies live in `pyproject.toml`: `numpy` and `pillow`
-  as core, the rest as extras named `<name>_backend` / `<name>_frontend`.
-  Adding a backend or frontend means adding its extra there.
-- **Frontend contract**: each module under `frontends/` exposes a single
-  entry point, `run(model: ModelBackend) -> None`. The model is passed
-  as a plain argument — no shared mutable module state. The UI shows
-  `model.display_name`. Register a new frontend in
-  `frontends/__init__.py`'s `FRONTEND_LOADERS`.
-- **Model contract**: each backend under `models/` implements the
-  `ModelBackend` interface (`models/base.py`): `capabilities`, `start()`,
-  `generate()`, with `shutdown()`, `list_loras()`, `model_name` and
-  `model_version` optional. Register a
-  new backend in `models/__init__.py`'s `MODEL_LOADERS`.
-- **Lazy model imports**: `models/__init__.py` imports each backend's
-  module lazily, inside its loader function, not at module top level.
-  The shipped backends (`qwen_image21` vs. the ComfyUI-based
-  `qwen_image_edit_2511_aio` and `qwen_image21_gguf`) have almost disjoint
-  dependency sets, and a given deployment only installs one stack — keep new backends lazy-imported
-  the same way. The
-  `qwen_image21` loader turns a missing `ai_image_edit_qwen` package into an
-  install hint and re-raises any other import error unchanged.
-- **Qwen-licensed code**: the Qwen-Image-2.1 pipeline and AOTI kernels live
-  in the separate `ai_image_edit_qwen` package
-  (https://github.com/pulb/ai_image_edit_qwen) under the Qwen Research
-  License, not the GPL. `src/ai_image_edit/models/qwen_image21/model.py` only imports it.
-  Never copy Qwen-licensed or Space-derived code into this repo.
-- **ComfyUI backends**: `models/_shared/comfyui/` holds what the ComfyUI-based
-  backends share (`client.py`, `common.py`). Each backend's main weights file
-  is named by the `MODEL_FILE` environment variable (a path relative to its
-  folder under ComfyUI's `models/`), set in the backend's Dockerfile.
+  import …`). Dependencies live in `pyproject.toml`: everything the app
+  needs (including NiceGUI and the ComfyUI client) is a regular dependency, and
+  `test` is the only extra.
+- **Frontend contract**: the UI, `frontends/nicegui.py`, exposes a single
+  entry point, `run(model: Model) -> None`, which `frontends/__init__.py`'s
+  `run_frontend()` calls. The model is passed as a plain argument — no shared
+  mutable module state. The UI shows `model.display_name`.
+- **Model contract**: the UI talks to a model through the `Model` interface
+  (`models/base.py`): `capabilities`, `start()`, `generate()`, with
+  `shutdown()`, `list_loras()`, `model_name` and `model_version` optional.
+  Every model is a workflow file, run by `ComfyWorkflowModel`;
+  `models/__init__.py`'s `get_model()` finds it by bundled name or by path.
+- **Qwen-licensed code**: no code under the Qwen Research License lives in
+  this repo; the Qwen-Image-2.1 weights are only downloaded, under their own
+  license. Never copy Qwen-licensed code into this repo.
+- **Models are data**: a model is one JSON file in
+  `src/ai_image_edit/data/workflows/` (`format_version`, `manifest`, `workflow`; package
+  data, installed with the app), run by the generic
+  `ComfyWorkflowModel` (`models/_shared/comfyui/workflow_model.py`); there is
+  no per-model Python class. `get_model()` finds every file there
+  by its name. The format is documented in
+  `doc/contribution/workflow_files.md` and defined by `src/ai_image_edit/data/workflow.schema.json`.
+  Output-size schemes are `size_policies.py`; a model with a new one adds a
+  policy class there.
+- **ComfyUI code**: `models/_shared/comfyui/` holds what the models
+  share (`client.py`, `common.py`, `downloads.py`). Weight files are
+  listed in the workflow file's `files` and downloaded when missing; an
+  environment variable such as `MODEL_FILE` can point to a local file instead.
   Qwen-Image-2.1 output sizes shared by `qwen_image21` and `qwen_image21_gguf`
   live in `models/_shared/qwen21_size.py`.
-- **Shared code**: helpers used by several backends or frontends live in
+- **Shared code**: helpers used by several models or frontends live in
   `_shared/` packages (`models/_shared/`, `frontends/_shared/`). The contracts
-  and registries (`models/base.py`, `models/__init__.py`,
+  and entry points (`models/base.py`, `models/__init__.py`,
   `frontends/__init__.py`) stay at the top level of their package.
-- **Default backend**: `src/ai_image_edit/app.py` defaults `MODEL_BACKEND` to
-  `qwen_image21_gguf`; each `deployments/docker/Dockerfile.*` sets
-  `MODEL_BACKEND` explicitly.
+- **Default model**: `src/ai_image_edit/app.py` defaults `--workflow`/`MODEL_WORKFLOW` to
+  `qwen_image21`; the `Dockerfile` leaves the default.
 - **Masking**: masked generation (crop → infer → composite/color-correct)
   is handled externally via `core/imaging.py`'s `run_masked_generation()`,
-  shared by every backend that supports inpainting. A model backend does
+  shared by every model that supports inpainting. A model does
   not need its own mask-blending logic; it only needs to accept a
   (possibly cropped) source path and hand back a result path.
 - **Working directory**: generated/uploaded/composited files live under
-  `core/paths.py`'s `WORK_DIR`, shared by both frontends, served to the
+  `core/paths.py`'s `WORK_DIR`, served to the
   browser at `/files/<name>`. It defaults to a folder under `/dev/shm`
   (RAM-backed), is overridable with `AI_IMAGE_EDIT_WORK_DIR`, and is capped by
-  `AI_IMAGE_EDIT_WORK_MAX_SIZE` through `trim_work_dir()`. The ComfyUI backend
-  keeps its input/output/temp folders under it too.
+  `AI_IMAGE_EDIT_WORK_MAX_SIZE` through `trim_work_dir()`. ComfyUI keeps
+  its input/output/temp folders under it too.
 - **License headers**: this project is GPL-3.0-or-later. Every source
   file starts with `# SPDX-License-Identifier: GPL-3.0-or-later` (or the
   file-format-appropriate comment syntax) as its very first line, before
@@ -111,5 +104,10 @@ Rules for any AI coding agent working in this repository.
   (`python -m py_compile <file>` or `ast.parse`) — several files start
   with a header comment followed immediately by a module docstring, and
   it's easy to break that pairing with a careless insertion.
-- There is no automated test suite in this repo yet; sanity-check changes
+- The models have tests (`tests/`, no GPU or ComfyUI needed):
+  `PYTHONPATH=src python -m unittest discover -s tests`. They load every
+  workflow file and check it against the JSON Schema and the code
+  that runs it (the schema tests need `pip install jsonschema`). Run them after touching
+  `models/_shared/comfyui/`, the schema or a workflow file.
+- There is no other automated test suite in this repo yet; sanity-check changes
   by reading the affected code paths end to end rather than assuming.

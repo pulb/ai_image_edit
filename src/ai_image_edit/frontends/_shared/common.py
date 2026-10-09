@@ -5,7 +5,7 @@ from typing import List, Optional, Sequence
 from ai_image_edit.core.errors import GenerationError
 from ai_image_edit.core.types import GenerationParams, ModelCapabilities
 
-# This app's one accent colour: both frontends read their purple from here.
+# This app's one accent colour: the frontend reads its purple from here.
 PRIMARY_COLOR = "#7c3aed"
 
 # Newest work-dir files trim_work_dir() never deletes: the files of the
@@ -57,7 +57,7 @@ def params_from_ui(
 
     cfg and lora_strength fall back to the capability's own declared
     default (not a bare 0.0) when unsupported: every model's cfg_range and
-    lora_strength_range starts above 0, and neither model backend currently
+    lora_strength_range starts above 0, and no model currently
     guards its use of params.cfg/params.lora_strength behind
     supports_cfg/supports_loras, so a bare 0.0 would silently fall outside
     a future such model's valid range.
