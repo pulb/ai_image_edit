@@ -2,7 +2,7 @@
 # One image for every ComfyUI-based model (the workflow files under
 # ai_image_edit/data/workflows/). It contains ComfyUI, PyTorch and the app,
 # but no model weights: the model is chosen when the container starts
-# (MODEL_BACKEND, MODEL_VARIANT, or a workflow file of your own), and its
+# (MODEL_WORKFLOW, MODEL_VARIANT, or a workflow file of your own), and its
 # weights, LoRAs and custom nodes are fetched on first start, as its workflow
 # file lists them. Mount a volume at /home/user/app/models to keep the weights
 # between containers.
@@ -78,6 +78,6 @@ RUN pip install --no-cache-dir \
 
 EXPOSE 7860
 
-# MODEL_BACKEND (default qwen_image21_gguf), MODEL_VARIANT, WORKFLOW_FILE and
+# MODEL_WORKFLOW (default qwen_image21), MODEL_VARIANT, WORKFLOW_FILE and
 # FRONTEND (default nicegui) are read from the environment.
 CMD ["python", "-m", "ai_image_edit"]

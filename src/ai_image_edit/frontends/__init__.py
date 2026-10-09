@@ -16,7 +16,7 @@ model. Importing a frontend module does nothing by itself; run_frontend()
 below imports the chosen module and calls its run() with the already-built
 model, so app.py doesn't need to know any of that — it just
 picks a name by FRONTEND, the same way models/__init__.py's get_model()
-picks one by MODEL_BACKEND.
+picks one by MODEL_WORKFLOW.
 
 Model selection also happens once, in app.py's main(), rather than each frontend
 module building its own model — run_frontend() takes the already-built

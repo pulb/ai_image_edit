@@ -9,10 +9,10 @@ works with any backend. You only need to replace its container image with
 your own and, if your registry is private, add registry credentials (see
 [Pod setup](#pod-setup)).
 
-| Backend (`MODEL_BACKEND`) | Weights |
+| Model workflow (`MODEL_WORKFLOW`) | Weights |
 |---|---|
-| `qwen_image21_gguf` (default) | downloaded on first start |
-| `qwen_image21` | downloaded on first start |
+| `qwen_image21` (default) | downloaded on first start |
+| `qwen_image21_gguf` | downloaded on first start |
 | `qwen_image_edit_2511_aio` | downloaded on first start |
 
 Environment variables, including the ComfyUI arguments for each GPU size, are
@@ -23,8 +23,8 @@ the image.
 ## Pod setup
 
 1. Create a Pod from the image, exposing HTTP port `7860`, e.g.
-   `ghcr.io/<owner>/<repo>:latest`. Select the model with `MODEL_BACKEND` and
-   accept the weights' license with `ACCEPT_LICENSES=qwen-research` (for the
+   `ghcr.io/<owner>/<repo>:latest`. The default is `qwen_image21`; select another with
+   `MODEL_WORKFLOW`. Accept the weights' license with `ACCEPT_LICENSES=qwen-research` (for the
    Qwen-Image-2.1 backends). Choose one of the GPUs the template recommends
    that has enough memory: at least 48 GB of VRAM for `qwen_image21`, at least
    16 GB for `qwen_image21_gguf`.

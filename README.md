@@ -27,16 +27,16 @@ front of a pluggable image-generation backend.
 
 ### Backends
 
-Selected with `--model NAME` or the `MODEL_BACKEND` variable (`--list-models` prints the names). `--workflow FILE` (or `WORKFLOW_FILE`) runs any [workflow file](doc/contribution/workflow_files.md) instead, and `--variant ID` (`MODEL_VARIANT`) picks one of its variants, e.g. another GGUF quantization. The [deployments](#deployment) are already
+Selected with `--model NAME` or the `MODEL_WORKFLOW` variable (`--list-models` prints the names). `--workflow FILE` (or `WORKFLOW_FILE`) runs any [workflow file](doc/contribution/workflow_files.md) instead, and `--variant ID` (`MODEL_VARIANT`) picks one of its variants, e.g. another GGUF quantization. The [deployments](#deployment) are already
 preconfigured with the most suitable backend.
 
-- **`qwen_image21_gguf`** (default) — Qwen-Image-2.1 with quantized
+- **`qwen_image21_gguf`** — Qwen-Image-2.1 with quantized
   [GGUF weights](https://huggingface.co/abenzerps/Qwen-Image-2.1-Uncensored-GGUF),
   driven through ComfyUI. Meant for low-VRAM GPUs, on RunPod or in
   self-hosted setups: it needs far less GPU memory than `qwen_image21`, at
   some cost in quality. The weights are under the Qwen RESEARCH LICENSE
   AGREEMENT (see [License](#license)).
-- **`qwen_image21`** — Qwen-Image-2.1 with the
+- **`qwen_image21`** (default) — Qwen-Image-2.1 with the
   [official ComfyUI weights](https://huggingface.co/Comfy-Org/Qwen-Image-2.1)
   (bf16, or `--variant int8`), driven through ComfyUI. The unquantized
   counterpart of `qwen_image21_gguf`, for GPUs with plenty of memory. The

@@ -16,7 +16,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# Backends (MODEL_BACKEND)
+# Backends (MODEL_WORKFLOW)
 comfy_backend = [
     "requests",
     "websocket-client",

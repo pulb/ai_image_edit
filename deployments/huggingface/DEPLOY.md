@@ -19,8 +19,8 @@ ComfyUI process, which needs a regular GPU. The UI is served on port `7860`.
    app_port: 7860
    ---
    ```
-3. Under **Settings → Variables and secrets** set `MODEL_BACKEND` and
-   `ACCEPT_LICENSES` (e.g. `qwen-research`), plus any optional variable from
+3. Under **Settings → Variables and secrets** set `ACCEPT_LICENSES` (e.g. `qwen-research`) and, to
+   change the model from the default `qwen_image21`, `MODEL_WORKFLOW`, plus any optional variable from
    [Docker](../docker/DEPLOY.md). The weights download on first start.
 
 The Space runs without a password login: don't set `APP_PASSWORD`. Access is

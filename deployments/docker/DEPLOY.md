@@ -64,7 +64,7 @@ docker run -p 7860:7860 --gpus all --shm-size=640m \
 
 | Variable | Meaning |
 |---|---|
-| `MODEL_BACKEND` | Model: `qwen_image21_gguf` (default), `qwen_image21` (the official bf16 weights; variant `int8`) or `qwen_image_edit_2511_aio`. |
+| `MODEL_WORKFLOW` | Model workflow: `qwen_image21` (default; the official bf16 weights, variant `int8`; needs a large GPU), `qwen_image21_gguf` (quantized, for smaller GPUs) or `qwen_image_edit_2511_aio`. |
 | `MODEL_VARIANT` | Variant of the model, e.g. `Q8_0` for `qwen_image21_gguf` (`Q4_0`, `Q4_K_M` (default), `Q5_K_M`, `Q6_K`, `Q8_0`, `BF16`: the uncensored third-party version; `standard-Q4_0` to `standard-Q8_0`: the unmodified model). Larger is better and needs more memory. |
 | `WORKFLOW_FILE` | Path of a workflow file in the container to run instead (mount it). |
 | `ACCEPT_LICENSES` | Licenses you accept, comma-separated (`all` for every one). A model whose files have a license is not downloaded without it; the error names the license and its URL. `qwen_image21_gguf` needs `qwen-research`. |

@@ -6,7 +6,7 @@ Entry point: builds the model backend and hands it to a UI frontend.
     python -m ai_image_edit --list-models
 
 Each option falls back to an environment variable, which is how the container
-images are configured: MODEL_BACKEND (default qwen_image21_gguf), WORKFLOW_FILE,
+images are configured: MODEL_WORKFLOW (default qwen_image21), WORKFLOW_FILE,
 MODEL_VARIANT and FRONTEND (default nicegui). APP_PASSWORD adds a password login
 to either frontend. The UI code lives under frontends/, the model code under
 models/; run_frontend() passes the built model straight to the chosen frontend's
@@ -23,7 +23,7 @@ from ai_image_edit.models import MODEL_LOADERS, get_model, get_model_from_file
 def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(prog="ai_image_edit", description="AI image editing with a web UI.")
     which = parser.add_mutually_exclusive_group()
-    which.add_argument("--model", help="model to run (see --list-models); env MODEL_BACKEND, default qwen_image21_gguf")
+    which.add_argument("--model", help="model to run (see --list-models); env MODEL_WORKFLOW, default qwen_image21")
     which.add_argument("--workflow", metavar="FILE", help="run the ComfyUI model in this workflow file; env WORKFLOW_FILE")
     parser.add_argument("--variant", help="variant of a workflow file's model, e.g. a quantization; env MODEL_VARIANT")
     parser.add_argument("--frontend", help="UI to serve; env FRONTEND, default nicegui")
@@ -52,7 +52,7 @@ def main(argv: Optional[List[str]] = None) -> None:
             model_name = workflow
             model = get_model_from_file(workflow, variant)
         else:
-            model_name = args.model or os.environ.get("MODEL_BACKEND", "qwen_image21_gguf")
+            model_name = args.model or os.environ.get("MODEL_WORKFLOW", "qwen_image21")
             model = get_model(model_name, variant)
     except (ValueError, OSError) as exc:
         raise SystemExit(str(exc))

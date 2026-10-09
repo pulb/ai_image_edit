@@ -36,7 +36,7 @@ class SelectionTests(unittest.TestCase):
         env = mock.patch.dict(os.environ)
         env.start()
         self.addCleanup(env.stop)
-        for name in ("MODEL_BACKEND", "WORKFLOW_FILE", "MODEL_VARIANT", "FRONTEND", "REQUIRE_PASSWORD", "MODEL_VERSION"):
+        for name in ("MODEL_WORKFLOW", "WORKFLOW_FILE", "MODEL_VARIANT", "FRONTEND", "REQUIRE_PASSWORD", "MODEL_VERSION"):
             os.environ.pop(name, None)
         self.model = mock.Mock()
         self.run = mock.patch.object(app, "run_frontend").start()
@@ -46,18 +46,18 @@ class SelectionTests(unittest.TestCase):
 
     def test_default_is_the_gguf_model(self):
         app.main([])
-        self.get.assert_called_once_with("qwen_image21_gguf", None)
+        self.get.assert_called_once_with("qwen_image21", None)
         self.model.start.assert_called_once()
         self.run.assert_called_once_with("nicegui", self.model)
 
     def test_environment_is_the_fallback(self):
-        os.environ.update(MODEL_BACKEND="x", MODEL_VARIANT="Q8_0", FRONTEND="gradio")
+        os.environ.update(MODEL_WORKFLOW="x", MODEL_VARIANT="Q8_0", FRONTEND="gradio")
         app.main([])
         self.get.assert_called_once_with("x", "Q8_0")
         self.run.assert_called_once_with("gradio", self.model)
 
     def test_command_line_beats_environment(self):
-        os.environ.update(MODEL_BACKEND="x", WORKFLOW_FILE="/env.json", MODEL_VARIANT="a")
+        os.environ.update(MODEL_WORKFLOW="x", WORKFLOW_FILE="/env.json", MODEL_VARIANT="a")
         app.main(["--model", "y", "--variant", "b"])
         self.get.assert_called_once_with("y", "b")
         self.get_file.assert_not_called()
