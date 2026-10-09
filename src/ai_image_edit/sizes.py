@@ -91,14 +91,12 @@ def _tier_size(resolution: int, aspect_ratio: str) -> Tuple[Optional[int], Optio
 def _dimensions_from_source(source_image_path: str, resolution: int) -> Tuple[int, int]:
     """
     Derives concrete (width, height) from the source image's own aspect
-    ratio at the given resolution tier. Used whenever _tier_size left
-    width/height unset (ORIGINAL, i.e. "Original"): the generation
-    needs concrete numbers up front, to crop the source to. Area scales with resolution the same
-    way QWEN21_ASPECT_RATIOS' entries do (area ~ resolution^2), just computed
-    directly from the source's own ratio instead of one of the model card's
-    named presets — there's no precomputed table entry for an arbitrary
-    uploaded image's ratio. A source that is already a valid size for the
-    tier (multiples of 32, area within 10% of the tier's) keeps its own size.
+    ratio at the given resolution tier, for when _tier_size has no size (the
+    "Original" ratio): the generation needs concrete numbers up front, to crop
+    the source to. Area scales with resolution the same way
+    QWEN21_ASPECT_RATIOS' entries do (area ~ resolution^2). A source that is
+    already a valid size for the tier (multiples of 32, area within 10% of the
+    tier's) keeps its own size.
     """
     with Image.open(source_image_path) as img:
         src_w, src_h = img.size

@@ -52,10 +52,10 @@ class _LastResult:
 _cache = _LastResult()
 
 
-# GenerationParams fields that never reach the model's inference: the source
-# and annotation paths (their pixels are fingerprinted as the model input),
-# the mask and what happens after inference, and the raw seed settings (the
-# resolved seed is passed in instead).
+# GenerationParams fields that are not part of the key as they are: the source
+# and annotation paths (the model input's pixels are fingerprinted instead),
+# the reference images (fingerprinted too), the mask and what happens after
+# inference, and the raw seed settings (the resolved seed is passed in instead).
 _NOT_KEYED = frozenset({
     "source_image_path", "annotated_image_path", "mask_path", "reference_images",
     "feather_amount", "apply_color_correction_enabled", "seed", "randomize_seed",

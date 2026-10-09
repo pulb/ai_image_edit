@@ -1,10 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """
-Shared filesystem/URL plumbing for the app's runtime working directory.
-
-Owned by the UI/app layer, not by any model: it answers "where do
-generated/uploaded files live so the browser can load them", which the models never see:
-they are handed plain local paths.
+Shared filesystem/URL plumbing for the app's runtime working directory:
+where uploaded and generated files live so the browser can load them.
 """
 import os
 import shutil
@@ -15,7 +12,7 @@ from pathlib import Path
 # (see ui/gui.py's app.add_static_files) so client-side
 # <canvas>/<img> elements can load them by URL. This also doubles as the
 # single source of truth for "what's the current result" — see
-# create_compare_slider()'s get_after_path() in ui/gui.py.
+# get_after_path() in ui/compare_slider.py.
 #
 # Defaults to a folder under /dev/shm (RAM-backed, so images never reach
 # persistent storage) and falls back to ./app_work where /dev/shm is not

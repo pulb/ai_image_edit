@@ -73,11 +73,7 @@ def params_from_ui(
     capability decides, and the field gets a neutral value instead.
 
     cfg and lora_strength fall back to the capability's own declared
-    default (not a bare 0.0) when unsupported: every model's cfg_range and
-    lora_strength_range starts above 0, and no model currently
-    guards its use of params.cfg/params.lora_strength behind
-    supports_cfg/supports_loras, so a bare 0.0 would silently fall outside
-    a future such model's valid range.
+    default (not a bare 0.0) when unsupported, since both ranges start above 0.
     """
     return GenerationParams(
         prompt=prompt or "",

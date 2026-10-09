@@ -92,7 +92,7 @@ class WorkflowModel:
     """
     A model run through a local ComfyUI server, as described by a workflow file.
 
-    The UI needs three things from it: what it can do (capabilities), how to
+    The UI needs four things from it: what it can do (capabilities), how to
     start and stop it (start(), shutdown(); setup_progress() reports the
     downloads start() continues in the background), and how to run one
     generation (generate()), plus a name and version to show.

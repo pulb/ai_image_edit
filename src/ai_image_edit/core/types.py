@@ -1,8 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """
-Data contracts shared between the UI (ui/) and the model (workflow_model.py). Deliberately
-dependency-free of both, so neither side ever needs
-to import from the other.
+Data contracts shared between the UI (ui/) and the model (workflow_model.py).
+Deliberately dependency-free of both, so neither side needs to import the other.
 """
 from dataclasses import dataclass, field
 from typing import List, Optional
@@ -38,7 +37,7 @@ FEATHER_RANGE = RangeSpec(0, 16, 3, step=1)
 class ModelCapabilities:
     """
     What a model supports, declared by the model itself. The UI
-    reads this once (via Model.capabilities) to decide which
+    reads this once (via WorkflowModel.capabilities) to decide which
     controls to render, instead of hardcoding assumptions about any one
     model — e.g. how many reference-image upload boxes to draw, whether to
     show the LoRA panel, or which sampler/scheduler/aspect-ratio/resolution
@@ -81,10 +80,10 @@ class ModelCapabilities:
     supports_cfg: bool = True
     supports_denoise: bool = True
     supports_seed: bool = True
-    # False by default: qwen_image_edit_2511_aio applies its own fixed negative
-    # prompt internally and never asks the user for one. A model that wants
-    # a user-facing negative-prompt box (only useful alongside supports_cfg,
-    # since CFG is what actually uses it) sets this True.
+    # False by default: a model whose workflow fixes its own negative prompt
+    # has nothing to ask for. A model that wants a user-facing negative-prompt
+    # box (only useful alongside supports_cfg, since CFG is what actually
+    # uses it) sets this True.
     supports_negative_prompt: bool = False
 
     # How many annotation colours the model understands (the first N of

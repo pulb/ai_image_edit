@@ -90,7 +90,7 @@ def remote_size(url: str) -> Optional[int]:
 
 
 class _Progress:
-    """Bytes downloaded so far, shared by the worker threads; reports whole percents."""
+    """Bytes downloaded so far, shared by the worker threads; passes the running total to the callback."""
 
     def __init__(self, total: Optional[int], done: int, callback: Optional[Callable[[int, Optional[int]], None]]) -> None:
         self._lock = threading.Lock()

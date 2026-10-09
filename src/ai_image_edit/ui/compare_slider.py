@@ -44,8 +44,8 @@ async def create_compare_slider() -> Tuple[
         # on some WebViews/browsers just from being focused. No label (label-always) here: this
         # overlays directly on the image, where a value bubble would be
         # visual noise rather than useful information. js_handler keeps
-        # dragging fully client-side (see CLIENT_JS's AIE comment for why
-        # that matters) — 'update:model-value' fires continuously while
+        # dragging fully client-side (see the module docstring of
+        # assets.py for why that matters) — 'update:model-value' fires continuously while
         # dragging, calling AIS.applyClip directly with no server
         # round-trip.
         range_slider = ui.slider(min=0, max=100, step=1, value=50).props("dense").classes("ais-range")

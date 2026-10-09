@@ -33,9 +33,10 @@ async def create_mask_editor(
     group switches between pinch-to-zoom (default), mask drawing and,
     when num_annotation_colors > 0, annotating in one of that many colours
     (ANNOTATION_COLORS, thin fixed stroke). Drawing a stroke in mask mode
-    makes this an Inpaint Edit, "Remove mask" reverts to a plain Image Edit. The Feather slider (0-16,
-    default 3) is the Gaussian blur radius composite_with_soft_transition()
-    applies to the mask edges; 0 falls back to a hard cutout.
+    makes this an Inpaint Edit, "Remove mask" reverts to a plain Image Edit.
+    The Feather slider (FEATHER_RANGE) is the Gaussian blur radius
+    composite_with_soft_transition() applies to the mask edges; 0 falls back
+    to a hard cutout.
 
     If given, on_mask_change(has_mask) fires whenever the mask goes from
     empty to non-empty or back (via the 'aie_mask_state' custom event).
@@ -114,8 +115,8 @@ async def create_mask_editor(
                     ).style("min-width: 1.5em")
                 brush_slider.disable()
                 # js_handler runs entirely in the browser, no server round-trip
-                # (see CLIENT_JS's AIE comment for why that matters for a
-                # dragged brush size) — 'update:model-value' fires continuously
+                # (see the module docstring of assets.py for why that matters
+                # for a dragged brush size) — 'update:model-value' fires continuously
                 # while dragging; 'change' fires once on release.
                 brush_slider.on(
                     "update:model-value",

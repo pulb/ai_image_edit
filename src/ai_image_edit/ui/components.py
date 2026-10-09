@@ -154,9 +154,8 @@ def create_simple_image_upload(label: str) -> dict:
     swaps in the preview.
 
     Styling (.aie-upload-box etc.) comes from WIDGET_CSS, a small stylesheet
-    this app defines itself and injects via ui.add_head_html — see the
-    comment above WIDGET_CSS for why that's preferred here over NiceGUI's
-    bundled Tailwind classes. The box itself is a real nicegui `ui.element`
+    this app defines itself and injects via ui.add_head_html (see the
+    module docstring of assets.py). The box itself is a real nicegui `ui.element`
     rather than raw HTML so a NiceGUI click handler can be attached to it
     directly (see attach_file_picker).
 

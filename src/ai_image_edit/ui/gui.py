@@ -37,8 +37,6 @@ from ai_image_edit.ui.mask_editor import create_mask_editor
 from ai_image_edit.workflow_model import WorkflowModel
 
 
-# --- Page ---
-
 # Every top-level section on the page (Prompt/Seed, Aspect ratio + editor,
 # the settings accordions, the Result panel) is wrapped in a ui.card using
 # this same class string, so their content all sits flush-aligned with each
