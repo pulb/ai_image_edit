@@ -1,6 +1,6 @@
 # Hugging Face Space
 
-Runs the ComfyUI image ([`../docker/DEPLOY.md`](../docker/DEPLOY.md)) as a
+Runs AI Image Edit ([Docker image](../docker/DEPLOY.md)) as a
 Docker Space on a **paid GPU**. ZeroGPU is not supported: the models run in a
 ComfyUI process, which needs a regular GPU. The UI is served on port `7860`.
 
