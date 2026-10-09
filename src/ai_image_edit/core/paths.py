@@ -6,6 +6,7 @@ where uploaded and generated files live so the browser can load them.
 import os
 import shutil
 from pathlib import Path
+from urllib.parse import quote, unquote
 
 # Where uploaded, generated, and composited images live for the lifetime of
 # the process. Served to the browser at /files/<name>
@@ -103,10 +104,10 @@ def trim_work_dir(keep: int = 0) -> None:
 
 def to_url(path_str: str) -> str:
     """Converts a local WORK_DIR file path into the URL it's served at."""
-    return f"/files/{Path(path_str).name}"
+    return f"/files/{quote(Path(path_str).name, safe='')}"
 
 
 def from_url(url: str) -> str:
     """Inverse of to_url() — recovers the local WORK_DIR path from a (possibly absolute) served URL."""
-    filename = url.rstrip("/").split("/")[-1]
+    filename = Path(unquote(url.rstrip("/").split("/")[-1])).name
     return str(WORK_DIR / filename)
