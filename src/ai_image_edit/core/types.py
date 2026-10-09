@@ -79,7 +79,6 @@ class ModelCapabilities:
 
     supports_cfg: bool = True
     supports_denoise: bool = True
-    supports_seed: bool = True
     # False by default: a model whose workflow fixes its own negative prompt
     # has nothing to ask for. A model that wants a user-facing negative-prompt
     # box (only useful alongside supports_cfg, since CFG is what actually

@@ -87,10 +87,6 @@ def build_prompt_card(caps: ModelCapabilities) -> PromptCard:
         with ui.row().classes("w-full items-center gap-4"):
             seed_input = ui.number(label="Seed", value=DEFAULT_SEED, format="%d").props("outlined dark").classes("flex-1")
             randomize_seed = ui.switch("Randomize seed", value=True)
-            if not caps.supports_seed:
-                seed_input.disable()
-                randomize_seed.value = False
-                randomize_seed.disable()
     return PromptCard(prompt, seed_input, randomize_seed)
 
 

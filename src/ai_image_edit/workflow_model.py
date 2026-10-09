@@ -28,6 +28,7 @@ from ai_image_edit.core.types import GenerationParams, GenerationResult, ModelCa
 from ai_image_edit.sizes import POLICIES, ResolvedSize, SizePolicy
 from ai_image_edit.workflows import available_workflows, read_workflow_file
 
+
 def configured_file(env_var: str, folder: Path) -> str:
     """
     The path (forward slashes, relative to `folder`) that environment variable
@@ -128,9 +129,9 @@ class WorkflowModel:
         same 'set' target (only the keys it gives), and its model_version replaces
         the file's.
         """
-        variants = manifest.get("variants", {})
         if not variant:
             return manifest
+        variants = manifest.get("variants", {})
         if variant not in variants:
             options = ", ".join(variants) or "none"
             raise ValueError(f"{name}: unknown variant {variant!r} (available: {options})")
@@ -243,7 +244,6 @@ class WorkflowModel:
             default_scheduler=caps["scheduler"]["default"],
             supports_cfg="cfg" in bind,
             supports_denoise="denoise" in bind,
-            supports_seed=True,
             supports_negative_prompt="negative_prompt" in bind,
             num_annotation_colors=caps.get("num_annotation_colors", 0),
             step_range=_range(caps["steps"]),
@@ -261,31 +261,20 @@ class WorkflowModel:
         variable if it is set (that file is used as it is and never downloaded),
         otherwise the manifest's name.
         """
-        if spec.get("env") and os.environ.get(spec["env"], "").strip():
+        env_set = bool(spec.get("env") and os.environ.get(spec["env"], "").strip())
+        if env_set or "name" not in spec:  # without a name the variable is required
             return configured_file(spec["env"], Path(spec["folder"]))
-        if "name" not in spec:
-            return configured_file(spec["env"], Path(spec["folder"]))  # raises: not set
         return spec["name"]
 
     def _pending_downloads(self) -> List[dict]:
-        pending = []
-        for spec in self._manifest.get("files", []):
-            dest = Path(spec["folder"]) / self._file_value(spec)
-            if not dest.is_file():
-                pending.append({
-                    "url": spec["url"], "dest": dest, "sha256": spec.get("sha256"), "size": spec.get("size"),
-                    "license": spec.get("license"),
-                })
+        wanted = [(spec, Path(spec["folder"]) / self._file_value(spec)) for spec in self._manifest.get("files", [])]
         # LoRA files: each goes into its own subfolder of loras.dir (the subfolder is the display name).
         loras = self._manifest.get("loras", {})
-        for spec in loras.get("files", []):
-            dest = Path(loras["dir"]) / spec["dir"] / spec["name"]
-            if not dest.is_file():
-                pending.append({
-                    "url": spec["url"], "dest": dest, "sha256": spec.get("sha256"), "size": spec.get("size"),
-                    "license": spec.get("license"),
-                })
-        return pending
+        wanted += [(spec, Path(loras["dir"]) / spec["dir"] / spec["name"]) for spec in loras.get("files", [])]
+        return [
+            {"url": spec["url"], "dest": dest, "sha256": spec.get("sha256"), "size": spec.get("size"), "license": spec.get("license")}
+            for spec, dest in wanted if not dest.is_file()
+        ]
 
     def _check_licenses(self, pending: List[dict]) -> None:
         """Downloading a file whose license needs accepting requires ACCEPT_LICENSES to name it."""
