@@ -126,8 +126,9 @@ class WorkflowModel:
     def _with_variant(name: str, manifest: dict, variant: Optional[str]) -> dict:
         """
         The manifest with a variant applied: its files replace the entries of the
-        same 'set' target (only the keys it gives), and its model_version replaces
-        the file's.
+        same 'set' target (only the keys it gives; a variant that names another
+        file or url does not inherit the sha256 and size of the original), and
+        its model_version replaces the file's.
         """
         if not variant:
             return manifest
@@ -141,6 +142,9 @@ class WorkflowModel:
             matches = [spec for spec in manifest["files"] if spec["set"] == target]
             if not matches:
                 raise ValueError(f"{name}: variant {variant!r} changes {target!r}, which is not in files")
+            if "name" in changes or "url" in changes:
+                for key in ("sha256", "size"):
+                    matches[0].pop(key, None)
             matches[0].update(changes)
         if "model_version" in chosen:
             manifest["model_version"] = chosen["model_version"]

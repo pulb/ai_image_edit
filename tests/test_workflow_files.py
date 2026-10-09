@@ -212,6 +212,20 @@ class ManifestModelTests(unittest.TestCase):
         finally:
             imaging.run_masked_generation = real
 
+    def test_variant_does_not_inherit_the_checksum_of_another_file(self):
+        manifest, workflow = workflow_files.read_workflow_file(available_workflows()["qwen_image21"])
+        manifest["files"][0].update(sha256="a" * 64, size=1)
+        manifest["variants"] = {
+            "other": {"files": {"1.unet_name": {"name": "o.safetensors", "url": "https://example.org/o"}}},
+            "same": {"files": {"1.unet_name": {"size": 2}}},
+        }
+        other = WorkflowModel("t", manifest, workflow, "other")._manifest["files"][0]
+        self.assertEqual(other["name"], "o.safetensors")
+        self.assertNotIn("sha256", other)
+        self.assertNotIn("size", other)
+        same = WorkflowModel("t", manifest, workflow, "same")._manifest["files"][0]
+        self.assertEqual((same["sha256"], same["size"]), ("a" * 64, 2))
+
     def test_seed_handling(self):
         real = random.randint
         try:
