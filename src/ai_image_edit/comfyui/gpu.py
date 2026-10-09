@@ -7,11 +7,14 @@ generation itself, ComfyUI keeps the weights on the GPU (FAST_ARGS), which saves
 10 to 15 s per generation. Otherwise it gets no extra arguments. COMFY_EXTRA_ARGS
 replaces the decision: if the variable is set, even to an empty value, its
 arguments are used as they are.
+
+ComfyUI is started with CUDA_DEVICE_ORDER=PCI_BUS_ID (unless the variable is
+set), so GPU numbers, CUDA_VISIBLE_DEVICES included, are the ones nvidia-smi shows.
 """
 import os
 import shlex
 import subprocess
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 # Working memory a generation needs on top of the weights, unless the workflow
 # file says otherwise (`vram_headroom_gb`).
@@ -20,8 +23,23 @@ FAST_ARGS = ["--highvram", "--disable-dynamic-vram"]
 GIB = 1024 ** 3
 
 
+def device_order() -> str:
+    return os.environ.get("CUDA_DEVICE_ORDER") or "PCI_BUS_ID"
+
+
+def environment() -> Dict[str, str]:
+    """The environment ComfyUI is started with."""
+    return {**os.environ, "CUDA_DEVICE_ORDER": device_order()}
+
+
 def free_vram_bytes() -> Optional[int]:
-    """Free memory of the first GPU ComfyUI can use (see CUDA_VISIBLE_DEVICES), or None if nvidia-smi cannot tell."""
+    """
+    Free memory of the first GPU ComfyUI can use (see CUDA_VISIBLE_DEVICES), or
+    None if nvidia-smi cannot tell, which includes a CUDA_DEVICE_ORDER whose
+    numbering differs from nvidia-smi's.
+    """
+    if device_order() != "PCI_BUS_ID":
+        return None
     command = ["nvidia-smi", "--query-gpu=memory.free", "--format=csv,noheader,nounits"]
     visible = os.environ.get("CUDA_VISIBLE_DEVICES")
     if visible is not None:

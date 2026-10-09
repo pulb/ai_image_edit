@@ -15,6 +15,7 @@ from typing import List, Optional
 import requests
 import websocket
 
+from ai_image_edit.comfyui import gpu
 from ai_image_edit.core.errors import GenerationError
 from ai_image_edit.core.paths import WORK_DIR
 
@@ -60,7 +61,7 @@ def launch_comfy_process(extra_args: Optional[List[str]] = None) -> subprocess.P
     for name in ("input", "output", "temp"):
         (comfy_dir / name).mkdir(parents=True, exist_ok=True)
         args += [f"--{name}-directory", str(comfy_dir / name)]
-    return subprocess.Popen([sys.executable, "-u", "main.py", *args])
+    return subprocess.Popen([sys.executable, "-u", "main.py", *args], env=gpu.environment())
 
 
 def missing_nodes(class_names: List[str]) -> List[str]:

@@ -102,6 +102,11 @@ Otherwise it gets no extra arguments. The decision and its reason are printed
 to the log (`ComfyUI arguments: ...`). The 6 GB is an estimate, not a
 measurement.
 
+ComfyUI is started with `CUDA_DEVICE_ORDER=PCI_BUS_ID` (unless you set the
+variable), so GPU numbers, `CUDA_VISIBLE_DEVICES` included, are the ones
+`nvidia-smi` shows. With another `CUDA_DEVICE_ORDER` the app cannot tell which
+GPU ComfyUI uses and starts it without extra arguments.
+
 Set `COMFY_EXTRA_ARGS` at run time to override this, for example
 `-e COMFY_EXTRA_ARGS="--lowvram"`. If the variable is set, even to an empty
 value, its arguments are used as they are and nothing is chosen automatically.

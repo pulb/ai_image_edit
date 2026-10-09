@@ -38,9 +38,22 @@ class FreeVramTest(unittest.TestCase):
         _, run = self.run_with({"CUDA_VISIBLE_DEVICES": "1,2"})
         self.assertEqual(run.call_args.args[0][-2:], ["-i", "1"])
 
+    def test_unknown_when_the_numbering_differs_from_nvidia_smi(self):
+        self.assertIsNone(self.run_with({"CUDA_DEVICE_ORDER": "FASTEST_FIRST"})[0])
+        self.assertEqual(self.run_with({"CUDA_DEVICE_ORDER": "PCI_BUS_ID"})[0], 24 * GIB)
+
     def test_no_visible_gpu(self):
         for value in ("", "-1"):
             self.assertIsNone(self.run_with({"CUDA_VISIBLE_DEVICES": value})[0])
+
+
+class EnvironmentTest(unittest.TestCase):
+    def test_comfyui_numbers_gpus_like_nvidia_smi(self):
+        base = {k: v for k, v in os.environ.items() if k != "CUDA_DEVICE_ORDER"}
+        with mock.patch.dict(os.environ, base, clear=True):
+            self.assertEqual(gpu.environment()["CUDA_DEVICE_ORDER"], "PCI_BUS_ID")
+        with mock.patch.dict(os.environ, base | {"CUDA_DEVICE_ORDER": "FASTEST_FIRST"}, clear=True):
+            self.assertEqual(gpu.environment()["CUDA_DEVICE_ORDER"], "FASTEST_FIRST")
 
 
 class ExtraArgsTest(unittest.TestCase):
