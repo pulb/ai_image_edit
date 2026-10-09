@@ -49,7 +49,7 @@ def main(argv: Optional[List[str]] = None) -> None:
     print(f"Starting model '{workflow}' in the background...", flush=True)
     try:
         model.start()
-    except RuntimeError as exc:  # a missing file, an unaccepted license: a message is enough
+    except (RuntimeError, OSError) as exc:  # a missing file, an unaccepted license, ComfyUI not launchable: a message is enough
         raise SystemExit(str(exc))
 
     ui.run(model)

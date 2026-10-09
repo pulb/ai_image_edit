@@ -69,6 +69,13 @@ class SelectionTests(unittest.TestCase):
         with self.assertRaisesRegex(SystemExit, "Unknown workflow"):
             app.main(["--workflow", "z"])
 
+    def test_start_failure_is_a_clean_exit(self):
+        for error in (RuntimeError("license not accepted"), FileNotFoundError("main.py")):
+            self.model.start.side_effect = error
+            with self.assertRaisesRegex(SystemExit, str(error)):
+                app.main([])
+        self.run.assert_not_called()
+
 
 class GetModelTests(unittest.TestCase):
     def test_bundled_name_and_file_path(self):
