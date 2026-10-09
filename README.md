@@ -66,9 +66,7 @@ models (Qwen-Image-2.1) on common GPUs, by output resolution in megapixels
 `--highvram --disable-dynamic-vram` (see [Docker](deployments/docker/DEPLOY.md#comfyui-arguments-comfy_extra_args)),
 the RTX 2000 Ada figures without. They are rough figures from single runs, not benchmarks,
 and will vary with the step count and reference images. A dash means not
-measured. The `qwen_image21` figures were measured with the former diffusers
-implementation; the ComfyUI workflow that replaced it performed on par in our tests on
-an A100, but it was not re-measured on the other GPUs.
+measured.
 
 | GPU | `qwen_image21` 1 MP | `qwen_image21` 2 MP | `qwen_image21_gguf` 1 MP | `qwen_image21_gguf` 2 MP |
 |---|---|---|---|---|

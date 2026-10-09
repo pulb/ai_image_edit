@@ -66,7 +66,7 @@ Rules for any AI coding agent working in this repository.
   instead of an import error at startup.
 - **Qwen-licensed code**: no code under the Qwen Research License lives in
   this repo; the Qwen-Image-2.1 weights are only downloaded, under their own
-  license. (The former diffusers implementation, `ai_image_edit_qwen`, is deprecated.)
+  license.
   Never copy Qwen-licensed or Space-derived code into this repo.
 - **ComfyUI models are data**: a ComfyUI model is one JSON file in
   `src/ai_image_edit/data/workflows/` (`format_version`, `manifest`, `workflow`; package
@@ -80,8 +80,7 @@ Rules for any AI coding agent working in this repository.
 - **ComfyUI models**: `models/_shared/comfyui/` holds what the ComfyUI-based
   models share (`client.py`, `common.py`, `downloads.py`). Weight files are
   listed in the workflow file's `files` and downloaded when missing; an
-  environment variable such as `MODEL_FILE` can point to a local file instead
-  (the image no longer bakes the weights in).
+  environment variable such as `MODEL_FILE` can point to a local file instead.
   Qwen-Image-2.1 output sizes shared by `qwen_image21` and `qwen_image21_gguf`
   live in `models/_shared/qwen21_size.py`.
 - **Shared code**: helpers used by several models or frontends live in

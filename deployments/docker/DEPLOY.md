@@ -102,7 +102,7 @@ tested only with this one:
 | Arguments | Use when |
 |---|---|
 | `--lowvram` | The GPU has little memory (about 8 GB or less). |
-| `--highvram --disable-dynamic-vram` | The GPU has about 24 GB or more (estimate; see below). By default ComfyUI re-stages the text encoder for every new prompt, which added roughly 10-15 s per generation in our tests; with these flags the weights stay on the GPU and generation time matches the former Diffusers-based implementation. `--disable-dynamic-vram` is deprecated in ComfyUI and will be removed. |
+| `--highvram --disable-dynamic-vram` | The GPU has about 24 GB or more (estimate; see below). By default ComfyUI re-stages the text encoder for every new prompt, which added roughly 10-15 s per generation in our tests; with these flags the weights stay on the GPU. `--disable-dynamic-vram` is deprecated in ComfyUI and will be removed. |
 | `--disable-comfy-compiler` | Sampling appears to hang on the first step. |
 
 The weights that `--highvram` keeps resident add up to about 14 GB with the
