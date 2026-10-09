@@ -301,6 +301,7 @@ async def build_editor_card(model: WorkflowModel, caps: ModelCapabilities) -> Ed
         editor_holder, get_editor_inputs, set_editor_image = await create_mask_editor(
             on_mask_change=handle_mask_change if caps.supports_inpainting else None,
             num_annotation_colors=caps.num_annotation_colors,
+            supports_mask=caps.supports_inpainting,
         )
     return EditorCard(aspect_ratio, megapixels, editor_holder, get_editor_inputs, set_editor_image)
 
