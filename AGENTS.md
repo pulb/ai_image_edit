@@ -47,7 +47,7 @@ Rules for any AI coding agent working in this repository.
   `src/`: `app.py` (entry point), `workflow_model.py` (the model),
   `workflows.py` (finding, reading and schema-checking workflow files),
   `sizes.py` (output-size policies), `comfyui/` (client, downloads, custom
-  nodes, GPU arguments), `ui/` (the NiceGUI UI) and `core/` (types, imaging,
+  nodes, GPU arguments), `ui/` (the NiceGUI UI; its CSS and JS are in `ui/static/`) and `core/` (types, imaging,
   paths, result cache). It is started with `python -m ai_image_edit`.
   Imports are absolute (`from ai_image_edit.core import …`). Dependencies
   live in `pyproject.toml`: everything the app needs (including NiceGUI and

@@ -23,6 +23,6 @@ dependencies = [
 where = ["src"]
 
 [tool.setuptools.package-data]
-# The workflow files and their JSON Schema are installed with the app.
-"ai_image_edit" = ["data/*.json", "data/workflows/*.json"]
+# The workflow files, their JSON Schema and the UI's stylesheet and script are installed with the app.
+"ai_image_edit" = ["data/*.json", "data/workflows/*.json", "ui/static/*"]
 

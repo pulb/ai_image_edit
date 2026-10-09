@@ -27,5 +27,16 @@ class StorageSecretTest(unittest.TestCase):
         self.assertEqual(self.secret("pw", APP_STORAGE_SECRET="abc"), "abc")
 
 
+class AssetsTest(unittest.TestCase):
+    def test_placeholders_are_filled_in(self):
+        import re
+        from ai_image_edit.ui import assets
+
+        for text in (assets.CLIENT_JS, assets.WIDGET_CSS):
+            self.assertTrue(text.strip())
+            self.assertEqual(re.findall(r"__[A-Z_]+__", text), [])
+        self.assertIn(str(assets.DEFAULT_BRUSH_SIZE), assets.CLIENT_JS)
+
+
 if __name__ == "__main__":
     unittest.main()
