@@ -11,7 +11,6 @@ are shown or hidden based on the active model's declared capabilities.
 
 import asyncio
 import base64
-import hashlib
 import hmac
 import json
 import os
@@ -39,6 +38,7 @@ from ai_image_edit.frontends._shared.common import (
     default_choice,
     describe_error,
     params_from_ui,
+    storage_secret,
 )
 from ai_image_edit.models.base import Model
 
@@ -145,7 +145,7 @@ def install_password_login(password: str) -> str:
             ui.button("Log in", on_click=try_login)
         return None
 
-    return os.environ.get("APP_STORAGE_SECRET") or hashlib.sha256(f"ai-image-edit-session:{password}".encode()).hexdigest()
+    return storage_secret(password)
 
 
 def call_js(ns: str, fn: str, *args, timeout: float = 5.0):

@@ -37,9 +37,9 @@ files it serves. The image sets `REQUIRE_PASSWORD=1` and refuses to start
 without it; set `REQUIRE_PASSWORD` to an empty value to run without a password.
 
 Logins survive restarts as long as the
-password stays the same; changing it logs everyone out. Set
-`APP_STORAGE_SECRET` to a long random value to keep sessions independent of
-the password. A wrong password is delayed by one second. This is a single shared password without real rate
+password stays the same; changing it logs everyone out. The session secret is
+a salted PBKDF2 hash of the password. Set `APP_STORAGE_SECRET` to a long random
+value to keep sessions independent of the password. A wrong password is delayed by one second. This is a single shared password without real rate
 limiting. For stronger protection, don't expose the port and use an
 SSH tunnel or Tailscale.
 

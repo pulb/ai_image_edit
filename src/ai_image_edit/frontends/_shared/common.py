@@ -1,5 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Constants and helpers shared by the frontends."""
+import hashlib
+import os
 from typing import List, Optional, Sequence
 
 from ai_image_edit.core.errors import GenerationError
@@ -14,6 +16,20 @@ RECENT_FILES_KEPT = 8
 
 HOST = "0.0.0.0"
 PORT = 7860
+
+
+# Fixed because the secret must be the same after a restart; APP_STORAGE_SECRET
+# replaces the whole derivation with a random value.
+_SECRET_SALT = b"ai-image-edit/session-secret/v1"
+_SECRET_ITERATIONS = 200_000
+
+
+def storage_secret(password: str) -> str:
+    """The secret that signs the session cookie: APP_STORAGE_SECRET, else a salted PBKDF2 hash of the password."""
+    configured = os.environ.get("APP_STORAGE_SECRET")
+    if configured:
+        return configured
+    return hashlib.pbkdf2_hmac("sha256", password.encode(), _SECRET_SALT, _SECRET_ITERATIONS).hex()
 
 
 def default_choice(default: Optional[str], choices: Optional[Sequence[str]]) -> Optional[str]:
