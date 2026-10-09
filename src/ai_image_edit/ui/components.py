@@ -6,7 +6,7 @@ import uuid
 from pathlib import Path
 from typing import Awaitable, Callable, Tuple
 
-from nicegui import app, ui
+from nicegui import ui
 from nicegui import run as nicegui_run
 
 from ai_image_edit.core import imaging

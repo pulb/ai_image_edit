@@ -19,7 +19,7 @@ from nicegui import run as nicegui_run
 
 from ai_image_edit.core import imaging
 from ai_image_edit.core.paths import WORK_DIR, trim_work_dir
-from ai_image_edit.core.types import DEFAULT_SEED, ORIGINAL_ASPECT_RATIO
+from ai_image_edit.core.types import DEFAULT_SEED, ORIGINAL_ASPECT_RATIO, ModelCapabilities
 from ai_image_edit.ui.assets import CLIENT_JS, WIDGET_CSS
 from ai_image_edit.ui.compare_slider import create_compare_slider
 from ai_image_edit.ui.components import apply_dark_theme, create_simple_image_upload, create_value_slider
@@ -80,7 +80,7 @@ class PromptCard:
     randomize_seed: ui.switch
 
 
-def build_prompt_card(caps) -> PromptCard:
+def build_prompt_card(caps: ModelCapabilities) -> PromptCard:
     with ui.card().classes(CARD_CLASSES):
         prompt = ui.textarea(label="Prompt").props("rows=6 outlined dark").classes("w-full")
 
@@ -105,7 +105,7 @@ class AdvancedCard:
     color_correction: ui.switch
 
 
-def build_advanced_card(caps) -> AdvancedCard:
+def build_advanced_card(caps: ModelCapabilities) -> AdvancedCard:
     with ui.card().classes(CARD_CLASSES):
         with ui.expansion("Advanced settings").props("dense").classes("w-full"):
             sr = caps.step_range
@@ -192,7 +192,7 @@ class ReferenceCard:
     lora_strength: Optional[ui.slider] = None
 
 
-def build_reference_card(model: WorkflowModel, caps) -> ReferenceCard:
+def build_reference_card(model: WorkflowModel, caps: ModelCapabilities) -> ReferenceCard:
     card = ReferenceCard()
     reference_holders = card.reference_holders
     if caps.max_reference_images > 1 or caps.supports_loras:
@@ -258,7 +258,7 @@ def build_reference_card(model: WorkflowModel, caps) -> ReferenceCard:
 # (model.megapixels_for_source) — only when the model actually
 # offers "Original" as a choice, and restored the moment the mask
 # is removed.
-async def build_editor_card(model: WorkflowModel, caps) -> EditorCard:
+async def build_editor_card(model: WorkflowModel, caps: ModelCapabilities) -> EditorCard:
     with ui.card().classes(CARD_CLASSES):
         with ui.row().classes("w-full items-center gap-4"):
             aspect_ratio = ui.select(
@@ -278,6 +278,7 @@ async def build_editor_card(model: WorkflowModel, caps) -> EditorCard:
         previous_aspect_ratio = aspect_ratio.value
         previous_megapixels = megapixels.value
 
+        # editor_holder is assigned below, by create_mask_editor; this only runs after that.
         def handle_mask_change(has_mask: bool) -> None:
             nonlocal previous_aspect_ratio, previous_megapixels
             if ORIGINAL_ASPECT_RATIO not in caps.supported_aspect_ratios:

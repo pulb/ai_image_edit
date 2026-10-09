@@ -3,7 +3,7 @@
 import uuid
 from typing import Awaitable, Callable, Dict, NamedTuple, Optional, Tuple
 
-from nicegui import app, ui
+from nicegui import ui
 
 from ai_image_edit.core.paths import to_url
 from ai_image_edit.core.types import ANNOTATION_COLORS, FEATHER_RANGE
@@ -78,7 +78,7 @@ async def create_mask_editor(
             sanitize=False,
         )
 
-    async def handle_file(path: str) -> None:
+    async def set_image(path: str) -> None:
         holder["path"] = path
         await call_js("AIE", "loadImage", editor_id, to_url(path), timeout=10.0)
         badge.set_visibility(True)
@@ -86,7 +86,7 @@ async def create_mask_editor(
     # Once an image is loaded, a click on the box draws on the canvas instead
     # of reopening the picker — holder['path'] already tells us which state
     # we're in, no need to ask the browser.
-    attach_file_picker(editor_box, handle_file, enabled=lambda: not holder["path"])
+    attach_file_picker(editor_box, set_image, enabled=lambda: not holder["path"])
 
     async def remove_mask() -> None:
         await call_js("AIE", "clearMask", editor_id)
@@ -203,10 +203,5 @@ async def create_mask_editor(
             save_data_url(data["annotations"], "annotations.png") if data["annotations"] else None,
             int(data["feather"]),
         )
-
-    async def set_image(path: str) -> None:
-        holder["path"] = path
-        await call_js("AIE", "loadImage", editor_id, to_url(path), timeout=10.0)
-        badge.set_visibility(True)
 
     return holder, get_inputs, set_image

@@ -3,7 +3,7 @@
 import uuid
 from typing import Awaitable, Callable, Optional, Tuple
 
-from nicegui import app, ui
+from nicegui import ui
 
 from ai_image_edit.core.paths import from_url, to_url
 from ai_image_edit.ui.components import call_js, init_widget
