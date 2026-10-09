@@ -192,7 +192,7 @@ class CustomNodeTests(unittest.TestCase):
         os.chdir(self.tmp)
         try:
             with mock.patch.object(client, "launch_comfy_process") as launch:
-                launch.side_effect = lambda: self.assertTrue((Path("custom_nodes/My-Node/node.py")).is_file()) or mock.Mock()
+                launch.side_effect = lambda *_: self.assertTrue((Path("custom_nodes/My-Node/node.py")).is_file()) or mock.Mock()
                 model.start()
                 self.assertTrue(model._download_status.finished.wait(20))
                 self.assertIsNone(model._download_status.error)

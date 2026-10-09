@@ -26,6 +26,7 @@ from ai_image_edit.core.result_cache import cached_infer
 from ai_image_edit.core.types import GenerationParams, GenerationResult, ModelCapabilities, RangeSpec
 from ai_image_edit.models.base import Model
 from ai_image_edit.models._shared.comfyui import client as comfy_client
+from ai_image_edit.models._shared.comfyui import gpu
 from ai_image_edit.models._shared.comfyui.common import SAMPLER_CHOICES, SCHEDULER_CHOICES, configured_file
 from ai_image_edit.models._shared.comfyui import custom_nodes, downloads
 from ai_image_edit.models._shared.comfyui.size_policies import POLICIES, ResolvedSize, SizePolicy
@@ -248,12 +249,26 @@ class ComfyWorkflowModel(Model):
                     f"Read it and, if you accept it, set ACCEPT_LICENSES={lic} to let the app download the file."
                 )
 
+    def _weights_bytes(self) -> int:
+        """Total size of the model files (not the LoRAs), which ComfyUI loads for a generation."""
+        total = 0
+        for spec in self._manifest.get("files", []):
+            path = Path(spec["folder"]) / self._file_value(spec)
+            if path.is_file():
+                total += path.stat().st_size
+        return total
+
+    def _launch_comfy(self) -> None:
+        args, reason = gpu.comfy_extra_args(self._weights_bytes(), self._manifest.get("vram_headroom_gb"))
+        print(f"ComfyUI arguments: {' '.join(args) or '(none)'} ({reason})", flush=True)
+        self._process = comfy_client.launch_comfy_process(args)
+
     def start(self) -> None:
         # Checked before anything starts, so a missing setting or file fails fast.
         pending = self._pending_downloads()
         nodes = custom_nodes.missing(self._manifest.get("custom_nodes", []))
         if not pending and not nodes:
-            self._process = comfy_client.launch_comfy_process()
+            self._launch_comfy()
             return
         self._check_licenses(pending)
         status = self._download_status = downloads.DownloadStatus()
@@ -265,7 +280,7 @@ class ComfyWorkflowModel(Model):
                 status.set_message(f"Installing {spec['name']}")
                 custom_nodes.install(spec)
             if not self._cancel_downloads.is_set():
-                self._process = comfy_client.launch_comfy_process()
+                self._launch_comfy()
 
         threading.Thread(
             target=downloads.run_downloads, args=(pending, status, self._cancel_downloads, prepare_and_launch),

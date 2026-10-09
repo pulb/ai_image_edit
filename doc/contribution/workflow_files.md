@@ -29,6 +29,7 @@ mistyped node id or input name fails when the model loads.
 |---|---|
 | `model_name` | Name shown in the UI. |
 | `model_version` | Optional. The version shown after the name, e.g. `"UC Q4_K_M"`. The `MODEL_VERSION` environment variable overrides it (for weights chosen with the `env` overrides). |
+| `vram_headroom_gb` | Optional number. GPU memory in GB the generation needs on top of the model files; the app starts ComfyUI with `--highvram --disable-dynamic-vram` if the free GPU memory covers the files plus this headroom. Default 6. See `deployments/docker/DEPLOY.md`. |
 | `custom_nodes` | `[{name, git, ref, subdir}]`: ComfyUI custom nodes installed to `custom_nodes/<name>` if that folder is missing, from the `https://` git repository at the exact commit `ref` (40 hex digits), plus its `requirements.txt`. With `subdir`, only that folder of the repository is installed (as `custom_nodes/<name>`). This is how a patched fork is referenced. An existing folder is left as it is. |
 | `variants` | `{id: {model_version, files: {<set target>: {name, url, sha256, size, license}}}}`: alternatives selected with `--variant id` / `MODEL_VARIANT`. A variant replaces the keys it gives in the `files` entry with that `set` target, and the `model_version`. |
 | `required_nodes`, `missing_nodes_hint` | Node classes ComfyUI must provide, checked on the first generation, and the advice shown if they are missing. |

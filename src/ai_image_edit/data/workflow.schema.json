@@ -73,6 +73,7 @@
       "properties": {
         "model_name": {"type": "string", "minLength": 1},
         "model_version": {"description": "The version shown after the name. MODEL_VERSION overrides it.", "type": "string", "minLength": 1},
+        "vram_headroom_gb": {"description": "GPU memory in GB the generation needs on top of the weights. Used to decide whether ComfyUI keeps the weights on the GPU. Default 6.", "type": "number", "exclusiveMinimum": 0},
         "custom_nodes": {
           "description": "ComfyUI custom nodes to install into custom_nodes/<name> if that folder is missing: a git repository (or one folder of it) at an exact commit.",
           "type": "array",

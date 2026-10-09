@@ -91,12 +91,21 @@ Build arguments: `APP_REPO` and `APP_REF` (where the app is installed from:
 build context, so to try a change, push it to a branch and pass its name),
 `COMFYUI_REF`, and the PyTorch versions.
 
-### ComfyUI arguments (`COMFY_EXTRA_ARGS`)
+### ComfyUI arguments
 
-Set `COMFY_EXTRA_ARGS` at run time to pass arguments to ComfyUI, for example
-`-e COMFY_EXTRA_ARGS="--highvram --disable-dynamic-vram"`. The variable also
-applies to every model, but the advice below was tested only with
-`qwen_image21_gguf`:
+At start-up the app reads the free GPU memory (`nvidia-smi`) and compares it
+with the size of the model files on disk plus a headroom of 6 GB for the
+generation itself (a workflow can change it with `vram_headroom_gb`). If the
+memory is sufficient, ComfyUI is started with `--highvram --disable-dynamic-vram`
+so the weights stay on the GPU, which saves roughly 10-15 s per generation.
+Otherwise it gets no extra arguments. The decision and its reason are printed
+to the log (`ComfyUI arguments: ...`). The 6 GB is an estimate, not a
+measurement.
+
+Set `COMFY_EXTRA_ARGS` at run time to override this, for example
+`-e COMFY_EXTRA_ARGS="--lowvram"`. If the variable is set, even to an empty
+value, its arguments are used as they are and nothing is chosen automatically.
+The advice below was tested only with `qwen_image21_gguf`:
 
 | Arguments | Use when |
 |---|---|

@@ -8,7 +8,6 @@ Used by the models of AI Image Edit (the workflow files) to drive ComfyUI.
 """
 import json
 import os
-import shlex
 import subprocess
 import time
 import urllib.request
@@ -30,18 +29,18 @@ SERVER_ADDRESS = "127.0.0.1:8188"
 GENERATION_TIMEOUT_SECONDS = int(os.environ.get("COMFY_GENERATION_TIMEOUT", "120"))
 
 
-def launch_comfy_process() -> subprocess.Popen:
+def launch_comfy_process(extra_args: Optional[List[str]] = None) -> subprocess.Popen:
     """
-    Starts the ComfyUI server in the background. -u forces unbuffered
-    output, so startup progress isn't silently swallowed. Returns the Popen
-    handle so the caller can terminate it. COMFY_EXTRA_ARGS adds command line
-    arguments, e.g. --lowvram.
+    Starts the ComfyUI server in the background with the given extra command
+    line arguments (see gpu.py). -u forces unbuffered output, so startup
+    progress isn't silently swallowed. Returns the Popen handle so the caller
+    can terminate it.
     """
     print("Starting ComfyUI server in the background...", flush=True)
     # ComfyUI's input/output/temp folders live under WORK_DIR too, so
     # everything the app handles sits in one place (RAM-backed by default).
     comfy_dir = WORK_DIR.resolve() / "comfy"
-    args = ["--port", "8188", *shlex.split(os.environ.get("COMFY_EXTRA_ARGS", ""))]
+    args = ["--port", "8188", *(extra_args or [])]
     for name in ("input", "output", "temp"):
         (comfy_dir / name).mkdir(parents=True, exist_ok=True)
         args += [f"--{name}-directory", str(comfy_dir / name)]

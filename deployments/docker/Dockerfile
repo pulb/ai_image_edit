@@ -61,10 +61,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Generations on smaller GPUs can take minutes (weights are offloaded to RAM).
 ENV COMFY_GENERATION_TIMEOUT=600
-# Extra ComfyUI command line arguments, set at run time (docker run -e
-# COMFY_EXTRA_ARGS=...). Which ones to use depending on the GPU memory:
-# deployments/docker/DEPLOY.md.
-ENV COMFY_EXTRA_ARGS=""
+# COMFY_EXTRA_ARGS is deliberately not set here: unset means the app chooses the
+# ComfyUI arguments from the free GPU memory (deployments/docker/DEPLOY.md).
 
 # Install the app from GitHub: the branch, tag or commit APP_REF of APP_REPO
 # (the CI build passes the commit it was started for). To try a change, push it
