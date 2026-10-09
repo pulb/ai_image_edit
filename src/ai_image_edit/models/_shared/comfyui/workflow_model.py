@@ -293,7 +293,7 @@ class ComfyWorkflowModel(Model):
             return SetupProgress()
         if status.error:
             return SetupProgress(done=True, error=f"Setting up the model failed: {status.error}")
-        return SetupProgress(done=status.finished.is_set(), message=status.message)
+        return SetupProgress(done=status.finished.is_set(), message=status.message, fraction=status.fraction)
 
     def _check_downloads(self) -> None:
         status = self._download_status

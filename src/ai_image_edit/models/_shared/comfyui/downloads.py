@@ -81,6 +81,14 @@ def _probe(url: str) -> Optional[int]:
         raise DownloadError(f"{url}: {exc} (run again to resume)") from exc
 
 
+def remote_size(url: str) -> Optional[int]:
+    """The file's size according to the server, or None if it does not say (or cannot be reached)."""
+    try:
+        return _probe(url)
+    except DownloadError:
+        return None
+
+
 class _Progress:
     """Bytes downloaded so far, shared by the worker threads; reports whole percents."""
 
@@ -250,7 +258,12 @@ class DownloadStatus:
         self._lock = threading.Lock()
         self._message = ""
         self._error: Optional[str] = None
+        self._fraction: Optional[float] = None
         self.finished = threading.Event()
+
+    def set_fraction(self, fraction: Optional[float]) -> None:
+        with self._lock:
+            self._fraction = fraction
 
     def set_message(self, message: str) -> None:
         with self._lock:
@@ -267,6 +280,12 @@ class DownloadStatus:
             return self._message
 
     @property
+    def fraction(self) -> Optional[float]:
+        """How much of all downloads is done (0 to 1), or None while that is not known."""
+        with self._lock:
+            return self._fraction
+
+    @property
     def error(self) -> Optional[str]:
         with self._lock:
             return self._error
@@ -279,13 +298,21 @@ def run_downloads(
     """
     items: [{"url", "dest": Path, "sha256", "size"}]. Calls on_done after the last file, then
     sets status.finished (also set on failure, with status.error). Meant to run in a thread.
+    status.fraction follows the bytes of all files together, if every file's size is known
+    (from the item or the server).
     """
     try:
+        status.set_message("Checking the file sizes")
+        sizes = [item.get("size") or remote_size(item["url"]) for item in items]
+        grand_total = sum(sizes) if items and all(sizes) else None
+        completed = 0
         for index, item in enumerate(items, 1):
             label = f"{item['dest'].name} ({index}/{len(items)})"
             last = [-1]
 
-            def progress(done: int, total: Optional[int], label: str = label) -> None:
+            def progress(done: int, total: Optional[int], label: str = label, before: int = completed) -> None:
+                if grand_total:
+                    status.set_fraction(min(1.0, (before + done) / grand_total))
                 pct = int(done * 100 / total) if total else None
                 if pct is None or pct != last[0]:
                     last[0] = pct if pct is not None else last[0]
@@ -295,6 +322,7 @@ def run_downloads(
             status.set_message(f"Downloading {label}")
             download_file(item["url"], item["dest"], sha256=item.get("sha256"), size=item.get("size"),
                           progress=progress, cancel=cancel)
+            completed += sizes[index - 1] or 0
         status.set_message("")
         if on_done:
             on_done()

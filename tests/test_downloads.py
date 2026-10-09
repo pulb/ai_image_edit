@@ -225,15 +225,18 @@ class ModelStartTests(ServerCase):
         with self.assertRaisesRegex(GenerationError, "still being set up"):
             model.generate(self.params())
         deadline = time.time() + 10
-        while not model.setup_progress().message and time.time() < deadline:
+        while "w.safetensors" not in model.setup_progress().message and time.time() < deadline:
             time.sleep(0.01)
         progress = model.setup_progress()
         self.assertFalse(progress.done)
         self.assertIn("w.safetensors", progress.message)
+        self.assertLess(progress.fraction or 0, 1.0)
         Handler.gate.set()
         self.assertTrue(model._download_status.finished.wait(10))
         self.assertIsNone(model._download_status.error)
-        self.assertEqual(model.setup_progress(), SetupProgress(done=True))
+        final = model.setup_progress()
+        self.assertTrue(final.done)
+        self.assertEqual((final.message, final.error, final.fraction), ("", None, 1.0))
         self.assertEqual((self.tmp / "models/checkpoints/w.safetensors").read_bytes(), PAYLOAD)
         self.launch.assert_called_once()
         model._check_downloads()  # no longer raises
@@ -275,6 +278,28 @@ class ModelStartTests(ServerCase):
         progress = model.setup_progress()
         self.assertTrue(progress.done)
         self.assertRegex(progress.error, "failed.*404")
+
+    def test_fraction_covers_all_files_together(self):
+        status = downloads.DownloadStatus()
+        seen = []
+        original = status.set_fraction
+        status.set_fraction = lambda value: (seen.append(value), original(value))
+        items = [
+            {"url": self.url + "/f", "dest": self.tmp / "a.bin"},
+            {"url": self.url + "/f", "dest": self.tmp / "b.bin", "size": len(PAYLOAD)},
+        ]
+        downloads.run_downloads(items, status, threading.Event())
+        self.assertTrue(status.finished.is_set() and status.error is None)
+        self.assertEqual(seen, sorted(seen))
+        self.assertTrue(0 < seen[0] < 0.5)
+        self.assertAlmostEqual(seen[-1], 1.0)
+
+    def test_fraction_is_unknown_if_the_server_gives_no_size(self):
+        Handler.ranges = False
+        status = downloads.DownloadStatus()
+        downloads.run_downloads([{"url": self.url + "/f", "dest": self.tmp / "a.bin"}], status, threading.Event())
+        self.assertTrue(status.finished.is_set() and status.error is None)
+        self.assertIsNone(status.fraction)
 
     def test_no_setup_means_done(self):
         self.assertEqual(self.model().setup_progress(), SetupProgress(done=True))

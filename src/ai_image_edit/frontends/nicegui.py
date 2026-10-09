@@ -1279,6 +1279,8 @@ def run(model: Model) -> None:
             ui.label(f"Model: {model.display_name}").classes("text-sm w-full text-center").style(f"color: {PRIMARY_COLOR}")
             setup_label = ui.label().classes("text-xs w-full text-center")
             setup_label.set_visibility(False)
+            setup_bar = ui.linear_progress(value=0, show_value=False, size="4px").props("rounded").classes("w-full q-mt-xs")
+            setup_bar.set_visibility(False)
 
         with ui.column().classes("w-full gap-3 aie-page"):
             with ui.card().classes(CARD_CLASSES):
@@ -1551,6 +1553,14 @@ def run(model: Model) -> None:
             setup_label.set_visibility(bool(text))
             setup_label.classes(add="text-negative" if progress.error else "text-gray-400",
                                 remove="text-gray-400" if progress.error else "text-negative")
+            running = not progress.done
+            setup_bar.set_visibility(running)
+            if running:
+                if progress.fraction is None:
+                    setup_bar.props("indeterminate")
+                else:
+                    setup_bar.props(remove="indeterminate")
+                    setup_bar.set_value(progress.fraction)
             if lora_name is not None:
                 found = model.list_loras()
                 if found != available_loras:

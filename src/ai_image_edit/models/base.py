@@ -22,6 +22,7 @@ class SetupProgress:
     done: bool = True
     message: str = ""  # what is being done right now, e.g. "Downloading x.safetensors (2/5): 42%"
     error: Optional[str] = None
+    fraction: Optional[float] = None  # 0 to 1 over the whole setup, None while that is not known
 
 
 class Model(ABC):
