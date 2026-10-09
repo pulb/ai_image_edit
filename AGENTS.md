@@ -61,7 +61,7 @@ Rules for any AI coding agent working in this repository.
 - **Qwen-licensed code**: no code under the Qwen Research License lives in
   this repo; the Qwen-Image-2.1 weights are only downloaded, under their own
   license. Never copy Qwen-licensed code into this repo.
-- **ComfyUI models are data**: a ComfyUI model is one JSON file in
+- **Models are data**: a model is one JSON file in
   `src/ai_image_edit/data/workflows/` (`format_version`, `manifest`, `workflow`; package
   data, installed with the app), run by the generic
   `ComfyWorkflowModel` (`models/_shared/comfyui/workflow_model.py`); there is
@@ -91,8 +91,8 @@ Rules for any AI coding agent working in this repository.
   `core/paths.py`'s `WORK_DIR`, served to the
   browser at `/files/<name>`. It defaults to a folder under `/dev/shm`
   (RAM-backed), is overridable with `AI_IMAGE_EDIT_WORK_DIR`, and is capped by
-  `AI_IMAGE_EDIT_WORK_MAX_SIZE` through `trim_work_dir()`. The ComfyUI models
-  keep their input/output/temp folders under it too.
+  `AI_IMAGE_EDIT_WORK_MAX_SIZE` through `trim_work_dir()`. ComfyUI keeps
+  its input/output/temp folders under it too.
 - **License headers**: this project is GPL-3.0-or-later. Every source
   file starts with `# SPDX-License-Identifier: GPL-3.0-or-later` (or the
   file-format-appropriate comment syntax) as its very first line, before
@@ -104,8 +104,8 @@ Rules for any AI coding agent working in this repository.
   (`python -m py_compile <file>` or `ast.parse`) — several files start
   with a header comment followed immediately by a module docstring, and
   it's easy to break that pairing with a careless insertion.
-- The ComfyUI models have tests (`tests/comfy_models/`, no GPU or ComfyUI needed):
-  `PYTHONPATH=src python -m unittest discover -s tests/comfy_models`. They load every
+- The models have tests (`tests/`, no GPU or ComfyUI needed):
+  `PYTHONPATH=src python -m unittest discover -s tests`. They load every
   workflow file and check it against the JSON Schema and the code
   that runs it (the schema tests need `pip install jsonschema`). Run them after touching
   `models/_shared/comfyui/`, the schema or a workflow file.

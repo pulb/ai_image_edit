@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-# One image for every ComfyUI-based model (the workflow files under
+# One image for AI Image Edit and all of its models (the workflow files under
 # ai_image_edit/data/workflows/). It contains ComfyUI, PyTorch and the app,
 # but no model weights: the model is chosen when the container starts
 # (MODEL_WORKFLOW, MODEL_VARIANT, or a workflow file of your own), and its

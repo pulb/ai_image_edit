@@ -1,6 +1,6 @@
 # Workflow files
 
-A ComfyUI model is one JSON file in `src/ai_image_edit/data/workflows/`; no Python is
+A model is one JSON file in `src/ai_image_edit/data/workflows/`; no Python is
 needed. The files are package data, so they are installed with the app. The file name is the
 model name (`--workflow <name>` or `MODEL_WORKFLOW=<name>`), and the file is found automatically. A file anywhere else is run by giving its path instead of a name; its name is then the file name without `.json`.
 
@@ -44,7 +44,7 @@ mistyped node id or input name fails when the model loads.
 
 ## Tests
 
-`PYTHONPATH=src python -m unittest discover -s tests/comfy_models` checks every file in
+`PYTHONPATH=src python -m unittest discover -s tests` checks every file in
 `src/ai_image_edit/data/workflows/` against the schema and loads it, builds workflows with 0, 1 and the
 maximum number of reference images, and checks they are well formed. The schema tests need
 `pip install jsonschema` and are skipped without it. The tests cannot check the workflow

@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """
-How a ComfyUI model turns the UI's size choices (aspect ratio, "megapixels")
+How a model turns the UI's size choices (aspect ratio, "megapixels")
 into the numbers its workflow needs. A manifest names one policy under
 "size"; adding a model with a new sizing scheme means adding a class here and
 registering it in POLICIES.

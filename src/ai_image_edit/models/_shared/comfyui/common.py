@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Settings and helpers shared by the ComfyUI-based models."""
+"""Settings and helpers shared by the models' ComfyUI code."""
 import os
 from pathlib import Path
 

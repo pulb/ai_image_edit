@@ -4,8 +4,7 @@ ComfyUI wire protocol: launching the server process, uploading images,
 submitting a workflow and waiting for it to finish, and fetching the
 result.
 
-Used by the ComfyUI-based models (the workflow files); a model that doesn't
-run through ComfyUI never touches it, and never has to.
+Used by the models of AI Image Edit (the workflow files) to drive ComfyUI.
 """
 import json
 import os

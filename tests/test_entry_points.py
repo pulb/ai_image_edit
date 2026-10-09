@@ -4,7 +4,7 @@ Tests the command line / environment selection of the model, workflow variants,
 the version override and the custom node installation (against a local git
 repository, no network):
 
-    PYTHONPATH=src python -m unittest discover -s tests/comfy_models -v
+    PYTHONPATH=src python -m unittest discover -s tests -v
 """
 import copy
 import json

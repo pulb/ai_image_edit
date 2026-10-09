@@ -2,7 +2,7 @@
 """
 Tests the weight downloads against a local HTTP server (no internet):
 
-    PYTHONPATH=src python -m unittest discover -s tests/comfy_models -v
+    PYTHONPATH=src python -m unittest discover -s tests -v
 """
 import hashlib
 import json

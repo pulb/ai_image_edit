@@ -3,7 +3,7 @@
 Checks every workflow file in src/ai_image_edit/data/workflows/ against the JSON Schema and
 against the code that runs it, so a new file is covered without adding a test:
 
-    PYTHONPATH=src python -m unittest discover -s tests/comfy_models -v
+    PYTHONPATH=src python -m unittest discover -s tests -v
 
 No ComfyUI, GPU or network is needed: image uploads are stubbed and the weight
 files are empty placeholders in a temporary folder. What this cannot catch is a
@@ -40,7 +40,7 @@ try:
 except ImportError:
     jsonschema = None
 
-DATA_DIR = Path(__file__).resolve().parents[2] / "src" / "ai_image_edit" / "data"
+DATA_DIR = Path(__file__).resolve().parents[1] / "src" / "ai_image_edit" / "data"
 SCHEMA_PATH = DATA_DIR / "workflow.schema.json"
 MANIFESTS = sorted((DATA_DIR / "workflows").glob("*.json"))
 LORAS = ["a.safetensors", "pack/unet.safetensors", "pack/clip.safetensors"]
