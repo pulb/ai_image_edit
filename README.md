@@ -37,12 +37,12 @@ The [deployments](#deployment) are already preconfigured.
 - **`qwen_image21`** (default) — Qwen-Image-2.1 with the
   [official ComfyUI weights](https://huggingface.co/Comfy-Org/Qwen-Image-2.1)
   (bf16, or `--variant int8`). Meant for GPUs with plenty of memory. The
-  weights are under the Qwen RESEARCH LICENSE AGREEMENT (see [License](#license)).
+  weights are under the [Qwen RESEARCH LICENSE AGREEMENT](https://huggingface.co/Qwen/Qwen-Image-2.1/raw/main/LICENSE).
 - **`qwen_image21_gguf`** — Qwen-Image-2.1 with quantized
   [GGUF weights](https://huggingface.co/abenzerps/Qwen-Image-2.1-Uncensored-GGUF).
   Meant for low-VRAM GPUs: it needs far less GPU memory than `qwen_image21`, at
-  some cost in quality. The weights are under the Qwen RESEARCH LICENSE
-  AGREEMENT (see [License](#license)).
+  some cost in quality. The weights are under the
+  [Qwen RESEARCH LICENSE AGREEMENT](https://huggingface.co/Qwen/Qwen-Image-2.1/raw/main/LICENSE).
 - **`qwen_image_edit_2511_aio`** — Qwen-Image-Edit 2511
   ([Phr00t's AIO merge](https://huggingface.co/Phr00t/Qwen-Image-Edit-Rapid-AIO))
   plus a curated set of LoRAs.
@@ -83,16 +83,10 @@ an A100, but it was not re-measured on the other GPUs.
 The code in this repository is licensed under the GNU General Public License
 v3.0 or later (GPL-3.0-or-later). See [`LICENSE`](LICENSE) for the full text.
 
-The model weights are not part of this repository and are not under the GPL.
-They are downloaded from their publishers when a model starts, and each has its
-own license:
-
-- The Qwen-Image-2.1 weights used by `qwen_image21` and `qwen_image21_gguf` are
-  under the Qwen RESEARCH LICENSE AGREEMENT (non-commercial use only). The GGUF
-  files are third-party conversions, and the default `qwen_image21_gguf`
-  variant is a third-party modified (uncensored) version of the model.
-- The weights and LoRAs of `qwen_image_edit_2511_aio` come from third parties;
-  check the licenses of the linked repositories before use.
+The third-party model and LoRA weights are not part of this repository and are
+not under the GPL. They are downloaded from their publishers when a model
+starts, and each has its own license. Check the licenses of the linked
+repositories before use.
 
 A model whose files carry a license that must be accepted is not downloaded
 until you accept it with `ACCEPT_LICENSES`; the error names the license and its
