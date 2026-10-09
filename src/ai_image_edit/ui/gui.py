@@ -132,7 +132,7 @@ def build_advanced_card(caps: ModelCapabilities) -> AdvancedCard:
             if caps.scheduler_choices:
                 scheduler = ui.select(caps.scheduler_choices, value=default_choice(caps.default_scheduler, caps.scheduler_choices), label="Scheduler").props("outlined dark").classes("w-full")
 
-            color_correction = ui.switch("Apply color corrections", value=False).classes("q-mt-sm")
+            color_correction = ui.switch("Apply color corrections (unmasked only)", value=False).classes("q-mt-sm")
     return AdvancedCard(steps, cfg, negative_prompt, denoise, sampler_name, scheduler, color_correction)
 
 
