@@ -308,14 +308,16 @@ def run_downloads(
         completed = 0
         for index, item in enumerate(items, 1):
             label = f"{item['dest'].name} ({index}/{len(items)})"
-            last = [-1]
+            last_pct = -1
 
             def progress(done: int, total: Optional[int], label: str = label, before: int = completed) -> None:
+                nonlocal last_pct
                 if grand_total:
                     status.set_fraction(min(1.0, (before + done) / grand_total))
                 pct = int(done * 100 / total) if total else None
-                if pct is None or pct != last[0]:
-                    last[0] = pct if pct is not None else last[0]
+                if pct is None or pct != last_pct:
+                    if pct is not None:
+                        last_pct = pct
                     gb = done / 1e9
                     status.set_message(f"Downloading {label}: {pct}%" if pct is not None else f"Downloading {label}: {gb:.1f} GB")
 

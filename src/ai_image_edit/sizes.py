@@ -18,8 +18,6 @@ from PIL import Image
 
 from ai_image_edit.core.types import ORIGINAL_ASPECT_RATIO, GenerationParams
 
-ORIGINAL = ORIGINAL_ASPECT_RATIO
-
 
 @dataclass
 class ResolvedSize:
@@ -33,10 +31,15 @@ class ResolvedSize:
 
 
 class SizePolicy:
+    """Built from the manifest's "size" section."""
+
     aspect_ratios: List[str]
     default_aspect_ratio: str
     megapixels: List[float]
     default_megapixels: float
+
+    def __init__(self, config: dict) -> None:
+        pass
 
     def megapixels_for_source(self, source_image_path: str) -> Optional[float]:
         """The megapixels value that fits the source image, or None if the policy has no such notion."""
@@ -78,10 +81,10 @@ def _tier_size(resolution: int, aspect_ratio: str) -> Tuple[Optional[int], Optio
     """
     Width/height for a resolution tier and a named aspect ratio: the model
     card's size for that ratio, scaled by resolution / QWEN21_BASE_RESOLUTION.
-    Returns (None, None) for ORIGINAL and for unknown names; use
+    Returns (None, None) for ORIGINAL_ASPECT_RATIO and for unknown names; use
     _dimensions_from_source() then.
     """
-    if not aspect_ratio or aspect_ratio == ORIGINAL or aspect_ratio not in QWEN21_ASPECT_RATIOS:
+    if not aspect_ratio or aspect_ratio == ORIGINAL_ASPECT_RATIO or aspect_ratio not in QWEN21_ASPECT_RATIOS:
         return None, None
     base_w, base_h = QWEN21_ASPECT_RATIOS[aspect_ratio]
     scale = resolution / QWEN21_BASE_RESOLUTION
@@ -124,11 +127,10 @@ def _nearest_tier(source_image_path: str) -> float:
 class Qwen21Tiers(SizePolicy):
     """Qwen-Image-2.1: resolution tiers (1K/1.5K/2K) and the model card's aspect ratios."""
 
-    def __init__(self, config: dict) -> None:  # takes no settings; the signature is the policies' common one
-        self.aspect_ratios = [ORIGINAL] + list(QWEN21_ASPECT_RATIOS)
-        self.default_aspect_ratio = ORIGINAL
-        self.megapixels = list(QWEN21_TIERS)
-        self.default_megapixels = QWEN21_DEFAULT_TIER
+    aspect_ratios = [ORIGINAL_ASPECT_RATIO, *QWEN21_ASPECT_RATIOS]
+    default_aspect_ratio = ORIGINAL_ASPECT_RATIO
+    megapixels = QWEN21_TIERS
+    default_megapixels = QWEN21_DEFAULT_TIER
 
     def megapixels_for_source(self, source_image_path: str) -> Optional[float]:
         return _nearest_tier(source_image_path)
@@ -136,7 +138,7 @@ class Qwen21Tiers(SizePolicy):
     def resolve(self, params: GenerationParams) -> ResolvedSize:
         # A mask only lines up with the source's own framing and resolution,
         # so both come from the source then.
-        aspect = ORIGINAL if params.mask_path else params.aspect_ratio
+        aspect = ORIGINAL_ASPECT_RATIO if params.mask_path else params.aspect_ratio
         megapixels = self.megapixels_for_source(params.source_image_path) if params.mask_path else params.target_megapixels
         resolution = _resolution_for(megapixels)
         width, height = _tier_size(resolution, aspect)
@@ -158,12 +160,11 @@ class FixedArea(SizePolicy):
         "2:3": (2, 3),
         "21:9": (21, 9),
         "9:21": (9, 21),
-        ORIGINAL: (0, 0),
     }
 
     def __init__(self, config: dict) -> None:
-        self.aspect_ratios = list(self.RATIOS.keys())
-        self.default_aspect_ratio = ORIGINAL
+        self.aspect_ratios = [*self.RATIOS, ORIGINAL_ASPECT_RATIO]
+        self.default_aspect_ratio = ORIGINAL_ASPECT_RATIO
         self.megapixels = list(config["megapixels"])
         self.default_megapixels = config.get("default_megapixels", self.megapixels[0])
         self.multiple = int(config.get("multiple", 8))
@@ -177,9 +178,9 @@ class FixedArea(SizePolicy):
     def resolve(self, params: GenerationParams) -> ResolvedSize:
         # A mask's coordinates only mean something relative to the source's
         # own framing, so a mask always gets the source's aspect ratio.
-        aspect = ORIGINAL if params.mask_path else params.aspect_ratio
+        aspect = ORIGINAL_ASPECT_RATIO if params.mask_path else params.aspect_ratio
         target_area = params.target_megapixels * 1024 * 1024
-        if aspect == ORIGINAL:
+        if aspect == ORIGINAL_ASPECT_RATIO:
             with Image.open(params.source_image_path) as img:
                 ratio_w, ratio_h = img.size
         else:
