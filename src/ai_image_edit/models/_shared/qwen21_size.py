@@ -2,7 +2,7 @@
 """
 Output sizes for Qwen-Image-2.1 models: the aspect ratios and resolution
 tiers from the model card, and the helpers that turn a choice of either into
-pixel dimensions. Shared by every backend that runs this model (qwen_image21,
+pixel dimensions. Used by the Qwen-Image-2.1 workflow files (qwen_image21,
 qwen_image21_gguf); pure functions, no model dependencies.
 """
 import math

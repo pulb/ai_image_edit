@@ -7,9 +7,9 @@ what it can do (capabilities), how to start/stop it, and how to run one
 generation — plus a readable name and version to show. How a model actually gets there (ComfyUI over a websocket, an
 in-process torch pipeline, or anything else) is the model's own
 business and never leaks into this contract — that's what lets a completely
-different execution model (e.g. qwen_image21's direct torch pipeline, with no
-ComfyUI involved at all) implement the same interface as
-qwen_image_edit_2511_aio without either one needing to know about the other.
+different execution model (e.g. a direct torch pipeline, with no ComfyUI
+involved at all) implement the same interface as the ComfyUI models without
+either one needing to know about the other.
 """
 from abc import ABC, abstractmethod
 from typing import Dict, List, Optional

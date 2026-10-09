@@ -1,7 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """
-Gradio frontend — needed for Hugging Face ZeroGPU Spaces, which require the
-Gradio SDK. Entry point is run(model), called by app.py —
+Gradio frontend (the NiceGUI one is the default). Entry point is run(model), called by app.py —
 importing this module does nothing by itself.
 
 UI-only, same contract as the sibling frontends/nicegui.py: renders

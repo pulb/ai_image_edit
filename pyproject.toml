@@ -17,12 +17,6 @@ dependencies = [
 
 [project.optional-dependencies]
 # Backends (MODEL_BACKEND)
-qwen_image_backend = [
-    # Separately licensed (Qwen RESEARCH LICENSE AGREEMENT); brings diffusers,
-    # transformers, accelerate, torchvision and `spaces`. torch is assumed to
-    # be installed already.
-    "ai-image-edit-qwen @ git+https://github.com/pulb/ai_image_edit_qwen",
-]
 comfy_backend = [
     "requests",
     "websocket-client",

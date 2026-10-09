@@ -5,8 +5,7 @@
 # (MODEL_BACKEND, MODEL_VARIANT, or a workflow file of your own), and its
 # weights, LoRAs and custom nodes are fetched on first start, as its workflow
 # file lists them. Mount a volume at /home/user/app/models to keep the weights
-# between containers. The diffusers-based qwen_image21 model has its own
-# Dockerfile (Dockerfile.qwen_image21).
+# between containers.
 #
 # Base image: plain Python (Debian slim), no bundled CUDA/PyTorch — torch
 # is installed manually below via pip, which pulls its own bundled CUDA

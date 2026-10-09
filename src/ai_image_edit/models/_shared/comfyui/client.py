@@ -4,9 +4,8 @@ ComfyUI wire protocol: launching the server process, uploading images,
 submitting a workflow and waiting for it to finish, and fetching the
 result.
 
-Shared by the ComfyUI-based backends (qwen_image_edit_2511_aio,
-qwen_image21_gguf); a model like qwen_image21 that doesn't run through ComfyUI
-never touches it, and never has to.
+Used by the ComfyUI-based models (the workflow files); a model that doesn't
+run through ComfyUI never touches it, and never has to.
 """
 import json
 import os

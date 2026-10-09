@@ -2,8 +2,7 @@
 #
 # Builds deployments/docker/Dockerfile (ComfyUI, PyTorch and the app, without
 # model weights, which the app downloads on first start) and pushes it to
-# GHCR. The app is installed from this commit. The diffusers-based
-# qwen_image21 image has its own workflow.
+# GHCR. The app is installed from this commit.
 name: Build Docker image
 
 on:

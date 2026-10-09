@@ -1,7 +1,0 @@
-# SPDX-License-Identifier: GPL-3.0-or-later
-# Requirements for a Hugging Face Space running the qwen_image21 backend. A
-# Space installs the requirements.txt at its own repo root, so copy this
-# file there (see deployments/huggingface/DEPLOY.md). The Gradio frontend
-# comes with the Space's Gradio SDK; NiceGUI is installed so FRONTEND can be
-# switched in app.py.
-ai-image-edit[qwen_image_backend,nicegui_frontend] @ git+https://github.com/pulb/ai_image_edit
