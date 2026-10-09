@@ -23,7 +23,6 @@ except ImportError:
     sys.modules["websocket"] = types.ModuleType("websocket")
 
 from ai_image_edit import app
-from ai_image_edit.models import MODEL_LOADERS
 from ai_image_edit.models._shared.comfyui import client, custom_nodes
 from ai_image_edit.models._shared.comfyui.workflow_files import available_workflows, read_workflow_file
 from ai_image_edit.models._shared.comfyui.workflow_model import ComfyWorkflowModel
@@ -36,15 +35,14 @@ class SelectionTests(unittest.TestCase):
         env = mock.patch.dict(os.environ)
         env.start()
         self.addCleanup(env.stop)
-        for name in ("MODEL_WORKFLOW", "WORKFLOW_FILE", "MODEL_VARIANT", "REQUIRE_PASSWORD", "MODEL_VERSION"):
+        for name in ("MODEL_WORKFLOW", "MODEL_VARIANT", "REQUIRE_PASSWORD", "MODEL_VERSION"):
             os.environ.pop(name, None)
         self.model = mock.Mock()
         self.run = mock.patch.object(app, "run_frontend").start()
         self.get = mock.patch.object(app, "get_model", return_value=self.model).start()
-        self.get_file = mock.patch.object(app, "get_model_from_file", return_value=self.model).start()
         self.addCleanup(mock.patch.stopall)
 
-    def test_default_is_the_gguf_model(self):
+    def test_default_workflow(self):
         app.main([])
         self.get.assert_called_once_with("qwen_image21", None)
         self.model.start.assert_called_once()
@@ -57,34 +55,37 @@ class SelectionTests(unittest.TestCase):
         self.run.assert_called_once_with(self.model)
 
     def test_command_line_beats_environment(self):
-        os.environ.update(MODEL_WORKFLOW="x", WORKFLOW_FILE="/env.json", MODEL_VARIANT="a")
-        app.main(["--model", "y", "--variant", "b"])
+        os.environ.update(MODEL_WORKFLOW="x", MODEL_VARIANT="a")
+        app.main(["--workflow", "y", "--variant", "b"])
         self.get.assert_called_once_with("y", "b")
-        self.get_file.assert_not_called()
-        self.get.reset_mock()
-        app.main(["--workflow", "/cli.json"])
-        self.get_file.assert_called_once_with("/cli.json", "a")
-        self.get.assert_not_called()
 
-    def test_workflow_file_from_environment(self):
-        os.environ["WORKFLOW_FILE"] = "/env.json"
-        app.main([])
-        self.get_file.assert_called_once_with("/env.json", None)
-
-    def test_model_and_workflow_exclude_each_other(self):
-        with self.assertRaises(SystemExit):
-            app.parse_args(["--model", "a", "--workflow", "b"])
-
-    def test_list_models(self):
+    def test_list_workflows(self):
         with mock.patch("builtins.print") as out:
-            app.main(["--list-models"])
-        self.assertEqual(out.call_args[0][0].split("\n"), sorted(MODEL_LOADERS))
+            app.main(["--list-workflows"])
+        self.assertEqual(out.call_args[0][0].split("\n"), sorted(available_workflows()))
         self.get.assert_not_called()
 
-    def test_bad_model_is_a_clean_exit(self):
-        self.get.side_effect = ValueError("Unknown model 'z'")
-        with self.assertRaisesRegex(SystemExit, "Unknown model"):
-            app.main(["--model", "z"])
+    def test_bad_workflow_is_a_clean_exit(self):
+        self.get.side_effect = ValueError("Unknown workflow 'z'")
+        with self.assertRaisesRegex(SystemExit, "Unknown workflow"):
+            app.main(["--workflow", "z"])
+
+
+class GetModelTests(unittest.TestCase):
+    def test_bundled_name_and_file_path(self):
+        from ai_image_edit.models import get_model
+
+        with mock.patch.object(ComfyWorkflowModel, "from_file") as from_file:
+            get_model("qwen_image21_gguf", "Q8_0")
+            from_file.assert_called_with(available_workflows()["qwen_image21_gguf"], "Q8_0")
+            get_model(str(GGUF))
+            from_file.assert_called_with(GGUF, None)
+
+    def test_unknown_workflow_lists_the_bundled_ones(self):
+        from ai_image_edit.models import get_model
+
+        with self.assertRaisesRegex(ValueError, "Unknown workflow 'nope'. Available: qwen_image21,"):
+            get_model("nope")
 
 
 class VariantTests(unittest.TestCase):

@@ -53,17 +53,11 @@ Rules for any AI coding agent working in this repository.
   entry point, `run(model: Model) -> None`, which `frontends/__init__.py`'s
   `run_frontend()` calls. The model is passed as a plain argument — no shared
   mutable module state. The UI shows `model.display_name`.
-- **Model contract**: each non-workflow model under `models/` implements the
-  `Model` interface (`models/base.py`): `capabilities`, `start()`,
-  `generate()`, with `shutdown()`, `list_loras()`, `model_name` and
-  `model_version` optional. Register a
-  new non-ComfyUI model in `models/__init__.py`'s `MODEL_LOADERS`.
-- **Lazy model imports**: `models/__init__.py` imports a non-workflow
-  model's module lazily, inside its loader function, not at module top
-  level. Models can have almost disjoint dependency sets and a given
-  deployment installs only one stack — keep new models lazy-imported the
-  same way, and let a missing optional package become an install hint
-  instead of an import error at startup.
+- **Model contract**: the UI talks to a model through the `Model` interface
+  (`models/base.py`): `capabilities`, `start()`, `generate()`, with
+  `shutdown()`, `list_loras()`, `model_name` and `model_version` optional.
+  Every model is a workflow file, run by `ComfyWorkflowModel`;
+  `models/__init__.py`'s `get_model()` finds it by bundled name or by path.
 - **Qwen-licensed code**: no code under the Qwen Research License lives in
   this repo; the Qwen-Image-2.1 weights are only downloaded, under their own
   license.
@@ -87,7 +81,7 @@ Rules for any AI coding agent working in this repository.
   `_shared/` packages (`models/_shared/`, `frontends/_shared/`). The contracts
   and registries (`models/base.py`, `models/__init__.py`,
   `frontends/__init__.py`) stay at the top level of their package.
-- **Default model**: `src/ai_image_edit/app.py` defaults `--model`/`MODEL_WORKFLOW` to
+- **Default model**: `src/ai_image_edit/app.py` defaults `--workflow`/`MODEL_WORKFLOW` to
   `qwen_image21`; the `Dockerfile` leaves the default.
 - **Masking**: masked generation (crop → infer → composite/color-correct)
   is handled externally via `core/imaging.py`'s `run_masked_generation()`,

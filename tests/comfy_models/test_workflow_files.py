@@ -31,7 +31,7 @@ from PIL import Image
 from ai_image_edit.core import imaging
 from ai_image_edit.core.errors import GenerationError
 from ai_image_edit.core.types import GenerationParams
-from ai_image_edit.models import MODEL_LOADERS, get_model
+from ai_image_edit.models._shared.comfyui.workflow_files import available_workflows
 from ai_image_edit.models._shared.comfyui import client, workflow_files
 from ai_image_edit.models._shared.comfyui.workflow_model import ComfyWorkflowModel
 
@@ -96,7 +96,7 @@ class ManifestModelTests(unittest.TestCase):
     def test_workflow_files_exist_and_are_registered(self):
         self.assertTrue(MANIFESTS, "no workflow file found in ai_image_edit/data/workflows")
         for path in MANIFESTS:
-            self.assertIn(path.stem, MODEL_LOADERS)
+            self.assertIn(path.stem, available_workflows())
 
     @unittest.skipUnless(jsonschema, "pip install jsonschema")
     def test_files_match_the_schema(self):

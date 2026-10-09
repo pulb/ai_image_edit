@@ -2,12 +2,12 @@
 """
 Entry point: builds the model and hands it to the web UI.
 
-    python -m ai_image_edit [--model NAME | --workflow FILE] [--variant ID]
-    python -m ai_image_edit --list-models
+    python -m ai_image_edit [--workflow NAME_OR_FILE] [--variant ID]
+    python -m ai_image_edit --list-workflows
 
 Each option falls back to an environment variable, which is how the container
-images are configured: MODEL_WORKFLOW (default qwen_image21), WORKFLOW_FILE,
-and MODEL_VARIANT. APP_PASSWORD adds a password login
+images are configured: MODEL_WORKFLOW (a bundled name or a workflow file;
+default qwen_image21) and MODEL_VARIANT. APP_PASSWORD adds a password login
 to the UI. The UI code lives under frontends/, the model code under
 models/; run_frontend() passes the built model straight to the UI's run(model).
 """
@@ -16,23 +16,22 @@ import os
 from typing import List, Optional
 
 from ai_image_edit.frontends import run_frontend
-from ai_image_edit.models import MODEL_LOADERS, get_model, get_model_from_file
+from ai_image_edit.models import get_model
+from ai_image_edit.models._shared.comfyui.workflow_files import available_workflows
 
 
 def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(prog="ai_image_edit", description="AI image editing with a web UI.")
-    which = parser.add_mutually_exclusive_group()
-    which.add_argument("--model", help="model to run (see --list-models); env MODEL_WORKFLOW, default qwen_image21")
-    which.add_argument("--workflow", metavar="FILE", help="run the ComfyUI model in this workflow file; env WORKFLOW_FILE")
-    parser.add_argument("--variant", help="variant of a workflow file's model, e.g. a quantization; env MODEL_VARIANT")
-    parser.add_argument("--list-models", action="store_true", help="print the available models and exit")
+    parser.add_argument("--workflow", metavar="NAME_OR_FILE", help="model workflow to run: a bundled name (see --list-workflows) or the path of a workflow file; env MODEL_WORKFLOW, default qwen_image21")
+    parser.add_argument("--variant", help="variant of the workflow's model, e.g. a quantization; env MODEL_VARIANT")
+    parser.add_argument("--list-workflows", action="store_true", help="print the bundled workflows and exit")
     return parser.parse_args(argv)
 
 
 def main(argv: Optional[List[str]] = None) -> None:
     args = parse_args(argv)
-    if args.list_models:
-        print("\n".join(sorted(MODEL_LOADERS)))
+    if args.list_workflows:
+        print("\n".join(sorted(available_workflows())))
         return
 
     variant = args.variant or os.environ.get("MODEL_VARIANT") or None
@@ -42,18 +41,12 @@ def main(argv: Optional[List[str]] = None) -> None:
     if os.environ.get("REQUIRE_PASSWORD") and not password:
         raise SystemExit("REQUIRE_PASSWORD is set but APP_PASSWORD is empty: set APP_PASSWORD to start the app.")
 
-    # An option on the command line beats the environment, whichever of the two it is.
-    workflow = args.workflow or (None if args.model else os.environ.get("WORKFLOW_FILE") or None)
+    workflow = args.workflow or os.environ.get("MODEL_WORKFLOW") or "qwen_image21"
     try:
-        if workflow:
-            model_name = workflow
-            model = get_model_from_file(workflow, variant)
-        else:
-            model_name = args.model or os.environ.get("MODEL_WORKFLOW", "qwen_image21")
-            model = get_model(model_name, variant)
+        model = get_model(workflow, variant)
     except (ValueError, OSError) as exc:
         raise SystemExit(str(exc))
-    print(f"Starting model '{model_name}' in the background...", flush=True)
+    print(f"Starting model '{workflow}' in the background...", flush=True)
     try:
         model.start()
     except RuntimeError as exc:  # a missing file, an unaccepted license: a message is enough

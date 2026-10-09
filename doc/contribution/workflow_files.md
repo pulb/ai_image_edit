@@ -2,7 +2,7 @@
 
 A ComfyUI model is one JSON file in `src/ai_image_edit/data/workflows/`; no Python is
 needed. The files are package data, so they are installed with the app. The file name is the
-model name (`--model <name>` or `MODEL_WORKFLOW=<name>`), and the file is found automatically. A file anywhere else is run with `--workflow <path>` (or `WORKFLOW_FILE`); its name is then the file name without `.json`.
+model name (`--workflow <name>` or `MODEL_WORKFLOW=<name>`), and the file is found automatically. A file anywhere else is run by giving its path instead of a name; its name is then the file name without `.json`.
 
 ```json
 {

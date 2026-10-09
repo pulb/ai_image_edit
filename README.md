@@ -25,29 +25,19 @@ front of interchangeable image-generation models.
 
 ## Model workflows
 
-Each model is a [workflow file](doc/contribution/workflow_files.md): a ComfyUI
-workflow plus a manifest that lists its weights, custom nodes and variants. They
-run in a ComfyUI process that the app starts, and the weights are downloaded
-when the model starts. Select one with `--model NAME` or the `MODEL_WORKFLOW`
-variable (`--list-models` prints the names). `--workflow FILE` (or
-`WORKFLOW_FILE`) runs any workflow file of your own instead, and `--variant ID`
-(`MODEL_VARIANT`) picks one of its variants, e.g. another GGUF quantization.
-The [deployments](#deployment) are already preconfigured.
+The models the app runs are interchangeable *model workflows*, and you can
+change them (see [Model workflows](doc/models.md) for how). The weights are
+downloaded when a model starts. These are available:
 
-- **`qwen_image21`** (default) — Qwen-Image-2.1 with the
-  [official ComfyUI weights](https://huggingface.co/Comfy-Org/Qwen-Image-2.1)
-  (bf16, or `--variant int8`). Meant for GPUs with plenty of memory. The
-  weights are under the [Qwen RESEARCH LICENSE AGREEMENT](https://huggingface.co/Qwen/Qwen-Image-2.1/raw/main/LICENSE).
-- **`qwen_image21_gguf`** — Qwen-Image-2.1 with quantized
-  [GGUF weights](https://huggingface.co/abenzerps/Qwen-Image-2.1-Uncensored-GGUF).
-  Meant for low-VRAM GPUs: it needs far less GPU memory than `qwen_image21`, at
-  some cost in quality. The weights are under the
-  [Qwen RESEARCH LICENSE AGREEMENT](https://huggingface.co/Qwen/Qwen-Image-2.1/raw/main/LICENSE).
-- **`qwen_image_edit_2511_aio`** — Qwen-Image-Edit 2511
-  ([Phr00t's AIO merge](https://huggingface.co/Phr00t/Qwen-Image-Edit-Rapid-AIO))
-  plus a curated set of LoRAs.
+- **`qwen_image21`** (default): Qwen-Image-2.1 in full quality, for GPUs with
+  plenty of memory.
+- **`qwen_image21_gguf`**: the same model, quantized, for GPUs with little
+  memory, at some cost in quality.
+- **`qwen_image_edit_2511_aio`**: Qwen-Image-Edit 2511 with a set of LoRAs, for
+  fast edits in just a few steps.
 
-The UI is served on port `7860`.
+The [deployments](#deployment) are already preconfigured. More details about
+each workflow, its variants and licenses are in [doc/models.md](doc/models.md).
 
 ## Deployment
 

@@ -78,6 +78,6 @@ RUN pip install --no-cache-dir \
 
 EXPOSE 7860
 
-# MODEL_WORKFLOW (default qwen_image21), MODEL_VARIANT and WORKFLOW_FILE
+# MODEL_WORKFLOW (default qwen_image21) and MODEL_VARIANT
 # are read from the environment.
 CMD ["python", "-m", "ai_image_edit"]
