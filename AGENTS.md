@@ -49,7 +49,7 @@ Rules for any AI coding agent working in this repository.
   `sizes.py` (output-size policies), `comfyui/` (client, downloads, custom
   nodes, GPU arguments), `ui/` (the NiceGUI UI: `gui.py` is the page, built from one function per section, with `login.py`,
   `components.py`, `mask_editor.py` and `compare_slider.py`; its CSS and JS are
-  in `ui/static/`) and `core/` (types, imaging, paths, result cache). It is started with `python -m ai_image_edit`.
+  in `ui/static/`) and `core/` (types, imaging, paths, result cache). It is started with `ai-image-edit` (or `python -m ai_image_edit`).
   Imports are absolute (`from ai_image_edit.core import …`). Dependencies
   live in `pyproject.toml`: everything the app needs (including NiceGUI and
   the ComfyUI client) is a regular dependency.

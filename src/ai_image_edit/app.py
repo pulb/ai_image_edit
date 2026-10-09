@@ -2,8 +2,8 @@
 """
 Entry point: builds the model and hands it to the web UI.
 
-    python -m ai_image_edit [--workflow NAME_OR_FILE] [--variant ID]
-    python -m ai_image_edit --list-workflows
+    ai-image-edit [--workflow NAME_OR_FILE] [--variant ID]
+    ai-image-edit --list-workflows
 
 Each option falls back to an environment variable, which is how the container
 images are configured: MODEL_WORKFLOW (a bundled name or a workflow file;
@@ -21,7 +21,7 @@ from ai_image_edit.workflows import available_workflows
 
 
 def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(prog="ai_image_edit", description="AI image editing with a web UI.")
+    parser = argparse.ArgumentParser(prog="ai-image-edit", description="AI image editing with a web UI.")
     parser.add_argument("--workflow", metavar="NAME_OR_FILE", help="model workflow to run: a bundled name (see --list-workflows) or the path of a workflow file; env MODEL_WORKFLOW, default qwen_image21")
     parser.add_argument("--variant", help="variant of the workflow's model, e.g. a quantization; env MODEL_VARIANT")
     parser.add_argument("--list-workflows", action="store_true", help="print the bundled workflows and exit")
