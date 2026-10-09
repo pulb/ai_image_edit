@@ -125,8 +125,8 @@ def install_password_login(password: str) -> str:
         if app.storage.user.get("authenticated"):
             return RedirectResponse("/")
 
-        # Only same-site paths: "//host" would redirect off-site.
-        target = redirect_to if redirect_to.startswith("/") and not redirect_to.startswith("//") else "/"
+        # Only same-site paths: "//host" and "/\\host" would redirect off-site.
+        target = redirect_to if redirect_to.startswith("/") and not redirect_to.startswith("//") and "\\" not in redirect_to else "/"
 
         async def try_login() -> None:
             if hmac.compare_digest(field.value.encode(), password.encode()):

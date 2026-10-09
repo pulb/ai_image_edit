@@ -21,12 +21,16 @@ GIB = 1024 ** 3
 
 
 def free_vram_bytes() -> Optional[int]:
-    """Free memory of the first NVIDIA GPU, or None if nvidia-smi cannot tell."""
+    """Free memory of the first GPU ComfyUI can use (see CUDA_VISIBLE_DEVICES), or None if nvidia-smi cannot tell."""
+    command = ["nvidia-smi", "--query-gpu=memory.free", "--format=csv,noheader,nounits"]
+    visible = os.environ.get("CUDA_VISIBLE_DEVICES")
+    if visible is not None:
+        first = visible.split(",")[0].strip()
+        if not first or first.startswith("-"):  # no GPU is visible
+            return None
+        command += ["-i", first]
     try:
-        out = subprocess.run(
-            ["nvidia-smi", "--query-gpu=memory.free", "--format=csv,noheader,nounits"],
-            capture_output=True, text=True, timeout=10, check=True,
-        ).stdout
+        out = subprocess.run(command, capture_output=True, text=True, timeout=10, check=True).stdout
         return int(out.splitlines()[0].strip()) * 1024 * 1024  # MiB
     except (OSError, subprocess.SubprocessError, ValueError, IndexError):
         return None
