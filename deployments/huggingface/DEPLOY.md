@@ -9,16 +9,10 @@ ComfyUI process, which needs a regular GPU. The UI is served on port `7860`.
 1. Create a Space with the **Docker** SDK and pick a GPU under
    **Settings → Space hardware**: at least 48 GB of VRAM for `qwen_image21`,
    at least 16 GB for `qwen_image21_gguf`.
-2. Copy [`../docker/Dockerfile`](../docker/Dockerfile) to the Space root as
-   `Dockerfile`, and add a `README.md` card with the front matter:
-
-   ```yaml
-   ---
-   title: AI Image Edit
-   sdk: docker
-   app_port: 7860
-   ---
-   ```
+2. Copy the contents of [`space/`](space/) into the root of the Space repo: the
+   `README.md` card (`sdk: docker`, `app_port: 7860`) and the `Dockerfile`, which
+   is a symlink to [`../docker/Dockerfile`](../docker/Dockerfile). Copy the
+   symlink's target, not the link itself (`cp -L`).
 3. Under **Settings → Variables and secrets** set `ACCEPT_LICENSES` (e.g. `qwen-research`) and, to
    change the model from the default `qwen_image21`, `MODEL_WORKFLOW`, plus any optional variable from
    [Docker](../docker/DEPLOY.md). The weights download on first start.
