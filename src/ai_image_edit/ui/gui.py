@@ -10,7 +10,7 @@ are shown or hidden based on the active model's declared capabilities.
 """
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Dict, List, Optional
 
@@ -186,6 +186,70 @@ class EditorCard:
     set_editor_image: Callable
 
 
+@dataclass
+class ReferenceCard:
+    reference_holders: List[dict] = field(default_factory=list)
+    available_loras: Dict[str, List[str]] = field(default_factory=dict)
+    lora_name: Optional[ui.select] = None
+    lora_strength: Optional[ui.slider] = None
+
+
+def build_reference_card(model: WorkflowModel, caps) -> ReferenceCard:
+    card = ReferenceCard()
+    reference_holders = card.reference_holders
+    if caps.max_reference_images > 1 or caps.supports_loras:
+        with ui.card().classes(CARD_CLASSES):
+            if caps.max_reference_images > 1:
+                with ui.expansion("Reference images (optional)").props("dense").classes("w-full"):
+                    for i in range(caps.max_reference_images - 1):
+                        reference_holders.append(create_simple_image_upload(f"Input image {i + 2}"))
+
+                    # Only the first slot shows; + / - reveal or hide
+                    # the rest. Hiding a slot also clears its image, so
+                    # nothing invisible is sent with the request.
+                    ref_state = {"visible": 1}
+                    for holder in reference_holders[1:]:
+                        holder["container"].set_visibility(False)
+
+                    with ui.row().classes("w-full items-center gap-2"):
+                        ref_remove_btn = ui.button(icon="remove").props("flat dense round size=sm")
+                        ref_add_btn = ui.button(icon="add").props("flat dense round size=sm")
+                        ref_count_label = ui.label().classes("text-xs text-gray-400")
+
+                    def update_reference_slots() -> None:
+                        total = len(reference_holders)
+                        ref_count_label.set_text(f"{ref_state['visible']} of {total}")
+                        ref_remove_btn.set_enabled(ref_state["visible"] > 1)
+                        ref_add_btn.set_enabled(ref_state["visible"] < total)
+
+                    def add_reference_slot() -> None:
+                        if ref_state["visible"] < len(reference_holders):
+                            reference_holders[ref_state["visible"]]["container"].set_visibility(True)
+                            ref_state["visible"] += 1
+                            update_reference_slots()
+
+                    def remove_reference_slot() -> None:
+                        if ref_state["visible"] > 1:
+                            ref_state["visible"] -= 1
+                            holder = reference_holders[ref_state["visible"]]
+                            holder["clear"]()
+                            holder["container"].set_visibility(False)
+                            update_reference_slots()
+
+                    ref_add_btn.on_click(add_reference_slot)
+                    ref_remove_btn.on_click(remove_reference_slot)
+                    update_reference_slots()
+
+            if caps.supports_loras:
+                with ui.expansion("LoRAs").props("dense").classes("w-full"):
+                    card.available_loras.update(model.list_loras())
+                    card.lora_name = ui.select(["None"] + list(card.available_loras), value="None", label="Name").props("outlined dark").classes("w-full")
+                    ui.label("Strength").classes("text-xs text-gray-400 q-mt-sm")
+                    card.lora_strength = create_value_slider(caps.lora_strength_range)
+    return card
+
+
+
 # Aspect ratio + resolution + the unified image/mask editor. As soon
 # as a mask is drawn on a model that supports inpainting, dimensions
 # must come from the source image's own aspect ratio (a mask's
@@ -284,60 +348,7 @@ def run(model: WorkflowModel) -> None:
 
             editor = await build_editor_card(model, caps)
 
-            reference_holders: List[dict] = []
-            if caps.max_reference_images > 1 or caps.supports_loras:
-                with ui.card().classes(CARD_CLASSES):
-                    if caps.max_reference_images > 1:
-                        with ui.expansion("Reference images (optional)").props("dense").classes("w-full"):
-                            for i in range(caps.max_reference_images - 1):
-                                reference_holders.append(create_simple_image_upload(f"Input image {i + 2}"))
-
-                            # Only the first slot shows; + / - reveal or hide
-                            # the rest. Hiding a slot also clears its image, so
-                            # nothing invisible is sent with the request.
-                            ref_state = {"visible": 1}
-                            for holder in reference_holders[1:]:
-                                holder["container"].set_visibility(False)
-
-                            with ui.row().classes("w-full items-center gap-2"):
-                                ref_remove_btn = ui.button(icon="remove").props("flat dense round size=sm")
-                                ref_add_btn = ui.button(icon="add").props("flat dense round size=sm")
-                                ref_count_label = ui.label().classes("text-xs text-gray-400")
-
-                            def update_reference_slots() -> None:
-                                total = len(reference_holders)
-                                ref_count_label.set_text(f"{ref_state['visible']} of {total}")
-                                ref_remove_btn.set_enabled(ref_state["visible"] > 1)
-                                ref_add_btn.set_enabled(ref_state["visible"] < total)
-
-                            def add_reference_slot() -> None:
-                                if ref_state["visible"] < len(reference_holders):
-                                    reference_holders[ref_state["visible"]]["container"].set_visibility(True)
-                                    ref_state["visible"] += 1
-                                    update_reference_slots()
-
-                            def remove_reference_slot() -> None:
-                                if ref_state["visible"] > 1:
-                                    ref_state["visible"] -= 1
-                                    holder = reference_holders[ref_state["visible"]]
-                                    holder["clear"]()
-                                    holder["container"].set_visibility(False)
-                                    update_reference_slots()
-
-                            ref_add_btn.on_click(add_reference_slot)
-                            ref_remove_btn.on_click(remove_reference_slot)
-                            update_reference_slots()
-
-                    available_loras: Dict[str, List[str]] = {}
-                    lora_name = None
-                    lora_strength = None
-                    if caps.supports_loras:
-                        with ui.expansion("LoRAs").props("dense").classes("w-full"):
-                            available_loras = model.list_loras()
-                            lora_name = ui.select(["None"] + list(available_loras.keys()), value="None", label="Name").props("outlined dark").classes("w-full")
-                            ui.label("Strength").classes("text-xs text-gray-400 q-mt-sm")
-                            ls = caps.lora_strength_range
-                            lora_strength = create_value_slider(ls)
+            references = build_reference_card(model, caps)
 
             advanced = build_advanced_card(caps)
             result_card = await build_result_card()
@@ -364,7 +375,7 @@ def run(model: WorkflowModel) -> None:
                     annotated_image_path = await nicegui_run.io_bound(
                         imaging.compose_annotations, source_image_path, editor_inputs.annotation_layer_path
                     )
-                lora_files = available_loras.get(lora_name.value, []) if lora_name is not None else []
+                lora_files = references.available_loras.get(references.lora_name.value, []) if references.lora_name is not None else []
 
                 params = params_from_ui(
                     caps,
@@ -372,7 +383,7 @@ def run(model: WorkflowModel) -> None:
                     source_image_path=source_image_path,
                     mask_path=editor_inputs.mask_path,
                     annotated_image_path=annotated_image_path,
-                    reference_images=[h["path"] for h in reference_holders if h["path"]],
+                    reference_images=[h["path"] for h in references.reference_holders if h["path"]],
                     seed=prompt_card.seed_input.value,
                     randomize_seed=prompt_card.randomize_seed.value,
                     aspect_ratio=editor.aspect_ratio.value,
@@ -384,7 +395,7 @@ def run(model: WorkflowModel) -> None:
                     scheduler=advanced.scheduler.value if advanced.scheduler is not None else None,
                     negative_prompt=advanced.negative_prompt.value if advanced.negative_prompt is not None else None,
                     lora_files=lora_files,
-                    lora_strength=lora_strength.value if lora_strength is not None else None,
+                    lora_strength=references.lora_strength.value if references.lora_strength is not None else None,
                     apply_color_correction=advanced.color_correction.value,
                     feather_amount=editor_inputs.feather_amount,
                 )
@@ -445,12 +456,14 @@ def run(model: WorkflowModel) -> None:
                 else:
                     header.setup_bar.props(remove="indeterminate")
                     header.setup_bar.set_value(progress.fraction)
-            if lora_name is not None:
+            if references.lora_name is not None:
                 found = model.list_loras()
-                if found != available_loras:
-                    available_loras.clear()
-                    available_loras.update(found)
-                    lora_name.set_options(["None"] + list(found), value=lora_name.value if lora_name.value in found else "None")
+                if found != references.available_loras:
+                    references.available_loras.clear()
+                    references.available_loras.update(found)
+                    references.lora_name.set_options(
+                        ["None"] + list(found), value=references.lora_name.value if references.lora_name.value in found else "None"
+                    )
             if progress.done:
                 setup_timer.deactivate()
 
