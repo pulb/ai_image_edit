@@ -25,9 +25,10 @@ front of interchangeable image-generation models.
 
 ## Model workflows
 
-The models the app runs are interchangeable *model workflows*, and you can
-change them (see [Model workflows](doc/models.md) for how). The weights are
-downloaded when a model starts. These are available:
+The models the app runs are interchangeable *model workflows*. You can select
+one of the included workflows or even write your own (see
+[Model workflows](doc/models.md)). The weights are downloaded when a model
+starts. These are included:
 
 - **`qwen_image21`** (default): Qwen-Image-2.1 in full quality, for GPUs with
   plenty of memory.
