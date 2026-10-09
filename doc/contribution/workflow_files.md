@@ -13,7 +13,7 @@ model name (`--workflow <name>` or `MODEL_WORKFLOW=<name>`), and the file is fou
 ```
 
 The structure is defined by [`workflow.schema.json`](../../src/ai_image_edit/data/workflow.schema.json) (JSON
-Schema), which the tests check every file against. `format_version` changes only when the
+Schema), which the app checks every file against when it loads it (and the tests check the bundled ones). `format_version` changes only when the
 format changes incompatibly; the app refuses files of another version.
 
 ## Targets
@@ -47,8 +47,7 @@ mistyped node id or input name fails when the model loads.
 
 `PYTHONPATH=src python -m unittest discover -s tests` checks every file in
 `src/ai_image_edit/data/workflows/` against the schema and loads it, builds workflows with 0, 1 and the
-maximum number of reference images, and checks they are well formed. The schema tests need
-`pip install jsonschema` and are skipped without it. The tests cannot check the workflow
+maximum number of reference images, and checks they are well formed. The tests cannot check the workflow
 itself (a wrong node class or input name): only running it in ComfyUI does.
 
 ## Downloads

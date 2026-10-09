@@ -15,14 +15,11 @@ dependencies = [
     "pillow",
     "nicegui==3.18.0",
     "requests",
+    "jsonschema",
     "websocket-client",
     "sentencepiece",
     "transformers",
 ]
-
-[project.optional-dependencies]
-# Tests (see AGENTS.md)
-test = ["jsonschema"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

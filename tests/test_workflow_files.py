@@ -35,10 +35,7 @@ from ai_image_edit.models._shared.comfyui.workflow_files import available_workfl
 from ai_image_edit.models._shared.comfyui import client, workflow_files
 from ai_image_edit.models._shared.comfyui.workflow_model import ComfyWorkflowModel
 
-try:
-    import jsonschema
-except ImportError:
-    jsonschema = None
+import jsonschema
 
 DATA_DIR = Path(__file__).resolve().parents[1] / "src" / "ai_image_edit" / "data"
 SCHEMA_PATH = DATA_DIR / "workflow.schema.json"
@@ -98,7 +95,6 @@ class ManifestModelTests(unittest.TestCase):
         for path in MANIFESTS:
             self.assertIn(path.stem, available_workflows())
 
-    @unittest.skipUnless(jsonschema, "pip install jsonschema")
     def test_files_match_the_schema(self):
         schema = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
         jsonschema.Draft202012Validator.check_schema(schema)
@@ -109,7 +105,15 @@ class ManifestModelTests(unittest.TestCase):
                 errors = sorted(validator.iter_errors(data), key=lambda e: list(e.path))
                 self.assertEqual([], [f"{'/'.join(map(str, e.path))}: {e.message}" for e in errors])
 
-    @unittest.skipUnless(jsonschema, "pip install jsonschema")
+    def test_loading_rejects_a_file_that_breaks_the_schema(self):
+        data = json.loads(MANIFESTS[0].read_text(encoding="utf-8"))
+        del data["manifest"]["bind"]
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "broken.json"
+            path.write_text(json.dumps(data), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "(?s)does not match the workflow file schema.*bind"):
+                workflow_files.read_workflow_file(path)
+
     def test_schema_rejects_mistakes(self):
         schema = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
         validator = jsonschema.Draft202012Validator(schema)

@@ -104,10 +104,9 @@ Rules for any AI coding agent working in this repository.
   (`python -m py_compile <file>` or `ast.parse`) — several files start
   with a header comment followed immediately by a module docstring, and
   it's easy to break that pairing with a careless insertion.
-- The models have tests (`tests/`, no GPU or ComfyUI needed):
-  `PYTHONPATH=src python -m unittest discover -s tests`. They load every
-  workflow file and check it against the JSON Schema and the code
-  that runs it (the schema tests need `pip install jsonschema`). Run them after touching
-  `models/_shared/comfyui/`, the schema or a workflow file.
-- There is no other automated test suite in this repo yet; sanity-check changes
-  by reading the affected code paths end to end rather than assuming.
+- Tests live in `tests/` (no GPU, ComfyUI or network needed):
+  `PYTHONPATH=src python -m unittest discover -s tests`. They cover the
+  workflow files (schema and the code that runs them), downloads, custom
+  node installation, the entry points and the GPU argument choice. Run them
+  after any change; for code they don't reach (the UI, the ComfyUI client),
+  also read the affected code paths end to end.
