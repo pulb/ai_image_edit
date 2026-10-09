@@ -93,7 +93,7 @@ class ManifestModelTests(unittest.TestCase):
             sampler="euler", scheduler="simple", lora_files=LORAS if m.get("loras") else [], size_values=size_values,
         )
 
-    def test_workflow_files_exist_and_are_registered(self):
+    def test_workflow_files_exist_and_are_listed(self):
         self.assertTrue(MANIFESTS, "no workflow file found in ai_image_edit/data/workflows")
         for path in MANIFESTS:
             self.assertIn(path.stem, available_workflows())

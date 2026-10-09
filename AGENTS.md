@@ -60,26 +60,25 @@ Rules for any AI coding agent working in this repository.
   `models/__init__.py`'s `get_model()` finds it by bundled name or by path.
 - **Qwen-licensed code**: no code under the Qwen Research License lives in
   this repo; the Qwen-Image-2.1 weights are only downloaded, under their own
-  license.
-  Never copy Qwen-licensed or Space-derived code into this repo.
+  license. Never copy Qwen-licensed code into this repo.
 - **ComfyUI models are data**: a ComfyUI model is one JSON file in
   `src/ai_image_edit/data/workflows/` (`format_version`, `manifest`, `workflow`; package
   data, installed with the app), run by the generic
   `ComfyWorkflowModel` (`models/_shared/comfyui/workflow_model.py`); there is
-  no per-model Python class. `models/__init__.py` registers every file there
+  no per-model Python class. `get_model()` finds every file there
   by its name. The format is documented in
   `doc/contribution/workflow_files.md` and defined by `src/ai_image_edit/data/workflow.schema.json`.
   Output-size schemes are `size_policies.py`; a model with a new one adds a
   policy class there.
-- **ComfyUI models**: `models/_shared/comfyui/` holds what the ComfyUI-based
-  models share (`client.py`, `common.py`, `downloads.py`). Weight files are
+- **ComfyUI code**: `models/_shared/comfyui/` holds what the models
+  share (`client.py`, `common.py`, `downloads.py`). Weight files are
   listed in the workflow file's `files` and downloaded when missing; an
   environment variable such as `MODEL_FILE` can point to a local file instead.
   Qwen-Image-2.1 output sizes shared by `qwen_image21` and `qwen_image21_gguf`
   live in `models/_shared/qwen21_size.py`.
 - **Shared code**: helpers used by several models or frontends live in
   `_shared/` packages (`models/_shared/`, `frontends/_shared/`). The contracts
-  and registries (`models/base.py`, `models/__init__.py`,
+  and entry points (`models/base.py`, `models/__init__.py`,
   `frontends/__init__.py`) stay at the top level of their package.
 - **Default model**: `src/ai_image_edit/app.py` defaults `--workflow`/`MODEL_WORKFLOW` to
   `qwen_image21`; the `Dockerfile` leaves the default.

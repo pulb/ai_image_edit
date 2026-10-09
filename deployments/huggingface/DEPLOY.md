@@ -23,8 +23,9 @@ ComfyUI process, which needs a regular GPU. The UI is served on port `7860`.
    change the model from the default `qwen_image21`, `MODEL_WORKFLOW`, plus any optional variable from
    [Docker](../docker/DEPLOY.md). The weights download on first start.
 
-A password (`APP_PASSWORD`) is optional: you can instead restrict access by
-setting the Space's visibility to private in Hugging Face.
+The image refuses to start without a password (`REQUIRE_PASSWORD=1`). Either set
+`APP_PASSWORD`, or set `REQUIRE_PASSWORD` to an empty value and restrict access
+by setting the Space's visibility to private in Hugging Face.
 
 The weights are downloaded when the Space starts and are not part of the Space
 repository, but they may be under the Qwen RESEARCH LICENSE AGREEMENT

@@ -3,7 +3,7 @@
 A Model that is described by data instead of code: one JSON file
 (ai_image_edit/data/workflows/<name>.json) with a ComfyUI workflow in API format and a
 manifest that says how the app's inputs map onto that workflow. The file is
-registered by its name (see models/__init__.py); its format is documented in
+found by its name (see get_model() in models/__init__.py); its format is documented in
 doc/contribution/workflow_files.md.
 
 Workflow targets are written "<node id>.<input name>", e.g. "6.seed"; the

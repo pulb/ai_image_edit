@@ -2,9 +2,8 @@
 """
 Finding and reading workflow files (ai_image_edit/data/workflows/*.json, format
 described in doc/contribution/workflow_files.md). The files are package data, so
-they are installed with the app. Standard library only, so the model
-registry can list the available files at import time without loading anything
-heavy.
+they are installed with the app. Standard library only, so the available
+files can be listed without loading anything heavy.
 """
 import json
 from pathlib import Path

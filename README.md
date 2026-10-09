@@ -36,10 +36,10 @@ downloaded when a model starts. These are available:
 - **`qwen_image_edit_2511_aio`**: Qwen-Image-Edit 2511 with a set of LoRAs, for
   fast edits in just a few steps.
 
-The [deployments](#deployment) are already preconfigured. More details about
+The [deployments](#deployments) are already preconfigured. More details about
 each workflow, its variants and licenses are in [doc/models.md](doc/models.md).
 
-## Deployment
+## Deployments
 
 | Target | Model workflows | Guide |
 |---|---|---|
@@ -47,24 +47,33 @@ each workflow, its variants and licenses are in [doc/models.md](doc/models.md).
 | Hugging Face Space | the ComfyUI image as a Docker Space on a paid GPU | [`deployments/huggingface`](deployments/huggingface/DEPLOY.md) |
 | Docker (self-hosted) | all (one ComfyUI image) | [`deployments/docker`](deployments/docker/DEPLOY.md) |
 
-### Generation times
+## Generation times
 
-Approximate generation times for the `qwen_image21` and `qwen_image21_gguf`
-models (Qwen-Image-2.1) on common GPUs, by output resolution in megapixels
-(MP), at the default of 40 steps. The GGUF figures are for the default
-`UC Q4_K_M` variant; the RTX 4090 figures were measured with
+Approximate generation times by output resolution in megapixels (MP), at the
+default of 40 steps. They are rough figures from single runs, not benchmarks,
+and will vary with the step count and reference images.
+
+### RunPod GPUs
+
+The `qwen_image21` model (Qwen-Image-2.1) on the datacenter GPUs available on RunPod.
+
+| GPU | 1 MP | 2 MP |
+|---|---|---|
+| NVIDIA H200 | ~10 s | ~1 min |
+| NVIDIA A100 | ~20 s | ~2 min |
+| NVIDIA L40S | ~23 s | insufficient mem |
+
+### Consumer hardware
+
+The `qwen_image21_gguf` model with the default `UC Q4_K_M` variant on GPUs you
+may have at home. The RTX 4090 figures were measured with
 `--highvram --disable-dynamic-vram` (see [Docker](deployments/docker/DEPLOY.md#comfyui-arguments-comfy_extra_args)),
-the RTX 2000 Ada figures without. They are rough figures from single runs, not benchmarks,
-and will vary with the step count and reference images. A dash means not
-measured.
+the RTX 2000 Ada figures without. `qwen_image21` does not fit on these GPUs.
 
-| GPU | `qwen_image21` 1 MP | `qwen_image21` 2 MP | `qwen_image21_gguf` 1 MP | `qwen_image21_gguf` 2 MP |
-|---|---|---|---|---|
-| NVIDIA H200 | ~10 s | ~1 min | – | – |
-| NVIDIA A100 | ~20 s | ~2 min | – | – |
-| NVIDIA L40S | ~23 s | insufficient mem | – | – |
-| NVIDIA RTX 4090 (24 GB) | insufficient mem | insufficient mem | ~31 s | ~2 min 40 s |
-| NVIDIA RTX 2000 Ada (16 GB) | insufficient mem | insufficient mem | ~2 min 10 s | ~12 min |
+| GPU | 1 MP | 2 MP |
+|---|---|---|
+| NVIDIA RTX 4090 (24 GB) | ~31 s | ~2 min 40 s |
+| NVIDIA RTX 2000 Ada (16 GB) | ~2 min 10 s | ~12 min |
 
 ## License
 

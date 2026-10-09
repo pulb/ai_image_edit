@@ -33,8 +33,8 @@ container's RAM limit.
 
 The app sits behind a password login when `APP_PASSWORD` is set (for example
 `-e APP_PASSWORD=...`), which protects the whole app, including the image
-files it serves. All images set `REQUIRE_PASSWORD=1` and refuse to start
-without it.
+files it serves. The image sets `REQUIRE_PASSWORD=1` and refuses to start
+without it; set `REQUIRE_PASSWORD` to an empty value to run without a password.
 
 Logins survive restarts as long as the
 password stays the same; changing it logs everyone out. Set
@@ -43,7 +43,7 @@ the password. A wrong password is delayed by one second. This is a single shared
 limiting. For stronger protection, don't expose the port and use an
 SSH tunnel or Tailscale.
 
-## ComfyUI image (`Dockerfile`)
+## Image (`Dockerfile`)
 
 ComfyUI, PyTorch and the app, without model weights. Which model runs is
 chosen when the container starts, and its weights, LoRAs and custom nodes
@@ -95,8 +95,8 @@ build context, so to try a change, push it to a branch and pass its name),
 
 Set `COMFY_EXTRA_ARGS` at run time to pass arguments to ComfyUI, for example
 `-e COMFY_EXTRA_ARGS="--highvram --disable-dynamic-vram"`. The variable also
-applies to the `qwen_image_edit_2511_aio` image, but the advice below was
-tested only with this one:
+applies to every model, but the advice below was tested only with
+`qwen_image21_gguf`:
 
 | Arguments | Use when |
 |---|---|

@@ -4,12 +4,9 @@ The interface every model implements.
 
 Kept intentionally small: the UI needs exactly three things from a model —
 what it can do (capabilities), how to start/stop it, and how to run one
-generation — plus a readable name and version to show. How a model actually gets there (ComfyUI over a websocket, an
-in-process torch pipeline, or anything else) is the model's own
-business and never leaks into this contract — that's what lets a completely
-different execution model (e.g. a direct torch pipeline, with no ComfyUI
-involved at all) implement the same interface as the ComfyUI models without
-either one needing to know about the other.
+generation — plus a readable name and version to show. How a model actually gets there
+(today: a ComfyUI process driven over a websocket) is the model's own business
+and never leaks into this contract.
 """
 from abc import ABC, abstractmethod
 from typing import Dict, List, Optional
