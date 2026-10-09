@@ -19,6 +19,9 @@ dependencies = [
     "websocket-client",
 ]
 
+[project.scripts]
+ai-image-edit = "ai_image_edit.app:main"
+
 [tool.setuptools.packages.find]
 where = ["src"]
 

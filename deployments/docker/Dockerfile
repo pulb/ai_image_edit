@@ -78,4 +78,4 @@ EXPOSE 7860
 
 # MODEL_WORKFLOW (default qwen_image21) and MODEL_VARIANT
 # are read from the environment.
-CMD ["python", "-m", "ai_image_edit"]
+CMD ["ai-image-edit"]
