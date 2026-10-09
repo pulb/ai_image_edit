@@ -177,6 +177,76 @@ async def build_result_card() -> ResultCard:
     )
 
 
+@dataclass
+class EditorCard:
+    aspect_ratio: ui.select
+    megapixels: ui.select
+    editor_holder: dict
+    get_editor_inputs: Callable
+    set_editor_image: Callable
+
+
+# Aspect ratio + resolution + the unified image/mask editor. As soon
+# as a mask is drawn on a model that supports inpainting, dimensions
+# must come from the source image's own aspect ratio (a mask's
+# coordinates are only meaningful relative to the source's own
+# framing), so both Aspect ratio and Resolution are disabled while a
+# mask exists — Aspect ratio additionally force-set to "Original",
+# Resolution set to the tier the model will use for the image
+# (model.megapixels_for_source) — only when the model actually
+# offers "Original" as a choice, and restored the moment the mask
+# is removed.
+async def build_editor_card(model: WorkflowModel, caps) -> EditorCard:
+    with ui.card().classes(CARD_CLASSES):
+        with ui.row().classes("w-full items-center gap-4"):
+            aspect_ratio = ui.select(
+                caps.supported_aspect_ratios, value=caps.default_aspect_ratio, label="Aspect ratio"
+            ).props("outlined dark").classes("flex-1")
+
+            megapixel_options = {mp: f"{mp:g} MP" for mp in caps.supported_megapixels}
+            megapixels = ui.select(
+                megapixel_options, value=caps.default_megapixels, label="Resolution"
+            ).props("outlined dark").classes("flex-1")
+            if len(caps.supported_megapixels) == 1:
+                # Nothing to choose — showing a disabled single-option
+                # dropdown says "this model only supports 1MP" more
+                # clearly than a dropdown that looks pickable but isn't.
+                megapixels.disable()
+
+        previous_aspect_ratio = aspect_ratio.value
+        previous_megapixels = megapixels.value
+
+        def handle_mask_change(has_mask: bool) -> None:
+            nonlocal previous_aspect_ratio, previous_megapixels
+            if ORIGINAL_ASPECT_RATIO not in caps.supported_aspect_ratios:
+                return
+            if has_mask:
+                if aspect_ratio.value != ORIGINAL_ASPECT_RATIO:
+                    previous_aspect_ratio = aspect_ratio.value
+                aspect_ratio.value = ORIGINAL_ASPECT_RATIO
+                aspect_ratio.disable()
+                # Shows the tier the model will use: it follows the image.
+                source_mp = model.megapixels_for_source(editor_holder["path"]) if editor_holder["path"] else None
+                if source_mp is not None:
+                    previous_megapixels = megapixels.value
+                    megapixels.value = source_mp
+                megapixels.disable()
+            else:
+                aspect_ratio.enable()
+                aspect_ratio.value = previous_aspect_ratio
+                megapixels.value = previous_megapixels
+                if len(caps.supported_megapixels) > 1:
+                    # Otherwise it was already permanently disabled above
+                    # (nothing to choose), independent of any mask.
+                    megapixels.enable()
+
+        editor_holder, get_editor_inputs, set_editor_image = await create_mask_editor(
+            on_mask_change=handle_mask_change if caps.supports_inpainting else None,
+            num_annotation_colors=caps.num_annotation_colors,
+        )
+    return EditorCard(aspect_ratio, megapixels, editor_holder, get_editor_inputs, set_editor_image)
+
+
 def run(model: WorkflowModel) -> None:
     # Everything below is model-dependent, so it lives inside run()
     # rather than at module scope: app.py builds the model once and
@@ -212,63 +282,7 @@ def run(model: WorkflowModel) -> None:
         with ui.column().classes("w-full gap-3 aie-page"):
             prompt_card = build_prompt_card(caps)
 
-            # Aspect ratio + resolution + the unified image/mask editor. As soon
-            # as a mask is drawn on a model that supports inpainting, dimensions
-            # must come from the source image's own aspect ratio (a mask's
-            # coordinates are only meaningful relative to the source's own
-            # framing), so both Aspect ratio and Resolution are disabled while a
-            # mask exists — Aspect ratio additionally force-set to "Original",
-            # Resolution set to the tier the model will use for the image
-            # (model.megapixels_for_source) — only when the model actually
-            # offers "Original" as a choice, and restored the moment the mask
-            # is removed.
-            with ui.card().classes(CARD_CLASSES):
-                with ui.row().classes("w-full items-center gap-4"):
-                    aspect_ratio = ui.select(
-                        caps.supported_aspect_ratios, value=caps.default_aspect_ratio, label="Aspect ratio"
-                    ).props("outlined dark").classes("flex-1")
-
-                    megapixel_options = {mp: f"{mp:g} MP" for mp in caps.supported_megapixels}
-                    megapixels = ui.select(
-                        megapixel_options, value=caps.default_megapixels, label="Resolution"
-                    ).props("outlined dark").classes("flex-1")
-                    if len(caps.supported_megapixels) == 1:
-                        # Nothing to choose — showing a disabled single-option
-                        # dropdown says "this model only supports 1MP" more
-                        # clearly than a dropdown that looks pickable but isn't.
-                        megapixels.disable()
-
-                previous_aspect_ratio = aspect_ratio.value
-                previous_megapixels = megapixels.value
-
-                def handle_mask_change(has_mask: bool) -> None:
-                    nonlocal previous_aspect_ratio, previous_megapixels
-                    if ORIGINAL_ASPECT_RATIO not in caps.supported_aspect_ratios:
-                        return
-                    if has_mask:
-                        if aspect_ratio.value != ORIGINAL_ASPECT_RATIO:
-                            previous_aspect_ratio = aspect_ratio.value
-                        aspect_ratio.value = ORIGINAL_ASPECT_RATIO
-                        aspect_ratio.disable()
-                        # Shows the tier the model will use: it follows the image.
-                        source_mp = model.megapixels_for_source(editor_holder["path"]) if editor_holder["path"] else None
-                        if source_mp is not None:
-                            previous_megapixels = megapixels.value
-                            megapixels.value = source_mp
-                        megapixels.disable()
-                    else:
-                        aspect_ratio.enable()
-                        aspect_ratio.value = previous_aspect_ratio
-                        megapixels.value = previous_megapixels
-                        if len(caps.supported_megapixels) > 1:
-                            # Otherwise it was already permanently disabled above
-                            # (nothing to choose), independent of any mask.
-                            megapixels.enable()
-
-                editor_holder, get_editor_inputs, set_editor_image = await create_mask_editor(
-                    on_mask_change=handle_mask_change if caps.supports_inpainting else None,
-                    num_annotation_colors=caps.num_annotation_colors,
-                )
+            editor = await build_editor_card(model, caps)
 
             reference_holders: List[dict] = []
             if caps.max_reference_images > 1 or caps.supports_loras:
@@ -339,12 +353,12 @@ def run(model: WorkflowModel) -> None:
             await result_card.reset_result()
             await result_card.set_compare(result_card.compare_switch.value)
             try:
-                if not editor_holder["path"]:
+                if not editor.editor_holder["path"]:
                     ui.notify("Please upload an image to edit!", type="negative")
                     return
 
-                source_image_path = editor_holder["path"]
-                editor_inputs = await get_editor_inputs()
+                source_image_path = editor.editor_holder["path"]
+                editor_inputs = await editor.get_editor_inputs()
                 annotated_image_path = None
                 if caps.num_annotation_colors > 0 and editor_inputs.annotation_layer_path:
                     annotated_image_path = await nicegui_run.io_bound(
@@ -361,8 +375,8 @@ def run(model: WorkflowModel) -> None:
                     reference_images=[h["path"] for h in reference_holders if h["path"]],
                     seed=prompt_card.seed_input.value,
                     randomize_seed=prompt_card.randomize_seed.value,
-                    aspect_ratio=aspect_ratio.value,
-                    target_megapixels=megapixels.value,
+                    aspect_ratio=editor.aspect_ratio.value,
+                    target_megapixels=editor.megapixels.value,
                     steps=advanced.steps.value,
                     cfg=advanced.cfg.value if advanced.cfg is not None else None,
                     denoise=advanced.denoise.value if advanced.denoise is not None else None,
@@ -396,7 +410,7 @@ def run(model: WorkflowModel) -> None:
             if not after_path:
                 return
 
-            await set_editor_image(after_path)
+            await editor.set_editor_image(after_path)
 
             # The previous before/after pair no longer corresponds to the input
             # that's now in place, so clear it and re-disable the controls that
