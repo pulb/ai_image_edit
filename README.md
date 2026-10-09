@@ -42,11 +42,11 @@ each workflow, its variants and licenses are in [doc/models.md](doc/models.md).
 
 ## Deployments
 
-| Target | Guide |
-|---|---|
-| ⭐ **RunPod GPU Pod** (recommended) | [`deployments/runpod`](deployments/runpod/DEPLOY.md) |
-| Hugging Face Space (Docker Space on a paid GPU) | [`deployments/huggingface`](deployments/huggingface/DEPLOY.md) |
-| Docker (self-hosted) | [`deployments/docker`](deployments/docker/DEPLOY.md) |
+| Target | Use case | Guide |
+|---|---|---|
+| ⭐ **RunPod GPU Pod** | Recommended: the most flexible option, supports all workflows and offers the best cost/performance ratio | [`deployments/runpod`](deployments/runpod/DEPLOY.md) |
+| **Hugging Face Space** | Alternative to RunPod if you already have a Hugging Face account; runs as a Docker Space on a paid GPU | [`deployments/huggingface`](deployments/huggingface/DEPLOY.md) |
+| **Docker** | Self-hosted, on your own machine with a GPU | [`deployments/docker`](deployments/docker/DEPLOY.md) |
 
 ## Generation times
 
