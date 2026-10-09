@@ -40,10 +40,6 @@ Rules for any AI coding agent working in this repository.
   naming that state and nothing else, e.g. `git hook: you have uncommitted
   changes`, `git hook: you have untracked files`, `git hook: you have
   unpushed commits`. Do not commit, push, or amend in response.
-- When making any change, check whether it also applies to the qwen_image21
-  backend repository (`ai_image_edit_qwen`,
-  https://github.com/pulb/ai_image_edit_qwen) — interface, naming,
-  packaging, docs or workflow changes may need a matching change there.
 
 ## Project conventions
 
@@ -63,18 +59,15 @@ Rules for any AI coding agent working in this repository.
   `generate()`, with `shutdown()`, `list_loras()`, `model_name` and
   `model_version` optional. Register a
   new non-ComfyUI backend in `models/__init__.py`'s `MODEL_LOADERS`.
-- **Lazy model imports**: `models/__init__.py` imports each backend's
-  module lazily, inside its loader function, not at module top level.
-  The shipped backends (`qwen_image21` vs. the ComfyUI-based
-  `qwen_image_edit_2511_aio` and `qwen_image21_gguf`) have almost disjoint
-  dependency sets, and a given deployment only installs one stack — keep new backends lazy-imported
-  the same way. The
-  `qwen_image21` loader turns a missing `ai_image_edit_qwen` package into an
-  install hint and re-raises any other import error unchanged.
-- **Qwen-licensed code**: the Qwen-Image-2.1 pipeline and AOTI kernels live
-  in the separate `ai_image_edit_qwen` package
-  (https://github.com/pulb/ai_image_edit_qwen) under the Qwen Research
-  License, not the GPL. `src/ai_image_edit/models/qwen_image21/model.py` only imports it.
+- **Lazy model imports**: `models/__init__.py` imports a non-workflow
+  backend's module lazily, inside its loader function, not at module top
+  level. Backends can have almost disjoint dependency sets and a given
+  deployment installs only one stack — keep new backends lazy-imported the
+  same way, and let a missing optional package become an install hint
+  instead of an import error at startup.
+- **Qwen-licensed code**: no code under the Qwen Research License lives in
+  this repo; the Qwen-Image-2.1 weights are only downloaded, under their own
+  license. (The former diffusers backend, `ai_image_edit_qwen`, is deprecated.)
   Never copy Qwen-licensed or Space-derived code into this repo.
 - **ComfyUI models are data**: a ComfyUI model is one JSON file in
   `src/ai_image_edit/data/workflows/` (`format_version`, `manifest`, `workflow`; package
@@ -97,8 +90,7 @@ Rules for any AI coding agent working in this repository.
   and registries (`models/base.py`, `models/__init__.py`,
   `frontends/__init__.py`) stay at the top level of their package.
 - **Default backend**: `src/ai_image_edit/app.py` defaults `--model`/`MODEL_BACKEND` to
-  `qwen_image21_gguf`; `deployments/docker/Dockerfile.qwen_image21` sets
-  `MODEL_BACKEND` explicitly, the ComfyUI `Dockerfile` leaves the default.
+  `qwen_image21_gguf`; the `Dockerfile` leaves the default.
 - **Masking**: masked generation (crop → infer → composite/color-correct)
   is handled externally via `core/imaging.py`'s `run_masked_generation()`,
   shared by every backend that supports inpainting. A model backend does

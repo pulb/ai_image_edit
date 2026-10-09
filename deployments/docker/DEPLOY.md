@@ -1,13 +1,10 @@
 # Docker
 
-Two images. The app serves on port `7860`.
-
-| Dockerfile | Models | Weights |
-|---|---|---|
-| `Dockerfile` | every ComfyUI model (`qwen_image21_gguf`, `qwen_image_edit_2511_aio`, and any [workflow file](../../doc/contribution/workflow_files.md) of your own) | not in the image: downloaded on first start |
-| `Dockerfile.qwen_image21` | `qwen_image21` (diffusers pipeline) | downloaded at startup |
-
-Both use the NiceGUI frontend.
+One image for every model, built from `deployments/docker/Dockerfile`. The app
+serves on port `7860` with the NiceGUI frontend. The image holds ComfyUI,
+PyTorch and the app, but no model weights: which model runs is chosen when the
+container starts, and any [workflow file](../../doc/contribution/workflow_files.md)
+of your own works too.
 
 ## Image storage
 
@@ -67,7 +64,7 @@ docker run -p 7860:7860 --gpus all --shm-size=640m \
 
 | Variable | Meaning |
 |---|---|
-| `MODEL_BACKEND` | Model: `qwen_image21_gguf` (default), `qwen_image21_official` (the official bf16 weights; variant `int8`) or `qwen_image_edit_2511_aio`. |
+| `MODEL_BACKEND` | Model: `qwen_image21_gguf` (default), `qwen_image21` (the official bf16 weights; variant `int8`) or `qwen_image_edit_2511_aio`. |
 | `MODEL_VARIANT` | Variant of the model, e.g. `Q8_0` for `qwen_image21_gguf` (`Q4_0`, `Q4_K_M` (default), `Q5_K_M`, `Q6_K`, `Q8_0`, `BF16`: the uncensored third-party version; `standard-Q4_0` to `standard-Q8_0`: the unmodified model). Larger is better and needs more memory. |
 | `WORKFLOW_FILE` | Path of a workflow file in the container to run instead (mount it). |
 | `ACCEPT_LICENSES` | Licenses you accept, comma-separated (`all` for every one). A model whose files have a license is not downloaded without it; the error names the license and its URL. `qwen_image21_gguf` needs `qwen-research`. |
@@ -86,7 +83,7 @@ and `models/vae`) can still name other files that exist in the container
 instead of the ones from the workflow file; set `MODEL_VERSION` to label them.
 `COMFY_GENERATION_TIMEOUT` (seconds, default 600) is for slow GPUs.
 
-The GPU needs at least 16 GB of VRAM for `qwen_image21_gguf`.
+The GPU needs at least 16 GB of VRAM for `qwen_image21_gguf`. `qwen_image21` with the bf16 weights needs far more; it was tested on an A100, and `MODEL_VARIANT=int8` uses less.
 
 The Qwen-Image-2.1 weights are under the Qwen RESEARCH LICENSE AGREEMENT
 (non-commercial use only), which is why they are not in the image and why you
@@ -135,34 +132,3 @@ the Dockerfile, `pyproject.toml` or `src/`, on `v*` tags and on manual runs. It
 installs the app from the commit it was started for and pushes
 `ghcr.io/<owner>/<repo>` tagged `latest`, the git tag and the short commit
 SHA.
-
-## qwen_image21 image
-
-Diffusers pipeline with the weights downloaded from the Hugging Face Hub at
-startup (no ComfyUI). It installs the separately licensed
-[`ai-image-edit-qwen`](https://github.com/pulb/ai_image_edit_qwen) package, so
-it combines GPL and Qwen-licensed code: keep it private (see the
-[License](../../README.md#license) section).
-
-The GPU needs at least 48 GB of VRAM.
-
-```bash
-docker build -f deployments/docker/Dockerfile.qwen_image21 -t ai-image-edit-qwen .
-docker run -p 7860:7860 --gpus all --shm-size=640m -e APP_PASSWORD=... ai-image-edit-qwen
-```
-
-`--build-arg QWEN_LIB_REF=<branch|tag|commit>` pins the package version
-(default `main`).
-
-Optional environment variables: `HF_TOKEN` (gated weights or a private AOTI
-repo), `QWEN21_AOTI` / `QWEN21_AOTI_REPO` (see
-`src/ai_image_edit/models/qwen_image21/model.py`), `HF_HUB_CACHE`. Point
-`HF_HUB_CACHE` at a volume so the multi-GB weights download once instead of on
-every fresh container.
-
-`.github/workflows/docker-qwen-image21.yml` builds the image on every push to
-`main` that touches the relevant files, on `v*` tags, and on manual runs. It
-pushes `ghcr.io/<owner>/<repo>-qwen-image21` tagged `latest`, the git tag and
-the short commit SHA. Each build uses the newest commit of
-`ai-image-edit-qwen`, resolved when the build starts. Pushes to that package's
-repo don't trigger a build: run the workflow manually to pick them up.

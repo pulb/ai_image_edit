@@ -36,7 +36,7 @@ preconfigured with the most suitable backend.
   self-hosted setups: it needs far less GPU memory than `qwen_image21`, at
   some cost in quality. The weights are under the Qwen RESEARCH LICENSE
   AGREEMENT (see [License](#license)).
-- **`qwen_image21_official`** — Qwen-Image-2.1 with the
+- **`qwen_image21`** — Qwen-Image-2.1 with the
   [official ComfyUI weights](https://huggingface.co/Comfy-Org/Qwen-Image-2.1)
   (bf16, or `--variant int8`), driven through ComfyUI. The unquantized
   counterpart of `qwen_image21_gguf`, for GPUs with plenty of memory. The
@@ -44,10 +44,6 @@ preconfigured with the most suitable backend.
 - **`qwen_image_edit_2511_aio`** — Qwen-Image-Edit 2511
   ([Phr00t's AIO merge](https://huggingface.co/Phr00t/Qwen-Image-Edit-Rapid-AIO))
   plus a curated set of LoRAs, driven through [ComfyUI](https://github.com/comfyanonymous/ComfyUI).
-- **`qwen_image21`** — a direct [diffusers](https://github.com/huggingface/diffusers)
-  pipeline for Qwen-Image-2.1. Needs the separately licensed
-  [`ai-image-edit-qwen`](https://github.com/pulb/ai_image_edit_qwen)
-  package (see [License](#license)).
 
 ### Frontends
 
@@ -55,8 +51,7 @@ Selected with `FRONTEND`. The [deployments](#deployment) are already
 preconfigured with the most suitable frontend.
 
 - **[NiceGUI](https://nicegui.io/)** (default) — the snappier frontend.
-- **[Gradio](https://www.gradio.app/)** — fallback frontend, required for
-  Hugging Face ZeroGPU.
+- **[Gradio](https://www.gradio.app/)** — fallback frontend.
 
 The UI is served on port `7860`.
 
@@ -64,9 +59,9 @@ The UI is served on port `7860`.
 
 | Target | Backend | Frontend | Guide |
 |---|---|---|---|
-| ⭐ **RunPod GPU Pod** (recommended) | `qwen_image21_gguf`, `qwen_image_edit_2511_aio` (one ComfyUI image), `qwen_image21` | NiceGUI only | [`deployments/runpod`](deployments/runpod/DEPLOY.md) |
-| Hugging Face Space | `qwen_image21` (ZeroGPU or paid GPU); on a paid GPU, any image as a Docker Space | Gradio (ZeroGPU), Gradio or NiceGUI (paid GPU) | [`deployments/huggingface`](deployments/huggingface/DEPLOY.md) |
-| Docker (self-hosted) | `qwen_image21_gguf`, `qwen_image_edit_2511_aio` (one ComfyUI image), `qwen_image21` | NiceGUI only | [`deployments/docker`](deployments/docker/DEPLOY.md) |
+| ⭐ **RunPod GPU Pod** (recommended) | `qwen_image21`, `qwen_image21_gguf`, `qwen_image_edit_2511_aio` (one ComfyUI image) | NiceGUI only | [`deployments/runpod`](deployments/runpod/DEPLOY.md) |
+| Hugging Face Space | the ComfyUI image as a Docker Space on a paid GPU | NiceGUI | [`deployments/huggingface`](deployments/huggingface/DEPLOY.md) |
+| Docker (self-hosted) | `qwen_image21`, `qwen_image21_gguf`, `qwen_image_edit_2511_aio` (one ComfyUI image) | NiceGUI only | [`deployments/docker`](deployments/docker/DEPLOY.md) |
 
 ### Generation times
 
@@ -77,7 +72,9 @@ backends (Qwen-Image-2.1) on common GPUs, by output resolution in megapixels
 `--highvram --disable-dynamic-vram` (see [Docker](deployments/docker/DEPLOY.md#comfyui-arguments-comfy_extra_args)),
 the RTX 2000 Ada figures without. They are rough figures from single runs, not benchmarks,
 and will vary with the step count and reference images. A dash means not
-measured.
+measured. The `qwen_image21` figures were measured with the former diffusers
+backend; the ComfyUI workflow that replaced it performed on par in our tests on
+an A100, but it was not re-measured on the other GPUs.
 
 | GPU | `qwen_image21` 1 MP | `qwen_image21` 2 MP | `qwen_image21_gguf` 1 MP | `qwen_image21_gguf` 2 MP |
 |---|---|---|---|---|
@@ -92,16 +89,12 @@ measured.
 Licensed under the GNU General Public License v3.0 or later
 (GPL-3.0-or-later). See [`LICENSE`](LICENSE) for the full text.
 
-The Qwen-Image-2.1 weights used by the `qwen_image21_gguf` backend are under the
-same agreement (non-commercial use only); the GGUF files are third-party
+The Qwen-Image-2.1 weights used by the `qwen_image21` and `qwen_image21_gguf` backends are under the
+Qwen RESEARCH LICENSE AGREEMENT (non-commercial use only); the GGUF files are third-party
 conversions, and the default uncensored variant is a third-party modified version of the model.
 
-The `qwen_image21` backend depends on a separate package,
-[`ai-image-edit-qwen`](https://github.com/pulb/ai_image_edit_qwen), which
-is under the Qwen RESEARCH LICENSE AGREEMENT rather than the GPL, as are
-the Qwen-Image-2.1 weights it loads. That agreement allows non-commercial
-use (research or evaluation) only. This repository contains no code under
-that license.
+The weights are downloaded when a model starts, after you accept their license
+(`ACCEPT_LICENSES`); this repository contains no code under that license.
 
 Copyright (C) 2026 AI Image Edit authors
 
