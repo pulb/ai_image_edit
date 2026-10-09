@@ -10,8 +10,9 @@ are shown or hidden based on the active model's declared capabilities.
 """
 
 import os
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List
+from typing import Callable, Dict, List, Optional
 
 from nicegui import app, ui
 from nicegui import run as nicegui_run
@@ -52,6 +53,130 @@ from ai_image_edit.workflow_model import WorkflowModel
 CARD_CLASSES = "w-full q-pa-none"
 
 
+# --- Page sections ---
+# Each builder creates one section of the page at the current position and
+# returns the widgets other code needs.
+
+
+@dataclass
+class Header:
+    setup_label: ui.label
+    setup_bar: ui.linear_progress
+
+
+def build_header(model: WorkflowModel) -> Header:
+    ui.label("AI Image Edit").classes("text-2xl font-bold text-white w-full text-center")
+    with ui.column().classes("w-full gap-0 items-center q-mb-md"):
+        ui.label(f"Model: {model.display_name}").classes("text-sm w-full text-center").style(f"color: {PRIMARY_COLOR}")
+        setup_label = ui.label().classes("text-xs w-full text-center")
+        setup_label.set_visibility(False)
+        setup_bar = ui.linear_progress(value=0, show_value=False, size="4px").props("rounded").classes("w-full q-mt-xs")
+        setup_bar.set_visibility(False)
+    return Header(setup_label, setup_bar)
+
+
+@dataclass
+class PromptCard:
+    prompt: ui.textarea
+    seed_input: ui.number
+    randomize_seed: ui.switch
+
+
+def build_prompt_card(caps) -> PromptCard:
+    with ui.card().classes(CARD_CLASSES):
+        prompt = ui.textarea(label="Prompt").props("rows=6 outlined dark").classes("w-full")
+
+        with ui.row().classes("w-full items-center gap-4"):
+            seed_input = ui.number(label="Seed", value=DEFAULT_SEED, format="%d").props("outlined dark").classes("flex-1")
+            randomize_seed = ui.switch("Randomize seed", value=True)
+            if not caps.supports_seed:
+                seed_input.disable()
+                randomize_seed.value = False
+                randomize_seed.disable()
+    return PromptCard(prompt, seed_input, randomize_seed)
+
+
+@dataclass
+class AdvancedCard:
+    steps: ui.slider
+    cfg: Optional[ui.slider]
+    negative_prompt: Optional[ui.textarea]
+    denoise: Optional[ui.slider]
+    sampler_name: Optional[ui.select]
+    scheduler: Optional[ui.select]
+    color_correction: ui.switch
+
+
+def build_advanced_card(caps) -> AdvancedCard:
+    with ui.card().classes(CARD_CLASSES):
+        with ui.expansion("Advanced settings").props("dense").classes("w-full"):
+            sr = caps.step_range
+            ui.label("Inference steps").classes("text-xs text-gray-400")
+            steps = create_value_slider(sr)
+
+            cfg = None
+            if caps.supports_cfg:
+                cr = caps.cfg_range
+                ui.label("CFG scale").classes("text-xs text-gray-400 q-mt-sm")
+                cfg = create_value_slider(cr)
+
+            negative_prompt = None
+            if caps.supports_negative_prompt:
+                negative_prompt = ui.textarea(label="Negative prompt").props("rows=2 outlined dark").classes("w-full q-mt-sm")
+
+            denoise = None
+            if caps.supports_denoise:
+                dr = caps.denoise_range
+                ui.label("Denoise").classes("text-xs text-gray-400 q-mt-sm")
+                denoise = create_value_slider(dr)
+
+            sampler_name = None
+            if caps.sampler_choices:
+                sampler_name = ui.select(caps.sampler_choices, value=default_choice(caps.default_sampler, caps.sampler_choices), label="Sampler name").props("outlined dark").classes("w-full q-mt-sm")
+
+            scheduler = None
+            if caps.scheduler_choices:
+                scheduler = ui.select(caps.scheduler_choices, value=default_choice(caps.default_scheduler, caps.scheduler_choices), label="Scheduler").props("outlined dark").classes("w-full")
+
+            color_correction = ui.switch("Apply color corrections", value=False).classes("q-mt-sm")
+    return AdvancedCard(steps, cfg, negative_prompt, denoise, sampler_name, scheduler, color_correction)
+
+
+@dataclass
+class ResultCard:
+    set_result_images: Callable
+    set_compare: Callable
+    reset_result: Callable
+    get_result_after_path: Callable
+    compare_switch: ui.switch
+    use_as_input_btn: ui.button
+    download_btn: ui.button
+
+
+async def build_result_card() -> ResultCard:
+    with ui.card().classes(CARD_CLASSES):
+        set_result_images, set_compare, reset_result, get_result_after_path = await create_compare_slider()
+
+        compare_switch = ui.switch("Compare input / output", value=False)
+        compare_switch.disable()
+
+        async def on_compare_change(e) -> None:
+            await set_compare(e.value)
+
+        compare_switch.on_value_change(on_compare_change)
+
+        with ui.row().classes("w-full items-center gap-3"):
+            use_as_input_btn = ui.button("Use as input").props("outline").classes("flex-1")
+            use_as_input_btn.disable()
+
+            download_btn = ui.button("Download result").props("outline").classes("flex-1")
+            download_btn.disable()
+    return ResultCard(
+        set_result_images, set_compare, reset_result, get_result_after_path,
+        compare_switch, use_as_input_btn, download_btn,
+    )
+
+
 def run(model: WorkflowModel) -> None:
     # Everything below is model-dependent, so it lives inside run()
     # rather than at module scope: app.py builds the model once and
@@ -82,25 +207,10 @@ def run(model: WorkflowModel) -> None:
         # based on this — nothing in this function assumes any one model.
         caps = model.capabilities
 
-        ui.label("AI Image Edit").classes("text-2xl font-bold text-white w-full text-center")
-        with ui.column().classes("w-full gap-0 items-center q-mb-md"):
-            ui.label(f"Model: {model.display_name}").classes("text-sm w-full text-center").style(f"color: {PRIMARY_COLOR}")
-            setup_label = ui.label().classes("text-xs w-full text-center")
-            setup_label.set_visibility(False)
-            setup_bar = ui.linear_progress(value=0, show_value=False, size="4px").props("rounded").classes("w-full q-mt-xs")
-            setup_bar.set_visibility(False)
+        header = build_header(model)
 
         with ui.column().classes("w-full gap-3 aie-page"):
-            with ui.card().classes(CARD_CLASSES):
-                prompt = ui.textarea(label="Prompt").props("rows=6 outlined dark").classes("w-full")
-
-                with ui.row().classes("w-full items-center gap-4"):
-                    seed_input = ui.number(label="Seed", value=DEFAULT_SEED, format="%d").props("outlined dark").classes("flex-1")
-                    randomize_seed = ui.switch("Randomize seed", value=True)
-                    if not caps.supports_seed:
-                        seed_input.disable()
-                        randomize_seed.value = False
-                        randomize_seed.disable()
+            prompt_card = build_prompt_card(caps)
 
             # Aspect ratio + resolution + the unified image/mask editor. As soon
             # as a mask is drawn on a model that supports inpainting, dimensions
@@ -215,67 +325,19 @@ def run(model: WorkflowModel) -> None:
                             ls = caps.lora_strength_range
                             lora_strength = create_value_slider(ls)
 
-            with ui.card().classes(CARD_CLASSES):
-                with ui.expansion("Advanced settings").props("dense").classes("w-full"):
-                    sr = caps.step_range
-                    ui.label("Inference steps").classes("text-xs text-gray-400")
-                    steps = create_value_slider(sr)
-
-                    cfg = None
-                    if caps.supports_cfg:
-                        cr = caps.cfg_range
-                        ui.label("CFG scale").classes("text-xs text-gray-400 q-mt-sm")
-                        cfg = create_value_slider(cr)
-
-                    negative_prompt = None
-                    if caps.supports_negative_prompt:
-                        negative_prompt = ui.textarea(label="Negative prompt").props("rows=2 outlined dark").classes("w-full q-mt-sm")
-
-                    denoise = None
-                    if caps.supports_denoise:
-                        dr = caps.denoise_range
-                        ui.label("Denoise").classes("text-xs text-gray-400 q-mt-sm")
-                        denoise = create_value_slider(dr)
-
-                    sampler_name = None
-                    if caps.sampler_choices:
-                        sampler_name = ui.select(caps.sampler_choices, value=default_choice(caps.default_sampler, caps.sampler_choices), label="Sampler name").props("outlined dark").classes("w-full q-mt-sm")
-
-                    scheduler = None
-                    if caps.scheduler_choices:
-                        scheduler = ui.select(caps.scheduler_choices, value=default_choice(caps.default_scheduler, caps.scheduler_choices), label="Scheduler").props("outlined dark").classes("w-full")
-
-                    apply_color_correction_switch = ui.switch("Apply color corrections", value=False).classes("q-mt-sm")
-
-            # --- Result panel ---
-            with ui.card().classes(CARD_CLASSES):
-                set_result_images, set_compare, reset_result, get_result_after_path = await create_compare_slider()
-
-                compare_switch = ui.switch("Compare input / output", value=False)
-                compare_switch.disable()
-
-                async def on_compare_change(e) -> None:
-                    await set_compare(e.value)
-
-                compare_switch.on_value_change(on_compare_change)
-
-                with ui.row().classes("w-full items-center gap-3"):
-                    use_as_input_btn = ui.button("Use as input").props("outline").classes("flex-1")
-                    use_as_input_btn.disable()
-
-                    download_btn = ui.button("Download result").props("outline").classes("flex-1")
-                    download_btn.disable()
+            advanced = build_advanced_card(caps)
+            result_card = await build_result_card()
 
             generate_btn = ui.button("Generate").props("color=primary unelevated").classes("w-full")
 
         async def do_generate() -> None:
             generate_btn.props("loading")
             generate_btn.disable()
-            compare_switch.disable()
-            use_as_input_btn.disable()
-            download_btn.disable()
-            await reset_result()
-            await set_compare(compare_switch.value)
+            result_card.compare_switch.disable()
+            result_card.use_as_input_btn.disable()
+            result_card.download_btn.disable()
+            await result_card.reset_result()
+            await result_card.set_compare(result_card.compare_switch.value)
             try:
                 if not editor_holder["path"]:
                     ui.notify("Please upload an image to edit!", type="negative")
@@ -292,34 +354,34 @@ def run(model: WorkflowModel) -> None:
 
                 params = params_from_ui(
                     caps,
-                    prompt=prompt.value,
+                    prompt=prompt_card.prompt.value,
                     source_image_path=source_image_path,
                     mask_path=editor_inputs.mask_path,
                     annotated_image_path=annotated_image_path,
                     reference_images=[h["path"] for h in reference_holders if h["path"]],
-                    seed=seed_input.value,
-                    randomize_seed=randomize_seed.value,
+                    seed=prompt_card.seed_input.value,
+                    randomize_seed=prompt_card.randomize_seed.value,
                     aspect_ratio=aspect_ratio.value,
                     target_megapixels=megapixels.value,
-                    steps=steps.value,
-                    cfg=cfg.value if cfg is not None else None,
-                    denoise=denoise.value if denoise is not None else None,
-                    sampler_name=sampler_name.value if sampler_name is not None else None,
-                    scheduler=scheduler.value if scheduler is not None else None,
-                    negative_prompt=negative_prompt.value if negative_prompt is not None else None,
+                    steps=advanced.steps.value,
+                    cfg=advanced.cfg.value if advanced.cfg is not None else None,
+                    denoise=advanced.denoise.value if advanced.denoise is not None else None,
+                    sampler_name=advanced.sampler_name.value if advanced.sampler_name is not None else None,
+                    scheduler=advanced.scheduler.value if advanced.scheduler is not None else None,
+                    negative_prompt=advanced.negative_prompt.value if advanced.negative_prompt is not None else None,
                     lora_files=lora_files,
                     lora_strength=lora_strength.value if lora_strength is not None else None,
-                    apply_color_correction=apply_color_correction_switch.value,
+                    apply_color_correction=advanced.color_correction.value,
                     feather_amount=editor_inputs.feather_amount,
                 )
                 result = await nicegui_run.io_bound(model.generate, params)
                 await nicegui_run.io_bound(trim_work_dir, RECENT_FILES_KEPT)
 
-                seed_input.value = result.actual_seed
-                await set_result_images(result.before_path, result.after_path)
-                compare_switch.enable()
-                use_as_input_btn.enable()
-                download_btn.enable()
+                prompt_card.seed_input.value = result.actual_seed
+                await result_card.set_result_images(result.before_path, result.after_path)
+                result_card.compare_switch.enable()
+                result_card.use_as_input_btn.enable()
+                result_card.download_btn.enable()
 
             except Exception as e:  # noqa: BLE001 — surface unexpected errors instead of hanging silently
                 ui.notify(describe_error(e), type="negative")
@@ -330,7 +392,7 @@ def run(model: WorkflowModel) -> None:
         generate_btn.on_click(do_generate)
 
         async def use_as_input() -> None:
-            after_path = await get_result_after_path()
+            after_path = await result_card.get_result_after_path()
             if not after_path:
                 return
 
@@ -343,13 +405,13 @@ def run(model: WorkflowModel) -> None:
             # reset() unconditionally hides) — reapplying it right after
             # restores the divider immediately if it was checked, matching the
             # same reset-then-reapply approach as do_generate.
-            await reset_result()
-            await set_compare(compare_switch.value)
-            compare_switch.disable()
-            use_as_input_btn.disable()
-            download_btn.disable()
+            await result_card.reset_result()
+            await result_card.set_compare(result_card.compare_switch.value)
+            result_card.compare_switch.disable()
+            result_card.use_as_input_btn.disable()
+            result_card.download_btn.disable()
 
-        use_as_input_btn.on_click(use_as_input)
+        result_card.use_as_input_btn.on_click(use_as_input)
 
         # While the model sets itself up in the background (weights and LoRAs
         # downloading, custom nodes installing) show how far it is, and add the
@@ -357,18 +419,18 @@ def run(model: WorkflowModel) -> None:
         def refresh_setup() -> None:
             progress = model.setup_progress()
             text = progress.error or progress.message
-            setup_label.set_text(text)
-            setup_label.set_visibility(bool(text))
-            setup_label.classes(add="text-negative" if progress.error else "text-gray-400",
+            header.setup_label.set_text(text)
+            header.setup_label.set_visibility(bool(text))
+            header.setup_label.classes(add="text-negative" if progress.error else "text-gray-400",
                                 remove="text-gray-400" if progress.error else "text-negative")
             running = not progress.done
-            setup_bar.set_visibility(running)
+            header.setup_bar.set_visibility(running)
             if running:
                 if progress.fraction is None:
-                    setup_bar.props("indeterminate")
+                    header.setup_bar.props("indeterminate")
                 else:
-                    setup_bar.props(remove="indeterminate")
-                    setup_bar.set_value(progress.fraction)
+                    header.setup_bar.props(remove="indeterminate")
+                    header.setup_bar.set_value(progress.fraction)
             if lora_name is not None:
                 found = model.list_loras()
                 if found != available_loras:
@@ -382,13 +444,13 @@ def run(model: WorkflowModel) -> None:
         refresh_setup()
 
         async def download_result() -> None:
-            after_path = await get_result_after_path()
+            after_path = await result_card.get_result_after_path()
             if not after_path:
                 ui.notify("No generated image to download yet.", type="negative")
                 return
             ui.download.file(after_path, filename=Path(after_path).name)
 
-        download_btn.on_click(download_result)
+        result_card.download_btn.on_click(download_result)
 
 
     # Serve everything under WORK_DIR at /files/<n> so <img>/<canvas> loads in
