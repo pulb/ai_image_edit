@@ -332,7 +332,8 @@ class WorkflowModel:
             return SetupProgress()
         if status.error:
             return SetupProgress(done=True, error=f"Setting up the model failed: {status.error}")
-        return SetupProgress(done=status.finished.is_set(), message=status.message, fraction=status.fraction)
+        done = status.finished.is_set()
+        return SetupProgress(done=done, message="" if done else status.message, fraction=status.fraction)
 
     def _check_downloads(self) -> None:
         status = self._download_status

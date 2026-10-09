@@ -196,6 +196,9 @@ class CustomNodeTests(unittest.TestCase):
                 self.assertTrue(model._download_status.finished.wait(20))
                 self.assertIsNone(model._download_status.error)
                 launch.assert_called_once()
+                progress = model.setup_progress()
+                self.assertTrue(progress.done)
+                self.assertEqual(progress.message, "")
         finally:
             os.chdir(old)
 
