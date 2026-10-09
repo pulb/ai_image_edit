@@ -17,7 +17,7 @@ PACKAGE_DIR = Path(__file__).resolve().parents[3] / "data" / "workflows"
 
 
 def available_workflows() -> Dict[str, Path]:
-    """Backend name (the file name without .json) -> workflow file."""
+    """Workflow name (the file name without .json) -> workflow file."""
     return {p.stem: p for p in sorted(PACKAGE_DIR.glob("*.json"))}
 
 

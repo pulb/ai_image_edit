@@ -1,16 +1,15 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """
-Entry point: builds the model backend and hands it to a UI frontend.
+Entry point: builds the model and hands it to the web UI.
 
-    python -m ai_image_edit [--model NAME | --workflow FILE] [--variant ID] [--frontend NAME]
+    python -m ai_image_edit [--model NAME | --workflow FILE] [--variant ID]
     python -m ai_image_edit --list-models
 
 Each option falls back to an environment variable, which is how the container
 images are configured: MODEL_WORKFLOW (default qwen_image21), WORKFLOW_FILE,
-MODEL_VARIANT and FRONTEND (default nicegui). APP_PASSWORD adds a password login
-to either frontend. The UI code lives under frontends/, the model code under
-models/; run_frontend() passes the built model straight to the chosen frontend's
-run(model).
+and MODEL_VARIANT. APP_PASSWORD adds a password login
+to the UI. The UI code lives under frontends/, the model code under
+models/; run_frontend() passes the built model straight to the UI's run(model).
 """
 import argparse
 import os
@@ -26,7 +25,6 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     which.add_argument("--model", help="model to run (see --list-models); env MODEL_WORKFLOW, default qwen_image21")
     which.add_argument("--workflow", metavar="FILE", help="run the ComfyUI model in this workflow file; env WORKFLOW_FILE")
     parser.add_argument("--variant", help="variant of a workflow file's model, e.g. a quantization; env MODEL_VARIANT")
-    parser.add_argument("--frontend", help="UI to serve; env FRONTEND, default nicegui")
     parser.add_argument("--list-models", action="store_true", help="print the available models and exit")
     return parser.parse_args(argv)
 
@@ -37,7 +35,6 @@ def main(argv: Optional[List[str]] = None) -> None:
         print("\n".join(sorted(MODEL_LOADERS)))
         return
 
-    frontend = args.frontend or os.environ.get("FRONTEND", "nicegui")
     variant = args.variant or os.environ.get("MODEL_VARIANT") or None
 
     # Checked before the model starts, which can take minutes.
@@ -56,10 +53,10 @@ def main(argv: Optional[List[str]] = None) -> None:
             model = get_model(model_name, variant)
     except (ValueError, OSError) as exc:
         raise SystemExit(str(exc))
-    print(f"Starting model backend '{model_name}' in the background...", flush=True)
+    print(f"Starting model '{model_name}' in the background...", flush=True)
     try:
         model.start()
     except RuntimeError as exc:  # a missing file, an unaccepted license: a message is enough
         raise SystemExit(str(exc))
 
-    run_frontend(frontend, model)
+    run_frontend(model)

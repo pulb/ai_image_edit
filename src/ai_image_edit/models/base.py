@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """
-The interface every model backend implements.
+The interface every model implements.
 
 Kept intentionally small: the UI needs exactly three things from a model —
 what it can do (capabilities), how to start/stop it, and how to run one
@@ -17,7 +17,7 @@ from typing import Dict, List, Optional
 from ai_image_edit.core.types import GenerationParams, GenerationResult, ModelCapabilities
 
 
-class ModelBackend(ABC):
+class Model(ABC):
     @property
     @abstractmethod
     def capabilities(self) -> ModelCapabilities:

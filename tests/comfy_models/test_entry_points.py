@@ -36,7 +36,7 @@ class SelectionTests(unittest.TestCase):
         env = mock.patch.dict(os.environ)
         env.start()
         self.addCleanup(env.stop)
-        for name in ("MODEL_WORKFLOW", "WORKFLOW_FILE", "MODEL_VARIANT", "FRONTEND", "REQUIRE_PASSWORD", "MODEL_VERSION"):
+        for name in ("MODEL_WORKFLOW", "WORKFLOW_FILE", "MODEL_VARIANT", "REQUIRE_PASSWORD", "MODEL_VERSION"):
             os.environ.pop(name, None)
         self.model = mock.Mock()
         self.run = mock.patch.object(app, "run_frontend").start()
@@ -48,13 +48,13 @@ class SelectionTests(unittest.TestCase):
         app.main([])
         self.get.assert_called_once_with("qwen_image21", None)
         self.model.start.assert_called_once()
-        self.run.assert_called_once_with("nicegui", self.model)
+        self.run.assert_called_once_with(self.model)
 
     def test_environment_is_the_fallback(self):
-        os.environ.update(MODEL_WORKFLOW="x", MODEL_VARIANT="Q8_0", FRONTEND="other")
+        os.environ.update(MODEL_WORKFLOW="x", MODEL_VARIANT="Q8_0")
         app.main([])
         self.get.assert_called_once_with("x", "Q8_0")
-        self.run.assert_called_once_with("other", self.model)
+        self.run.assert_called_once_with(self.model)
 
     def test_command_line_beats_environment(self):
         os.environ.update(MODEL_WORKFLOW="x", WORKFLOW_FILE="/env.json", MODEL_VARIANT="a")
@@ -82,8 +82,8 @@ class SelectionTests(unittest.TestCase):
         self.get.assert_not_called()
 
     def test_bad_model_is_a_clean_exit(self):
-        self.get.side_effect = ValueError("Unknown model backend 'z'")
-        with self.assertRaisesRegex(SystemExit, "Unknown model backend"):
+        self.get.side_effect = ValueError("Unknown model 'z'")
+        with self.assertRaisesRegex(SystemExit, "Unknown model"):
             app.main(["--model", "z"])
 
 

@@ -74,10 +74,10 @@ ENV COMFY_EXTRA_ARGS=""
 ARG APP_REPO=pulb/ai_image_edit
 ARG APP_REF=main
 RUN pip install --no-cache-dir \
-    "ai-image-edit[comfy_backend,nicegui_frontend] @ git+https://github.com/${APP_REPO}@${APP_REF}"
+    "ai-image-edit @ git+https://github.com/${APP_REPO}@${APP_REF}"
 
 EXPOSE 7860
 
-# MODEL_WORKFLOW (default qwen_image21), MODEL_VARIANT, WORKFLOW_FILE and
-# FRONTEND (default nicegui) are read from the environment.
+# MODEL_WORKFLOW (default qwen_image21), MODEL_VARIANT and WORKFLOW_FILE
+# are read from the environment.
 CMD ["python", "-m", "ai_image_edit"]

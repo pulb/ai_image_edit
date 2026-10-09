@@ -1,11 +1,11 @@
 # RunPod
 
-Runs any backend with the NiceGUI frontend in a GPU Pod. One image serves them all; how to build, configure and run them
+Runs any model workflow in a GPU Pod. One image serves them all; how to build, configure and run them
 is described in [Docker](../docker/DEPLOY.md). This page covers only what is
 specific to RunPod.
 
 A public [RunPod template](https://console.runpod.io/hub/template/ayt3pyrp7w?ref=e1nr94ls)
-works with any backend. You only need to replace its container image with
+works with any model workflow. You only need to replace its container image with
 your own and, if your registry is private, add registry credentials (see
 [Pod setup](#pod-setup)).
 
@@ -25,7 +25,7 @@ the image.
 1. Create a Pod from the image, exposing HTTP port `7860`, e.g.
    `ghcr.io/<owner>/<repo>:latest`. The default is `qwen_image21`; select another with
    `MODEL_WORKFLOW`. Accept the weights' license with `ACCEPT_LICENSES=qwen-research` (for the
-   Qwen-Image-2.1 backends). Choose one of the GPUs the template recommends
+   Qwen-Image-2.1 models). Choose one of the GPUs the template recommends
    that has enough memory: at least 48 GB of VRAM for `qwen_image21`, at least
    16 GB for `qwen_image21_gguf`.
 2. If the registry package is private (GHCR packages are by default), add a

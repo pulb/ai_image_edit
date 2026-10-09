@@ -1,53 +1,21 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """
-Registry + factory for UI frontends.
+The web UI.
 
-Mirrors models/__init__.py's pattern: each frontend module is imported
-lazily, inside its loader function, rather than at the top of this file.
-That matters because each frontend has its own dependency set, which a
-deployment only needs when it runs that frontend.
+frontends/nicegui.py exposes a single function, run(model), which builds and
+launches the UI (ui.run()) against the given model. Importing it does nothing
+by itself; run_frontend() below imports it lazily and calls run() with the
+already-built model, so importing this package stays cheap (and the tests don't
+need NiceGUI installed).
 
-Unlike a model backend, a frontend has no class to instantiate. Instead,
-each frontend module (e.g. frontends/nicegui.py) exposes a single function, run(model), which builds and
-launches its UI (ui.run()) against the given
-model. Importing a frontend module does nothing by itself; run_frontend()
-below imports the chosen module and calls its run() with the already-built
-model, so app.py doesn't need to know any of that — it just
-picks a name by FRONTEND, the same way models/__init__.py's get_model()
-picks one by MODEL_WORKFLOW.
-
-Model selection also happens once, in app.py's main(), rather than each frontend
-module building its own model — run_frontend() takes the already-built
-model and passes it straight to the chosen module's run() as a plain
-function argument, so frontends stay ordinary, explicit Python:
-model is just a parameter of run(), not a value pulled from somewhere else
+Model selection happens once, in app.py's main(): the built model is passed
+straight to run() as a plain function argument, not pulled from somewhere else
 at import time.
-
-Add a new frontend by writing its module in this package (with its own
-run(model) function) and adding one loader function + one
-line in FRONTEND_LOADERS — nothing else needs to change.
 """
-from typing import Callable, Dict
-
-from ai_image_edit.models.base import ModelBackend
+from ai_image_edit.models.base import Model
 
 
-def _load_nicegui(model: ModelBackend) -> None:
+def run_frontend(model: Model) -> None:
     import ai_image_edit.frontends.nicegui as _frontend
 
     _frontend.run(model)
-
-
-FRONTEND_LOADERS: Dict[str, Callable[[ModelBackend], None]] = {
-    "nicegui": _load_nicegui,
-}
-
-
-def run_frontend(name: str, model: ModelBackend) -> None:
-    try:
-        loader = FRONTEND_LOADERS[name]
-    except KeyError:
-        raise ValueError(
-            f"Unknown frontend '{name}'. Available: {', '.join(sorted(FRONTEND_LOADERS))}"
-        )
-    loader(model)

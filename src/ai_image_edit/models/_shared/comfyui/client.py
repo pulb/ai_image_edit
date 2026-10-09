@@ -58,7 +58,7 @@ def missing_nodes(class_names: List[str]) -> List[str]:
         ]
     except (requests.exceptions.RequestException, ValueError) as e:
         raise GenerationError(
-            f"Cannot reach ComfyUI ({e}). The backend may still be starting or has crashed. Please wait a moment and try again."
+            f"Cannot reach ComfyUI ({e}). ComfyUI may still be starting or has crashed. Please wait a moment and try again."
         )
 
 
@@ -74,7 +74,7 @@ def upload_image(filepath: Optional[str]) -> Optional[str]:
             return res.json()["name"]
     except requests.exceptions.RequestException as e:
         raise GenerationError(
-            f"Cannot reach ComfyUI ({e}). The backend may still be starting or has crashed. Please wait a moment and try again."
+            f"Cannot reach ComfyUI ({e}). ComfyUI may still be starting or has crashed. Please wait a moment and try again."
         )
 
 

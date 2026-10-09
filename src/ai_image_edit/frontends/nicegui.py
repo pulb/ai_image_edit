@@ -40,7 +40,7 @@ from ai_image_edit.frontends._shared.common import (
     describe_error,
     params_from_ui,
 )
-from ai_image_edit.models.base import ModelBackend
+from ai_image_edit.models.base import Model
 
 
 # --- Configuration Constants ---
@@ -1240,10 +1240,10 @@ CLIENT_JS = CLIENT_JS.replace("__ANNOTATION_STROKE__", str(ANNOTATION_STROKE))
 CARD_CLASSES = "w-full q-pa-none"
 
 
-def run(model: ModelBackend) -> None:
+def run(model: Model) -> None:
     # Everything below is model-dependent, so it lives inside run()
     # rather than at module scope: app.py builds the model once and
-    # calls this after picking this module via the FRONTEND env var
+    # calls this through run_frontend()
     # (see app.py and frontends/__init__.py).
 
     @ui.page("/")

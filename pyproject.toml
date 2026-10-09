@@ -13,20 +13,16 @@ license-files = ["LICENSE"]
 dependencies = [
     "numpy",
     "pillow",
-]
-
-[project.optional-dependencies]
-# Backends (MODEL_WORKFLOW)
-comfy_backend = [
+    "nicegui==3.18.0",
     "requests",
     "websocket-client",
     "sentencepiece",
     "transformers",
 ]
+
+[project.optional-dependencies]
 # Tests (see AGENTS.md)
 test = ["jsonschema"]
-# Frontends (FRONTEND)
-nicegui_frontend = ["nicegui==3.18.0"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

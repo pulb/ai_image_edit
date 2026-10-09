@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """
-A ModelBackend that is described by data instead of code: one JSON file
+A Model that is described by data instead of code: one JSON file
 (ai_image_edit/data/workflows/<name>.json) with a ComfyUI workflow in API format and a
 manifest that says how the app's inputs map onto that workflow. The file is
 registered by its name (see models/__init__.py); its format is documented in
@@ -24,7 +24,7 @@ from ai_image_edit.core import imaging
 from ai_image_edit.core.errors import GenerationError
 from ai_image_edit.core.result_cache import cached_infer
 from ai_image_edit.core.types import GenerationParams, GenerationResult, ModelCapabilities, RangeSpec
-from ai_image_edit.models.base import ModelBackend
+from ai_image_edit.models.base import Model
 from ai_image_edit.models._shared.comfyui import client as comfy_client
 from ai_image_edit.models._shared.comfyui.common import SAMPLER_CHOICES, SCHEDULER_CHOICES, configured_file
 from ai_image_edit.models._shared.comfyui import custom_nodes, downloads
@@ -50,7 +50,7 @@ def _choices(value: Any) -> List[str]:
     return list(_NAMED_CHOICES[value]) if isinstance(value, str) else list(value)
 
 
-class ComfyWorkflowModel(ModelBackend):
+class ComfyWorkflowModel(Model):
     """A model run through a local ComfyUI server, as described by a manifest."""
 
     def __init__(self, name: str, manifest: dict, workflow: dict, variant: Optional[str] = None) -> None:

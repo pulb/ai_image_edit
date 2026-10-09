@@ -60,14 +60,14 @@ The UI is served on port `7860`.
 ### Generation times
 
 Approximate generation times for the `qwen_image21` and `qwen_image21_gguf`
-backends (Qwen-Image-2.1) on common GPUs, by output resolution in megapixels
+models (Qwen-Image-2.1) on common GPUs, by output resolution in megapixels
 (MP), at the default of 40 steps. The GGUF figures are for the default
 `UC Q4_K_M` variant; the RTX 4090 figures were measured with
 `--highvram --disable-dynamic-vram` (see [Docker](deployments/docker/DEPLOY.md#comfyui-arguments-comfy_extra_args)),
 the RTX 2000 Ada figures without. They are rough figures from single runs, not benchmarks,
 and will vary with the step count and reference images. A dash means not
 measured. The `qwen_image21` figures were measured with the former diffusers
-backend; the ComfyUI workflow that replaced it performed on par in our tests on
+implementation; the ComfyUI workflow that replaced it performed on par in our tests on
 an A100, but it was not re-measured on the other GPUs.
 
 | GPU | `qwen_image21` 1 MP | `qwen_image21` 2 MP | `qwen_image21_gguf` 1 MP | `qwen_image21_gguf` 2 MP |
