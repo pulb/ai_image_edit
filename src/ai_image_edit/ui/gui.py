@@ -37,6 +37,13 @@ from ai_image_edit.ui.mask_editor import create_mask_editor
 from ai_image_edit.workflow_model import WorkflowModel
 
 
+COLOR_CORRECTION_INFO = (
+    "Applies to edits without a mask. The result's brightness, contrast and color cast are adjusted "
+    "to match your original image, which helps when the model shifts the overall tones. "
+    "It also dampens deliberate color changes, such as recoloring everything. "
+    "With a mask, the new region is always matched to the surrounding image, so this switch has no effect."
+)
+
 # Every top-level section on the page (Prompt/Seed, Aspect ratio + editor,
 # the settings accordions, the Result panel) is wrapped in a ui.card using
 # this same class string, so their content all sits flush-aligned with each
@@ -132,7 +139,11 @@ def build_advanced_card(caps: ModelCapabilities) -> AdvancedCard:
             if caps.scheduler_choices:
                 scheduler = ui.select(caps.scheduler_choices, value=default_choice(caps.default_scheduler, caps.scheduler_choices), label="Scheduler").props("outlined dark").classes("w-full")
 
-            color_correction = ui.switch("Apply color corrections (unmasked only)", value=False).classes("q-mt-sm")
+            with ui.row().classes("items-center no-wrap q-mt-sm"):
+                color_correction = ui.switch("Apply color corrections", value=False)
+                with ui.button(icon="info").props("flat round dense size=sm").classes("text-gray-400"):
+                    with ui.menu():
+                        ui.label(COLOR_CORRECTION_INFO).classes("text-xs q-pa-sm").style("max-width: 280px")
     return AdvancedCard(steps, cfg, negative_prompt, denoise, sampler_name, scheduler, color_correction)
 
 
