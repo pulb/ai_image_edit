@@ -73,10 +73,12 @@ def build_header(model: WorkflowModel) -> Header:
     ui.label("AI Image Edit").classes("text-2xl font-bold text-white w-full text-center")
     with ui.column().classes("w-full gap-0 items-center q-mb-md"):
         ui.label(f"Model: {model.display_name}").classes("text-sm w-full text-center").style(f"color: {PRIMARY_COLOR}")
-        setup_label = ui.label().classes("text-xs w-full text-center")
-        setup_label.set_visibility(False)
-        setup_bar = ui.linear_progress(value=0, show_value=False, size="4px").props("rounded").classes("w-full q-mt-xs")
-        setup_bar.set_visibility(False)
+        # The same width as the cards below (aie-page).
+        with ui.column().classes("w-full gap-0 aie-page"):
+            setup_label = ui.label().classes("text-xs w-full text-center mt-3")
+            setup_label.set_visibility(False)
+            setup_bar = ui.linear_progress(value=0, show_value=False, size="4px").props("rounded").classes("w-full q-mt-xs")
+            setup_bar.set_visibility(False)
     return Header(setup_label, setup_bar)
 
 
@@ -455,6 +457,8 @@ def run(model: WorkflowModel) -> None:
             header.setup_label.classes(add="text-negative" if progress.error else "text-gray-400",
                                 remove="text-gray-400" if progress.error else "text-negative")
             running = not progress.done
+            # A generation needs the finished setup, so Generate waits for it (and stays off after an error).
+            generate_btn.set_enabled(progress.done and not progress.error)
             header.setup_bar.set_visibility(running)
             if running:
                 if progress.fraction is None:
