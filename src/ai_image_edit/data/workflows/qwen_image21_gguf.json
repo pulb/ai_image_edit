@@ -101,7 +101,7 @@
       "references": {"target": "5.images.image_{n}", "first_n": 2, "loader_id_start": 20, "max": 9}
     },
 
-    "size": {"policy": "qwen21_tiers", "bind": {"resolution": "5.resolution"}},
+    "size": {"policy": "qwen21_tiers", "bind": {"resolution": "5.resolution", "width": "11.width", "height": "11.height"}},
 
     "capabilities": {
       "supports_inpainting": true,
@@ -146,7 +146,7 @@
         "model": ["4", 0],
         "positive": ["5", 0],
         "negative": ["5", 1],
-        "latent_image": ["5", 2],
+        "latent_image": ["11", 0],
         "seed": 0,
         "steps": 40,
         "cfg": 1,
@@ -166,6 +166,10 @@
     "10": {
       "class_type": "LoadImage",
       "inputs": {"image": "", "upload": "image"}
+    },
+    "11": {
+      "class_type": "EmptyLatentImage",
+      "inputs": {"width": 1024, "height": 1024, "batch_size": 1}
     }
   }
 }

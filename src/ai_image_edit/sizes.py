@@ -125,7 +125,12 @@ def _nearest_tier(source_image_path: str) -> float:
 
 
 class Qwen21Tiers(SizePolicy):
-    """Qwen-Image-2.1: resolution tiers (1K/1.5K/2K) and the model card's aspect ratios."""
+    """
+    Qwen-Image-2.1: resolution tiers (1K/1.5K/2K) and the model card's aspect ratios.
+    The encode node scales the reference images to the tier, and the workflow
+    samples an empty latent of width x height, so the output size is independent
+    of the source's own shape.
+    """
 
     aspect_ratios = [ORIGINAL_ASPECT_RATIO, *QWEN21_ASPECT_RATIOS]
     default_aspect_ratio = ORIGINAL_ASPECT_RATIO
@@ -144,7 +149,8 @@ class Qwen21Tiers(SizePolicy):
         width, height = _tier_size(resolution, aspect)
         if width is None or height is None:
             width, height = _dimensions_from_source(params.source_image_path, resolution)
-        return ResolvedSize(width, height, {"resolution": resolution}, {"resolution": resolution}, f"resolution_tier={resolution}")
+        values = {"resolution": resolution, "width": width, "height": height}
+        return ResolvedSize(width, height, values, {"resolution": resolution}, f"resolution_tier={resolution}")
 
 
 class FixedArea(SizePolicy):

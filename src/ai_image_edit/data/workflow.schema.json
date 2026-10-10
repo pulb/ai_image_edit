@@ -208,7 +208,7 @@
             {
               "if": {"properties": {"policy": {"const": "qwen21_tiers"}}},
               "then": {
-                "properties": {"policy": true, "bind": {"required": ["resolution"], "propertyNames": {"const": "resolution"}}},
+                "properties": {"policy": true, "bind": {"required": ["resolution", "width", "height"], "propertyNames": {"enum": ["resolution", "width", "height"]}}},
                 "additionalProperties": false
               }
             },

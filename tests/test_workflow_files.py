@@ -212,6 +212,25 @@ class ManifestModelTests(unittest.TestCase):
         finally:
             imaging.run_masked_generation = real
 
+    def test_qwen21_output_size_comes_from_an_empty_latent(self):
+        for name in ("qwen_image21", "qwen_image21_gguf"):
+            with self.subTest(workflow=name):
+                model = self.load(workflow_files.available_workflows()[name])
+                params = GenerationParams(
+                    prompt="p", source_image_path=str(self.tmp / "source.png"), mask_path=None, steps=4,
+                    aspect_ratio="16:9", target_megapixels=1.0,
+                )
+                size = model._size.resolve(params)
+                self.assertEqual((1376, 768), (size.width, size.height))
+                wf = model.build_workflow(
+                    prompt="p", negative_prompt="", source_path="/x/source.png", reference_paths=[], seed=1, steps=4,
+                    cfg=1.0, denoise=1.0, sampler="euler", scheduler="simple", size_values=size.values,
+                )
+                latent_id = wf["6"]["inputs"]["latent_image"][0]
+                self.assertEqual("EmptyLatentImage", wf[latent_id]["class_type"])
+                self.assertEqual((1376, 768), (wf[latent_id]["inputs"]["width"], wf[latent_id]["inputs"]["height"]))
+                self.assertEqual(1024, wf["5"]["inputs"]["resolution"])
+
     def test_variant_does_not_inherit_the_checksum_of_another_file(self):
         manifest, workflow = workflow_files.read_workflow_file(available_workflows()["qwen_image21"])
         manifest["files"][0].update(sha256="a" * 64, size=1)
