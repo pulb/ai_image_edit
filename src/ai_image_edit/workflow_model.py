@@ -198,6 +198,12 @@ class WorkflowModel:
                 raise ValueError(f"{self.name}: images.references needs loader_ids or loader_id_start")
             if ids is not None and len(ids) < refs["max"]:
                 raise ValueError(f"{self.name}: images.references.loader_ids has fewer entries than max")
+        bound = set(m["size"].get("bind", {}))
+        if bound != self._size.value_names:
+            raise ValueError(
+                f"{self.name}: size.bind must bind exactly {sorted(self._size.value_names)} "
+                f"for policy {m['size']['policy']!r}, not {sorted(bound)}"
+            )
         for key, target in m["size"].get("bind", {}).items():
             need_node(target, f"size.bind.{key}")
         loras = m.get("loras")
@@ -508,9 +514,10 @@ class WorkflowModel:
         """
         Resolves the target size, then hands off to imaging.run_masked_generation
         for the crop -> infer -> composite sequence; _infer() builds and submits
-        the ComfyUI workflow and fetches the result. The source is cropped to
-        the generation size first, so the output matches; reference images are
-        passed as they are.
+        the ComfyUI workflow and fetches the result. Only a masked request has
+        its source cropped to the generation size; otherwise the output size
+        comes from the workflow, through the values the manifest binds
+        (size.bind). Reference images are passed as they are.
         """
         self._check_downloads()
         prompt = (params.prompt or "").strip()

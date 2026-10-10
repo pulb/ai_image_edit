@@ -34,6 +34,7 @@ from ai_image_edit.core.types import GenerationParams
 from ai_image_edit.workflows import available_workflows
 from ai_image_edit import workflows as workflow_files
 from ai_image_edit.comfyui import client
+from ai_image_edit.sizes import POLICIES
 from ai_image_edit.workflow_model import WorkflowModel
 
 import jsonschema
@@ -230,6 +231,25 @@ class ManifestModelTests(unittest.TestCase):
                 self.assertEqual("EmptyLatentImage", wf[latent_id]["class_type"])
                 self.assertEqual((1376, 768), (wf[latent_id]["inputs"]["width"], wf[latent_id]["inputs"]["height"]))
                 self.assertEqual(1024, wf["5"]["inputs"]["resolution"])
+
+    def test_size_policies_resolve_exactly_the_values_they_declare(self):
+        source = str(self.tmp / "source.png")
+        for name, policy_class in POLICIES.items():
+            config = {"megapixels": [1.0]} if name == "fixed_area" else {}
+            policy = policy_class(config)
+            for aspect in policy.aspect_ratios:
+                with self.subTest(policy=name, aspect=aspect):
+                    params = GenerationParams(
+                        prompt="p", source_image_path=source, mask_path=None, steps=4,
+                        aspect_ratio=aspect, target_megapixels=policy.default_megapixels,
+                    )
+                    self.assertEqual(policy.value_names, set(policy.resolve(params).values))
+
+    def test_loading_rejects_a_size_binding_that_leaves_a_value_unused(self):
+        data = json.loads(workflow_files.available_workflows()["qwen_image21"].read_text(encoding="utf-8"))
+        del data["manifest"]["size"]["bind"]["height"]
+        with self.assertRaisesRegex(ValueError, "size.bind must bind exactly"):
+            WorkflowModel("broken", data["manifest"], data["workflow"])
 
     def test_variant_does_not_inherit_the_checksum_of_another_file(self):
         manifest, workflow = workflow_files.read_workflow_file(available_workflows()["qwen_image21"])

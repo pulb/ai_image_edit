@@ -12,7 +12,7 @@ into the workflow.
 """
 import math
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, FrozenSet, List, Optional, Tuple
 
 from PIL import Image
 
@@ -37,6 +37,9 @@ class SizePolicy:
     default_aspect_ratio: str
     megapixels: List[float]
     default_megapixels: float
+    # The names resolve() puts in ResolvedSize.values. A manifest must bind
+    # exactly these, so a choice offered in the UI cannot end up unused.
+    value_names: FrozenSet[str]
 
     def __init__(self, config: dict) -> None:
         pass
@@ -136,6 +139,7 @@ class Qwen21Tiers(SizePolicy):
     default_aspect_ratio = ORIGINAL_ASPECT_RATIO
     megapixels = QWEN21_TIERS
     default_megapixels = QWEN21_DEFAULT_TIER
+    value_names = frozenset({"resolution", "width", "height"})
 
     def megapixels_for_source(self, source_image_path: str) -> Optional[float]:
         return _nearest_tier(source_image_path)
@@ -167,6 +171,8 @@ class FixedArea(SizePolicy):
         "21:9": (21, 9),
         "9:21": (9, 21),
     }
+
+    value_names = frozenset({"width", "height"})
 
     def __init__(self, config: dict) -> None:
         self.aspect_ratios = [*self.RATIOS, ORIGINAL_ASPECT_RATIO]
