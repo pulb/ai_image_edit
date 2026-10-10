@@ -13,10 +13,13 @@ model is passed straight to the UI's run(model).
 """
 import argparse
 import os
+from pathlib import Path
 from typing import List, Optional
 
 from ai_image_edit import ui
-from ai_image_edit.workflow_model import get_model
+from ai_image_edit.comfyui import client, downloads, gpu
+from ai_image_edit.core import paths
+from ai_image_edit.workflow_model import WorkflowModel, get_model
 from ai_image_edit.workflows import available_workflows
 
 
@@ -26,6 +29,28 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     parser.add_argument("--variant", help="variant of the workflow's model, e.g. a quantization; env MODEL_VARIANT")
     parser.add_argument("--list-workflows", action="store_true", help="print the bundled workflows and exit")
     return parser.parse_args(argv)
+
+
+def describe_config(model: WorkflowModel, workflow: str, variant: Optional[str]) -> str:
+    """The settings the app starts with, one per line. Secrets are only reported as set or not set."""
+    def flag(name: str) -> str:
+        return "set" if os.environ.get(name) else "(not set)"
+
+    rows = [
+        ("workflow", workflow),
+        ("variant", variant or "(default)"),
+        ("model", model.display_name),
+        ("work directory", f"{paths.WORK_DIR} (cap {paths.format_size(paths.WORK_MAX_BYTES)})"),
+        ("ComfyUI directory", Path.cwd()),
+        ("generation timeout", f"{client.GENERATION_TIMEOUT_SECONDS} s"),
+        ("download connections", downloads.connections()),
+        ("CUDA_VISIBLE_DEVICES", os.environ.get("CUDA_VISIBLE_DEVICES", "(not set)")),
+        ("CUDA_DEVICE_ORDER", gpu.device_order()),
+        ("accepted licenses", os.environ.get("ACCEPT_LICENSES", "").strip() or "(none)"),
+        ("password login", "on" if os.environ.get("APP_PASSWORD") else "off"),
+        ("HF_TOKEN", flag("HF_TOKEN")),
+    ]
+    return "Configuration:\n" + "\n".join(f"  {name + ':':<22}{value}" for name, value in rows)
 
 
 def main(argv: Optional[List[str]] = None) -> None:
@@ -46,6 +71,7 @@ def main(argv: Optional[List[str]] = None) -> None:
         model = get_model(workflow, variant)
     except (ValueError, OSError) as exc:
         raise SystemExit(str(exc))
+    print(describe_config(model, workflow, variant), flush=True)
     print(f"Starting model '{workflow}' in the background...", flush=True)
     try:
         model.start()

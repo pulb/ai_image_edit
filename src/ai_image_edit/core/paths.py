@@ -43,7 +43,7 @@ def parse_size(text: str) -> int:
     return int(text)
 
 
-def _format_size(n: int) -> str:
+def format_size(n: int) -> str:
     for unit in ("B", "KiB", "MiB", "GiB"):
         if n < 1024 or unit == "GiB":
             return f"{n:.0f} {unit}" if unit == "B" else f"{n:.1f} {unit}"
@@ -64,8 +64,8 @@ def _effective_max_bytes() -> int:
         return limit
     if configured > limit:
         print(
-            f"WARNING: AI_IMAGE_EDIT_WORK_MAX_SIZE ({_format_size(configured)}) is larger than "
-            f"90% of the filesystem holding {WORK_DIR}; the effective cap is {_format_size(limit)}. "
+            f"WARNING: AI_IMAGE_EDIT_WORK_MAX_SIZE ({format_size(configured)}) is larger than "
+            f"90% of the filesystem holding {WORK_DIR}; the effective cap is {format_size(limit)}. "
             "Enlarge the filesystem (docker run --shm-size) or lower the setting.",
             flush=True,
         )

@@ -49,7 +49,7 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def _connections() -> int:
+def connections() -> int:
     """How many parts of a file are fetched at once (DOWNLOAD_CONNECTIONS, default 8, at most 32)."""
     try:
         return max(1, min(32, int(os.environ.get("DOWNLOAD_CONNECTIONS", "8"))))
@@ -188,7 +188,7 @@ def _download_parts(
                 done_parts.add(i)
                 save_state()
 
-    threads = [threading.Thread(target=worker, daemon=True) for _ in range(min(_connections(), len(todo)))]
+    threads = [threading.Thread(target=worker, daemon=True) for _ in range(min(connections(), len(todo)))]
     for t in threads:
         t.start()
     for t in threads:
