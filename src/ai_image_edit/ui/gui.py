@@ -141,7 +141,7 @@ def build_advanced_card(caps: ModelCapabilities) -> AdvancedCard:
             if caps.scheduler_choices:
                 scheduler = ui.select(caps.scheduler_choices, value=default_choice(caps.default_scheduler, caps.scheduler_choices), label="Scheduler").props("outlined dark").classes("w-full")
 
-            with ui.row().classes("items-center no-wrap q-mt-sm"):
+            with ui.row().classes("items-center no-wrap gap-0 q-mt-sm"):
                 color_correction = ui.switch("Apply color corrections", value=False)
                 with ui.button(icon="info").props("flat round dense size=sm").classes("text-gray-400"):
                     with ui.menu():
