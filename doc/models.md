@@ -39,6 +39,20 @@ the bf16 diffusion model, text encoder and VAE.
   [Qwen RESEARCH LICENSE AGREEMENT](https://huggingface.co/Qwen/Qwen-Image-2.1/raw/main/LICENSE)
   (accept it with `ACCEPT_LICENSES=qwen-research`).
 
+### `qwen_image21_turbo`
+
+The official 8-step distilled version of Qwen-Image-2.1, from the same
+[ComfyUI repository](https://huggingface.co/Comfy-Org/Qwen-Image-2.1) as
+`qwen_image21`: bf16 diffusion model, shared text encoder and VAE.
+
+- **Use it for:** much faster generation, with somewhat lower quality on small
+  dense text and complex edits. Memory needs are those of `qwen_image21`.
+- **Variants:** `int8`, which uses less memory.
+- **Steps:** 1 to 16, 8 by default, with CFG 1 (the default); the distillation
+  needs no guidance, so a higher CFG only makes it slower.
+- **License:** the same Qwen RESEARCH LICENSE AGREEMENT
+  (`ACCEPT_LICENSES=qwen-research`).
+
 ### `qwen_image21_gguf`
 
 Qwen-Image-2.1 as quantized
@@ -56,6 +70,20 @@ loaded with the [ComfyUI-GGUF](https://github.com/pulb/ComfyUI-GGUF) custom node
 - **License:** the GGUF files are third-party conversions of the Qwen-Image-2.1
   weights and are under the same
   [Qwen RESEARCH LICENSE AGREEMENT](https://huggingface.co/Qwen/Qwen-Image-2.1/raw/main/LICENSE)
+  (`ACCEPT_LICENSES=qwen-research`).
+
+### `qwen_image21_turbo_gguf`
+
+The Turbo model as quantized
+[GGUF weights](https://huggingface.co/unsloth/Qwen-Image-2.1-Turbo-GGUF) by
+Unsloth, loaded with the same ComfyUI-GGUF custom node as `qwen_image21_gguf`.
+
+- **Use it for:** fast generation on GPUs with little memory.
+- **Variants:** the quantization, from `Q2_K` over `Q4_K_M` (default) and `Q8_0`
+  to `F16`. Larger is better and needs more memory; below `Q4_K_M` quality drops
+  noticeably at 8 steps.
+- **Steps:** 1 to 16, 8 by default, with CFG 1.
+- **License:** the same Qwen RESEARCH LICENSE AGREEMENT
   (`ACCEPT_LICENSES=qwen-research`).
 
 ### `qwen_image_edit_2511_aio`

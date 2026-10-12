@@ -222,8 +222,16 @@ class ManifestModelTests(unittest.TestCase):
         finally:
             imaging.run_masked_generation = real
 
+    def test_turbo_workflows_default_to_eight_steps_without_guidance(self):
+        for name in ("qwen_image21_turbo", "qwen_image21_turbo_gguf"):
+            with self.subTest(workflow=name):
+                model = self.load(workflow_files.available_workflows()[name])
+                self.assertEqual(8, model.capabilities.step_range.default)
+                self.assertEqual(1.0, model.capabilities.cfg_range.default)
+                self.assertEqual(8, model._workflow["6"]["inputs"]["steps"])
+
     def test_qwen21_output_size_comes_from_an_empty_latent(self):
-        for name in ("qwen_image21", "qwen_image21_gguf"):
+        for name in ("qwen_image21", "qwen_image21_gguf", "qwen_image21_turbo", "qwen_image21_turbo_gguf"):
             with self.subTest(workflow=name):
                 model = self.load(workflow_files.available_workflows()[name])
                 params = GenerationParams(

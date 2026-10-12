@@ -1,0 +1,176 @@
+{
+  "format_version": 1,
+  "manifest": {
+    "model_name": "Qwen-Image 2.1 Turbo GGUF",
+    "model_version": "Q4_K_M",
+    "required_nodes": ["UnetLoaderGGUF", "QwenImage21Cache", "TextEncodeQwenImage21"],
+    "missing_nodes_hint": "install the ComfyUI-GGUF custom node and use a ComfyUI version that supports Qwen-Image 2.1.",
+
+    "custom_nodes": [
+      {
+        "name": "ComfyUI-GGUF",
+        "git": "https://github.com/pulb/ComfyUI-GGUF",
+        "ref": "c1efb13f15f8368660cf06d7233d5099c2d88ce0"
+      }
+    ],
+    "variants": {
+      "Q2_K": {
+        "model_version": "Q2_K",
+        "files": {"1.unet_name": {"name": "qwen-image-2.1-turbo-Q2_K.gguf", "url": "https://huggingface.co/unsloth/Qwen-Image-2.1-Turbo-GGUF/resolve/main/qwen-image-2.1-turbo-Q2_K.gguf?download=true"}}
+      },
+      "Q3_K_S": {
+        "model_version": "Q3_K_S",
+        "files": {"1.unet_name": {"name": "qwen-image-2.1-turbo-Q3_K_S.gguf", "url": "https://huggingface.co/unsloth/Qwen-Image-2.1-Turbo-GGUF/resolve/main/qwen-image-2.1-turbo-Q3_K_S.gguf?download=true"}}
+      },
+      "Q3_K_M": {
+        "model_version": "Q3_K_M",
+        "files": {"1.unet_name": {"name": "qwen-image-2.1-turbo-Q3_K_M.gguf", "url": "https://huggingface.co/unsloth/Qwen-Image-2.1-Turbo-GGUF/resolve/main/qwen-image-2.1-turbo-Q3_K_M.gguf?download=true"}}
+      },
+      "Q3_K_XL": {
+        "model_version": "Q3_K_XL",
+        "files": {"1.unet_name": {"name": "qwen-image-2.1-turbo-Q3_K_XL.gguf", "url": "https://huggingface.co/unsloth/Qwen-Image-2.1-Turbo-GGUF/resolve/main/qwen-image-2.1-turbo-Q3_K_XL.gguf?download=true"}}
+      },
+      "Q4_K_S": {
+        "model_version": "Q4_K_S",
+        "files": {"1.unet_name": {"name": "qwen-image-2.1-turbo-Q4_K_S.gguf", "url": "https://huggingface.co/unsloth/Qwen-Image-2.1-Turbo-GGUF/resolve/main/qwen-image-2.1-turbo-Q4_K_S.gguf?download=true"}}
+      },
+      "Q4_K_M": {
+        "model_version": "Q4_K_M",
+        "files": {"1.unet_name": {"name": "qwen-image-2.1-turbo-Q4_K_M.gguf", "url": "https://huggingface.co/unsloth/Qwen-Image-2.1-Turbo-GGUF/resolve/main/qwen-image-2.1-turbo-Q4_K_M.gguf?download=true"}}
+      },
+      "Q5_K_S": {
+        "model_version": "Q5_K_S",
+        "files": {"1.unet_name": {"name": "qwen-image-2.1-turbo-Q5_K_S.gguf", "url": "https://huggingface.co/unsloth/Qwen-Image-2.1-Turbo-GGUF/resolve/main/qwen-image-2.1-turbo-Q5_K_S.gguf?download=true"}}
+      },
+      "Q5_K_M": {
+        "model_version": "Q5_K_M",
+        "files": {"1.unet_name": {"name": "qwen-image-2.1-turbo-Q5_K_M.gguf", "url": "https://huggingface.co/unsloth/Qwen-Image-2.1-Turbo-GGUF/resolve/main/qwen-image-2.1-turbo-Q5_K_M.gguf?download=true"}}
+      },
+      "Q6_K": {
+        "model_version": "Q6_K",
+        "files": {"1.unet_name": {"name": "qwen-image-2.1-turbo-Q6_K.gguf", "url": "https://huggingface.co/unsloth/Qwen-Image-2.1-Turbo-GGUF/resolve/main/qwen-image-2.1-turbo-Q6_K.gguf?download=true"}}
+      },
+      "Q6_K_XL": {
+        "model_version": "Q6_K_XL",
+        "files": {"1.unet_name": {"name": "qwen-image-2.1-turbo-Q6_K_XL.gguf", "url": "https://huggingface.co/unsloth/Qwen-Image-2.1-Turbo-GGUF/resolve/main/qwen-image-2.1-turbo-Q6_K_XL.gguf?download=true"}}
+      },
+      "Q8_0": {
+        "model_version": "Q8_0",
+        "files": {"1.unet_name": {"name": "qwen-image-2.1-turbo-Q8_0.gguf", "url": "https://huggingface.co/unsloth/Qwen-Image-2.1-Turbo-GGUF/resolve/main/qwen-image-2.1-turbo-Q8_0.gguf?download=true"}}
+      },
+      "F16": {
+        "model_version": "F16",
+        "files": {"1.unet_name": {"name": "qwen-image-2.1-turbo-F16.gguf", "url": "https://huggingface.co/unsloth/Qwen-Image-2.1-Turbo-GGUF/resolve/main/qwen-image-2.1-turbo-F16.gguf?download=true"}}
+      }
+    },
+    "licenses": {
+      "qwen-research": {
+        "name": "Qwen RESEARCH LICENSE AGREEMENT (non-commercial)",
+        "url": "https://huggingface.co/Qwen/Qwen-Image-2.1/raw/main/LICENSE"
+      }
+    },
+    "files": [
+      {
+        "name": "qwen-image-2.1-turbo-Q4_K_M.gguf", "license": "qwen-research", "env": "MODEL_FILE",
+        "url": "https://huggingface.co/unsloth/Qwen-Image-2.1-Turbo-GGUF/resolve/main/qwen-image-2.1-turbo-Q4_K_M.gguf?download=true",
+        "folder": "models/diffusion_models", "set": "1.unet_name"
+      },
+      {
+        "name": "qwen3vl_8b_int8_convrot.safetensors", "license": "qwen-research", "env": "TEXT_ENCODER_FILE",
+        "url": "https://huggingface.co/Comfy-Org/Qwen-Image-2.1/resolve/main/text_encoders/qwen3vl_8b_int8_convrot.safetensors?download=true",
+        "folder": "models/text_encoders", "set": "2.clip_name"
+      },
+      {
+        "name": "qwen_image_2.1_vae_bf16.safetensors", "license": "qwen-research", "env": "VAE_FILE",
+        "url": "https://huggingface.co/Comfy-Org/Qwen-Image-2.1/resolve/main/vae/qwen_image_2.1_vae_bf16.safetensors?download=true",
+        "folder": "models/vae", "set": "3.vae_name"
+      }
+    ],
+    "bind": {
+      "prompt":          "5.prompt",
+      "negative_prompt": "5.negative_prompt",
+      "seed":            "6.seed",
+      "steps":           "6.steps",
+      "cfg":             "6.cfg",
+      "sampler":         "6.sampler_name",
+      "scheduler":       "6.scheduler"
+    },
+    "seed": {"min": 0, "max": 2147483647, "wrap": true},
+
+    "images": {
+      "source": "10.image",
+      "references": {"target": "5.images.image_{n}", "first_n": 2, "loader_id_start": 20, "max": 9}
+    },
+
+    "size": {"policy": "qwen21_tiers", "bind": {"resolution": "5.resolution", "width": "11.width", "height": "11.height"}},
+
+    "capabilities": {
+      "supports_inpainting": true,
+      "num_annotation_colors": 3,
+      "sampler": {"default": "euler"},
+      "scheduler": {"default": "simple"},
+      "steps": {"min": 1, "max": 16, "default": 8, "step": 1},
+      "cfg": {"min": 1.0, "max": 10.0, "default": 1.0, "step": 0.1}
+    }
+  },
+  "workflow": {
+    "1": {
+      "class_type": "UnetLoaderGGUF",
+      "inputs": {"unet_name": ""}
+    },
+    "2": {
+      "class_type": "CLIPLoader",
+      "inputs": {"clip_name": "", "type": "qwen_image", "device": "default"}
+    },
+    "3": {
+      "class_type": "VAELoader",
+      "inputs": {"vae_name": ""}
+    },
+    "4": {
+      "class_type": "QwenImage21Cache",
+      "inputs": {"model": ["1", 0], "device": "auto", "dtype": "default"}
+    },
+    "5": {
+      "class_type": "TextEncodeQwenImage21",
+      "inputs": {
+        "clip": ["2", 0],
+        "vae": ["3", 0],
+        "prompt": "",
+        "negative_prompt": "",
+        "resolution": 1024,
+        "images.image_1": ["10", 0]
+      }
+    },
+    "6": {
+      "class_type": "KSampler",
+      "inputs": {
+        "model": ["4", 0],
+        "positive": ["5", 0],
+        "negative": ["5", 1],
+        "latent_image": ["11", 0],
+        "seed": 0,
+        "steps": 8,
+        "cfg": 1,
+        "sampler_name": "euler",
+        "scheduler": "simple",
+        "denoise": 1
+      }
+    },
+    "7": {
+      "class_type": "VAEDecode",
+      "inputs": {"samples": ["6", 0], "vae": ["3", 0]}
+    },
+    "8": {
+      "class_type": "SaveImage",
+      "inputs": {"filename_prefix": "ComfyUI", "images": ["7", 0]}
+    },
+    "10": {
+      "class_type": "LoadImage",
+      "inputs": {"image": "", "upload": "image"}
+    },
+    "11": {
+      "class_type": "EmptyLatentImage",
+      "inputs": {"width": 1024, "height": 1024, "batch_size": 1}
+    }
+  }
+}

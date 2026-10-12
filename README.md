@@ -34,6 +34,9 @@ starts. These are included:
   plenty of memory.
 - **`qwen_image21_gguf`**: the same model, quantized, for GPUs with little
   memory, at some cost in quality.
+- **`qwen_image21_turbo`** and **`qwen_image21_turbo_gguf`**: the official
+  8-step Turbo version of the model (full precision or quantized), for much faster
+  generation.
 - **`qwen_image_edit_2511_aio`**: Qwen-Image-Edit 2511 with a set of LoRAs, for
   fast edits in just a few steps.
 
