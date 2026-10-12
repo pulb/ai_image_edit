@@ -10,7 +10,7 @@ except ImportError:
     sys.modules["websocket"] = types.ModuleType("websocket")
 
 from ai_image_edit.core.errors import GenerationError
-from ai_image_edit.comfyui import client
+from ai_image_edit.comfy import client
 
 
 def response(body, status=200):

@@ -24,7 +24,7 @@ except ImportError:
 
 from ai_image_edit.core.errors import GenerationError
 from ai_image_edit.core.types import GenerationParams
-from ai_image_edit.comfyui import client, downloads
+from ai_image_edit.comfy import client, downloads
 from ai_image_edit.workflow_model import SetupProgress, WorkflowModel
 
 PAYLOAD = bytes(range(256)) * 4000  # ~1 MB

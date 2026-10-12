@@ -15,7 +15,7 @@ from typing import List, Optional
 import requests
 import websocket
 
-from ai_image_edit.comfyui import gpu
+from ai_image_edit.comfy import gpu
 from ai_image_edit.core.errors import GenerationError
 from ai_image_edit.core.paths import WORK_DIR
 

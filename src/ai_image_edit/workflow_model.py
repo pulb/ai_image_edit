@@ -19,8 +19,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-from ai_image_edit.comfyui import client as comfy_client
-from ai_image_edit.comfyui import custom_nodes, downloads, gpu
+from ai_image_edit.comfy import client as comfy_client
+from ai_image_edit.comfy import custom_nodes, downloads, gpu
 from ai_image_edit.core import imaging
 from ai_image_edit.core.errors import GenerationError
 from ai_image_edit.core.result_cache import cached_infer

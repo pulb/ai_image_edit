@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import List, Optional
 
 from ai_image_edit import ui
-from ai_image_edit.comfyui import client, downloads, gpu
+from ai_image_edit.comfy import client, downloads, gpu
 from ai_image_edit.core import paths
 from ai_image_edit.workflow_model import WorkflowModel, get_model
 from ai_image_edit.workflows import available_workflows

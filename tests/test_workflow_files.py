@@ -33,7 +33,7 @@ from ai_image_edit.core.errors import GenerationError
 from ai_image_edit.core.types import GenerationParams
 from ai_image_edit.workflows import available_workflows
 from ai_image_edit import workflows as workflow_files
-from ai_image_edit.comfyui import client
+from ai_image_edit.comfy import client
 from ai_image_edit.sizes import POLICIES
 from ai_image_edit.workflow_model import WorkflowModel
 

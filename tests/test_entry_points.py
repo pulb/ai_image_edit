@@ -22,7 +22,7 @@ except ImportError:
     sys.modules["websocket"] = types.ModuleType("websocket")
 
 from ai_image_edit import app
-from ai_image_edit.comfyui import client, custom_nodes
+from ai_image_edit.comfy import client, custom_nodes
 from ai_image_edit.workflows import available_workflows, read_workflow_file
 from ai_image_edit.workflow_model import WorkflowModel
 
