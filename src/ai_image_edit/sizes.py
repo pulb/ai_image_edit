@@ -1,13 +1,16 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """
-How a model turns the UI's size choices (aspect ratio, "megapixels")
+How a model turns the UI's size choices (aspect ratio, resolution)
 into the numbers its workflow needs. A manifest names one policy under
 "size"; adding a model with a new sizing scheme means adding a class here and
 registering it in POLICIES.
 
+A resolution is the side length, in pixels, of a square with the area to
+generate (1024 is "1K"); the aspect ratio then shapes that area.
+
 A policy answers three questions: what the UI may offer (aspect ratios,
-megapixel choices), which resolution to generate at for one request, and which
-named values (e.g. "width"/"height", or "resolution") the manifest should write
+resolutions), which size to generate at for one request, and which named
+values (e.g. "width"/"height", or "resolution") the manifest should write
 into the workflow.
 """
 import math
@@ -35,8 +38,8 @@ class SizePolicy:
 
     aspect_ratios: List[str]
     default_aspect_ratio: str
-    megapixels: List[float]
-    default_megapixels: float
+    resolutions: List[int]
+    default_resolution: int
     # The names resolve() puts in ResolvedSize.values. A manifest must bind
     # exactly these, so a choice offered in the UI cannot end up unused.
     value_names: FrozenSet[str]
@@ -44,8 +47,8 @@ class SizePolicy:
     def __init__(self, config: dict) -> None:
         pass
 
-    def megapixels_for_source(self, source_image_path: str) -> Optional[float]:
-        """The megapixels value that fits the source image, or None if the policy has no such notion."""
+    def resolution_for_source(self, source_image_path: str) -> Optional[int]:
+        """The resolution that fits the source image, or None if the policy has no such notion."""
         return None
 
     def resolve(self, params: GenerationParams) -> ResolvedSize:
@@ -66,13 +69,9 @@ QWEN21_ASPECT_RATIOS: Dict[str, Tuple[int, int]] = {
     "9:16": (1536, 2752),
 }
 
-# Resolution tiers, reusing the "megapixels" field every model's
-# capabilities expose for its resolution choices. Here it's actually this
-# model's own tier (1K/1.5K/2K, i.e. target side length 1024/1536/2048)
-# rather than a literal computed pixel area. _resolution_for() turns the chosen
-# value back into that side length.
-QWEN21_TIERS = [1.0, 1.5, 2.0]
-QWEN21_DEFAULT_TIER = 1.0
+# The model's resolution tiers: 1K, 1.5K and 2K.
+QWEN21_RESOLUTIONS = [1024, 1536, 2048]
+QWEN21_DEFAULT_RESOLUTION = 1024
 
 
 def _round32(v: float) -> int:
@@ -82,7 +81,7 @@ def _round32(v: float) -> int:
 
 def _tier_size(resolution: int, aspect_ratio: str) -> Tuple[Optional[int], Optional[int]]:
     """
-    Width/height for a resolution tier and a named aspect ratio: the model
+    Width/height for a resolution and a named aspect ratio: the model
     card's size for that ratio, scaled by resolution / QWEN21_BASE_RESOLUTION.
     Returns (None, None) for ORIGINAL_ASPECT_RATIO and for unknown names; use
     _dimensions_from_source() then.
@@ -115,16 +114,11 @@ def _dimensions_from_source(source_image_path: str, resolution: int) -> Tuple[in
     return _round32(w), _round32(h)
 
 
-def _resolution_for(target_megapixels: float) -> int:
-    """The side-length tier (1024/1536/2048) a QWEN21_TIERS value stands for."""
-    return int(round(target_megapixels * 1024))
-
-
-def _nearest_tier(source_image_path: str) -> float:
-    """The tier whose area is closest to the source image's own."""
+def _nearest_resolution(source_image_path: str) -> int:
+    """The resolution closest to the source image's own (the side of a square of its area)."""
     with Image.open(source_image_path) as img:
-        area = img.width * img.height
-    return min(QWEN21_TIERS, key=lambda mp: abs(math.log(area / (mp * 1024) ** 2)))
+        side = math.sqrt(img.width * img.height)
+    return min(QWEN21_RESOLUTIONS, key=lambda r: abs(math.log(side / r)))
 
 
 class Qwen21Tiers(SizePolicy):
@@ -137,28 +131,27 @@ class Qwen21Tiers(SizePolicy):
 
     aspect_ratios = [ORIGINAL_ASPECT_RATIO, *QWEN21_ASPECT_RATIOS]
     default_aspect_ratio = ORIGINAL_ASPECT_RATIO
-    megapixels = QWEN21_TIERS
-    default_megapixels = QWEN21_DEFAULT_TIER
+    resolutions = QWEN21_RESOLUTIONS
+    default_resolution = QWEN21_DEFAULT_RESOLUTION
     value_names = frozenset({"resolution", "width", "height"})
 
-    def megapixels_for_source(self, source_image_path: str) -> Optional[float]:
-        return _nearest_tier(source_image_path)
+    def resolution_for_source(self, source_image_path: str) -> Optional[int]:
+        return _nearest_resolution(source_image_path)
 
     def resolve(self, params: GenerationParams) -> ResolvedSize:
         # A mask only lines up with the source's own framing and resolution,
         # so both come from the source then.
         aspect = ORIGINAL_ASPECT_RATIO if params.mask_path else params.aspect_ratio
-        megapixels = self.megapixels_for_source(params.source_image_path) if params.mask_path else params.target_megapixels
-        resolution = _resolution_for(megapixels)
+        resolution = self.resolution_for_source(params.source_image_path) if params.mask_path else params.resolution
         width, height = _tier_size(resolution, aspect)
         if width is None or height is None:
             width, height = _dimensions_from_source(params.source_image_path, resolution)
         values = {"resolution": resolution, "width": width, "height": height}
-        return ResolvedSize(width, height, values, {"resolution": resolution}, f"resolution_tier={resolution}")
+        return ResolvedSize(width, height, values, {"resolution": resolution}, f"resolution={resolution}")
 
 
 class FixedArea(SizePolicy):
-    """A target pixel area (megapixels) split by an aspect ratio, rounded to a multiple of `multiple`."""
+    """A target pixel area (the square of the resolution) split by an aspect ratio, rounded to a multiple of `multiple`."""
 
     RATIOS: Dict[str, Tuple[int, int]] = {
         "1:1": (1, 1),
@@ -177,8 +170,8 @@ class FixedArea(SizePolicy):
     def __init__(self, config: dict) -> None:
         self.aspect_ratios = [*self.RATIOS, ORIGINAL_ASPECT_RATIO]
         self.default_aspect_ratio = ORIGINAL_ASPECT_RATIO
-        self.megapixels = list(config["megapixels"])
-        self.default_megapixels = config.get("default_megapixels", self.megapixels[0])
+        self.resolutions = list(config["resolutions"])
+        self.default_resolution = config.get("default_resolution", self.resolutions[0])
         self.multiple = int(config.get("multiple", 8))
 
     def _dimensions_for(self, aspect_w: int, aspect_h: int, target_area: float) -> Tuple[int, int]:
@@ -191,14 +184,14 @@ class FixedArea(SizePolicy):
         # A mask's coordinates only mean something relative to the source's
         # own framing, so a mask always gets the source's aspect ratio.
         aspect = ORIGINAL_ASPECT_RATIO if params.mask_path else params.aspect_ratio
-        target_area = params.target_megapixels * 1024 * 1024
+        target_area = float(params.resolution) ** 2
         if aspect == ORIGINAL_ASPECT_RATIO:
             with Image.open(params.source_image_path) as img:
                 ratio_w, ratio_h = img.size
         else:
             ratio_w, ratio_h = self.RATIOS[aspect]
         width, height = self._dimensions_for(ratio_w, ratio_h, target_area)
-        return ResolvedSize(width, height, {"width": width, "height": height}, {}, f"mp={params.target_megapixels}")
+        return ResolvedSize(width, height, {"width": width, "height": height}, {}, f"resolution={params.resolution}")
 
 
 POLICIES = {

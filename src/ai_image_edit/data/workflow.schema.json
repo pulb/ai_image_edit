@@ -213,12 +213,12 @@
             {
               "if": {"properties": {"policy": {"const": "fixed_area"}}},
               "then": {
-                "required": ["megapixels"],
+                "required": ["resolutions"],
                 "properties": {
                   "policy": true,
                   "bind": {"required": ["width", "height"], "propertyNames": {"enum": ["width", "height"]}},
-                  "megapixels": {"type": "array", "items": {"type": "number", "exclusiveMinimum": 0}, "minItems": 1},
-                  "default_megapixels": {"type": "number", "exclusiveMinimum": 0},
+                  "resolutions": {"type": "array", "items": {"type": "integer", "minimum": 64}, "minItems": 1},
+                  "default_resolution": {"type": "integer", "minimum": 64},
                   "multiple": {"type": "integer", "minimum": 1}
                 },
                 "additionalProperties": false

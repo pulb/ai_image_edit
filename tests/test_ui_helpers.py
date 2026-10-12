@@ -27,6 +27,23 @@ class StorageSecretTest(unittest.TestCase):
         self.assertEqual(self.secret("pw", APP_STORAGE_SECRET="abc"), "abc")
 
 
+class ResolutionTest(unittest.TestCase):
+    def test_label_is_the_side_in_k(self):
+        self.assertEqual([common.resolution_label(r) for r in (1024, 1536, 2048)], ["1K", "1.5K", "2K"])
+
+    def test_source_gets_the_nearest_resolution(self):
+        import tempfile
+        from PIL import Image
+        from ai_image_edit.sizes import Qwen21Tiers
+
+        cases = {(1024, 768): 1024, (1920, 1080): 1536, (2560, 1440): 2048, (4000, 3000): 2048, (320, 240): 1024}
+        with tempfile.TemporaryDirectory() as tmp:
+            for size, expected in cases.items():
+                path = f"{tmp}/{size[0]}x{size[1]}.png"
+                Image.new("RGB", size).save(path)
+                self.assertEqual(Qwen21Tiers({}).resolution_for_source(path), expected, size)
+
+
 class AssetsTest(unittest.TestCase):
     def test_placeholders_are_filled_in(self):
         import re

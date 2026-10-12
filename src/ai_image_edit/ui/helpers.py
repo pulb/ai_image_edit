@@ -32,6 +32,11 @@ def storage_secret(password: str) -> str:
     return hashlib.pbkdf2_hmac("sha256", password.encode(), _SECRET_SALT, _SECRET_ITERATIONS).hex()
 
 
+def resolution_label(resolution: int) -> str:
+    """A resolution (side length in pixels) as shown to the user: 1024 is "1K", 1536 is "1.5K"."""
+    return f"{resolution / 1024:g}K"
+
+
 def default_choice(default: Optional[str], choices: Optional[Sequence[str]]) -> Optional[str]:
     """The model's declared default if it is one of `choices`, else the first choice (None if there are none)."""
     if not choices:
@@ -55,7 +60,7 @@ def params_from_ui(
     seed: Optional[float],
     randomize_seed: bool,
     aspect_ratio: str,
-    target_megapixels: float,
+    resolution: int,
     steps: int,
     cfg: Optional[float] = None,
     denoise: Optional[float] = None,
@@ -85,7 +90,7 @@ def params_from_ui(
         seed=int(seed) if seed is not None else 0,
         randomize_seed=bool(randomize_seed),
         aspect_ratio=aspect_ratio,
-        target_megapixels=target_megapixels,
+        resolution=resolution,
         cfg=cfg if caps.supports_cfg and cfg is not None else caps.cfg_range.default,
         denoise=denoise if caps.supports_denoise and denoise is not None else 1.0,
         sampler_name=sampler_name if caps.sampler_choices else None,

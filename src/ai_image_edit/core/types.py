@@ -60,13 +60,14 @@ class ModelCapabilities:
     supported_aspect_ratios: List[str]
     default_aspect_ratio: str
 
-    # Output resolution choices, in megapixels (e.g. [1.0, 1.5, 2.0] — or
-    # just [1.0] for a model that only really supports one target area).
-    # The model converts (aspect_ratio, megapixels) into actual pixel
-    # dimensions internally — the UI never computes or sees real pixel
-    # dimensions. default_megapixels must be one of supported_megapixels.
-    supported_megapixels: List[float]
-    default_megapixels: float
+    # Output resolution choices: the side length in pixels of a square with
+    # the area to generate (e.g. [1024, 1536, 2048], shown as 1K, 1.5K and
+    # 2K — or just [1024] for a model that only supports one). The model
+    # converts (aspect_ratio, resolution) into actual pixel dimensions
+    # internally — the UI never computes or sees real pixel dimensions.
+    # default_resolution must be one of supported_resolutions.
+    supported_resolutions: List[int]
+    default_resolution: int
 
     # None hides the corresponding UI control entirely rather than showing
     # a dropdown with a meaningless single choice. default_sampler/
@@ -129,7 +130,7 @@ class GenerationParams:
     randomize_seed: bool = True
 
     aspect_ratio: str = ORIGINAL_ASPECT_RATIO
-    target_megapixels: float = 1.0
+    resolution: int = 1024
 
     cfg: float = 1.0
     denoise: float = 1.0

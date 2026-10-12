@@ -179,7 +179,7 @@ class ManifestModelTests(unittest.TestCase):
                 self.assertEqual(caps.supports_loras, bool(model._manifest.get("loras")))
                 self.assertIn(caps.default_sampler, caps.sampler_choices)
                 self.assertIn(caps.default_scheduler, caps.scheduler_choices)
-                self.assertIn(caps.default_megapixels, caps.supported_megapixels)
+                self.assertIn(caps.default_resolution, caps.supported_resolutions)
                 self.assertIn(caps.default_aspect_ratio, caps.supported_aspect_ratios)
                 self.assertIsInstance(model.list_loras(), dict)
                 model.model_version  # must not raise
@@ -232,7 +232,7 @@ class ManifestModelTests(unittest.TestCase):
                 model = self.load(workflow_files.available_workflows()[name])
                 params = GenerationParams(
                     prompt="p", source_image_path=str(self.tmp / "source.png"), mask_path=None, steps=4,
-                    aspect_ratio="16:9", target_megapixels=1.0,
+                    aspect_ratio="16:9", resolution=1024,
                 )
                 size = model._size.resolve(params)
                 self.assertEqual((1376, 768), (size.width, size.height))
@@ -248,13 +248,13 @@ class ManifestModelTests(unittest.TestCase):
     def test_size_policies_resolve_exactly_the_values_they_declare(self):
         source = str(self.tmp / "source.png")
         for name, policy_class in POLICIES.items():
-            config = {"megapixels": [1.0]} if name == "fixed_area" else {}
+            config = {"resolutions": [1024]} if name == "fixed_area" else {}
             policy = policy_class(config)
             for aspect in policy.aspect_ratios:
                 with self.subTest(policy=name, aspect=aspect):
                     params = GenerationParams(
                         prompt="p", source_image_path=source, mask_path=None, steps=4,
-                        aspect_ratio=aspect, target_megapixels=policy.default_megapixels,
+                        aspect_ratio=aspect, resolution=policy.default_resolution,
                     )
                     self.assertEqual(policy.value_names, set(policy.resolve(params).values))
 

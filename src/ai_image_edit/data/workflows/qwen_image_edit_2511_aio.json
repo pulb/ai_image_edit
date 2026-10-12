@@ -40,7 +40,7 @@
       "references": {"target": "3.image{n}", "first_n": 2, "loader_ids": ["8", "10"], "max": 2}
     },
 
-    "size": {"policy": "fixed_area", "megapixels": [1.0], "multiple": 8, "bind": {"width": "9.width", "height": "9.height"}},
+    "size": {"policy": "fixed_area", "resolutions": [1024], "multiple": 8, "bind": {"width": "9.width", "height": "9.height"}},
 
     "loras": {
       "dir": "models/loras",

@@ -229,8 +229,8 @@ class WorkflowModel:
             supports_inpainting=caps["supports_inpainting"],
             supported_aspect_ratios=list(self._size.aspect_ratios),
             default_aspect_ratio=self._size.default_aspect_ratio,
-            supported_megapixels=list(self._size.megapixels),
-            default_megapixels=self._size.default_megapixels,
+            supported_resolutions=list(self._size.resolutions),
+            default_resolution=self._size.default_resolution,
             sampler_choices=_choices(caps["sampler"].get("choices", "comfy_samplers")),
             default_sampler=caps["sampler"]["default"],
             scheduler_choices=_choices(caps["scheduler"].get("choices", "comfy_schedulers")),
@@ -331,8 +331,8 @@ class WorkflowModel:
         if self._process is not None:
             self._process.terminate()
 
-    def megapixels_for_source(self, source_image_path: str) -> Optional[float]:
-        return self._size.megapixels_for_source(source_image_path)
+    def resolution_for_source(self, source_image_path: str) -> Optional[int]:
+        return self._size.resolution_for_source(source_image_path)
 
     def list_loras(self) -> Dict[str, List[str]]:
         """

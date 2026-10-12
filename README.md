@@ -53,15 +53,15 @@ each workflow, its variants and licenses are in [doc/models.md](doc/models.md).
 
 ## Generation times
 
-Approximate generation times by output resolution in megapixels (MP), at the
-default of 40 steps. They are rough figures from single runs, not benchmarks,
+Approximate generation times by output resolution (1K is about 1024 × 1024
+pixels, 2K about 2048 × 2048), at the default of 40 steps. They are rough figures from single runs, not benchmarks,
 and will vary with the step count and reference images.
 
 ### RunPod GPUs
 
 The `qwen_image21` model (Qwen-Image-2.1) on the datacenter GPUs available on RunPod.
 
-| GPU | 1 MP | 2 MP |
+| GPU | 1K | 2K |
 |---|---|---|
 | NVIDIA H200 | ~10 s | ~1 min |
 | NVIDIA A100 | ~20 s | ~2 min |
@@ -74,7 +74,7 @@ may have at home. The RTX 4090 figures were measured with
 `--highvram --disable-dynamic-vram` (see [Docker](deployments/docker/DEPLOY.md#comfyui-arguments)),
 the RTX 2000 Ada figures without. `qwen_image21` does not fit on these GPUs.
 
-| GPU | 1 MP | 2 MP |
+| GPU | 1K | 2K |
 |---|---|---|
 | NVIDIA RTX 4090 (24 GB) | ~31 s | ~2 min 40 s |
 | NVIDIA RTX 2000 Ada (16 GB) | ~2 min 10 s | ~12 min |
