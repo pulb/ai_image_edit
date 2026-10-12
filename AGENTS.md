@@ -70,7 +70,7 @@ Rules for any AI coding agent working in this repository.
   data, installed with the app), run by the generic `WorkflowModel`; there is
   no per-model Python class. `get_model()` finds every file there
   by its name. The format is documented in
-  `doc/contribution/workflow_files.md` and defined by `src/ai_image_edit/data/workflow.schema.json`.
+  `doc/contributing/workflow_files.md` and defined by `src/ai_image_edit/data/workflow.schema.json`.
   Output-size schemes (including the Qwen-Image-2.1 tiers) are in `sizes.py`;
   a model with a new one adds a policy class there.
 - **ComfyUI code**: `comfy/` holds the client (`client.py`), downloads,

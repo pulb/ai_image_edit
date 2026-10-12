@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/pulb/ai_image_edit/blob/main/src/ai_image_edit/data/workflow.schema.json",
   "title": "AI Image Edit workflow file",
-  "description": "A ComfyUI workflow (API format) plus the manifest that maps the app's inputs onto it. Described in doc/contribution/workflow_files.md.",
+  "description": "A ComfyUI workflow (API format) plus the manifest that maps the app's inputs onto it. Described in doc/contributing/workflow_files.md.",
   "type": "object",
   "required": ["format_version", "manifest", "workflow"],
   "additionalProperties": false,

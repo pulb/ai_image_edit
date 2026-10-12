@@ -3,7 +3,7 @@
 The model the app runs: a workflow file (ai_image_edit/data/workflows/<name>.json) with a
 ComfyUI workflow in API format and a manifest that says how the app's inputs map
 onto that workflow. A bundled file is found by its name, any other by its path
-(see get_model()); the format is documented in doc/contribution/workflow_files.md.
+(see get_model()); the format is documented in doc/contributing/workflow_files.md.
 
 Workflow targets are written "<node id>.<input name>", e.g. "6.seed"; the
 input name may itself contain dots ("5.images.image_2").

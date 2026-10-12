@@ -6,8 +6,8 @@ describing everything the app needs to run it (weights to download, custom
 nodes to install, variants, which workflow inputs the prompt, seed and images go
 to). The app starts a ComfyUI process, loads the workflow into it and downloads
 what is missing when the model starts. Adding or changing a model needs no
-Python; see [workflow files](contribution/workflow_files.md) for the format and
-[adding a model](contribution/extending.md).
+Python; see [workflow files](contributing/workflow_files.md) for the format and
+[adding a model](contributing/extending.md).
 
 ## Choosing a workflow
 

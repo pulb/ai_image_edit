@@ -3,7 +3,7 @@
 One image for every model, built from `deployments/docker/Dockerfile`. The app
 serves the NiceGUI UI on port `7860`. The image holds ComfyUI,
 PyTorch and the app, but no model weights: which model runs is chosen when the
-container starts, and any [workflow file](../../doc/contribution/workflow_files.md)
+container starts, and any [workflow file](../../doc/contributing/workflow_files.md)
 of your own works too.
 
 ## Image storage
@@ -48,7 +48,7 @@ SSH tunnel or Tailscale.
 ComfyUI, PyTorch and the app, without model weights. Which model runs is
 chosen when the container starts, and its weights, LoRAs and custom nodes
 are fetched on first start as its workflow file lists them (see
-[Downloads](../../doc/contribution/workflow_files.md#downloads)). While that
+[Downloads](../../doc/contributing/workflow_files.md#downloads)). While that
 runs the app is already up and says what is being downloaded when you try to
 generate; ComfyUI starts when everything is there. Nothing is baked in, so the
 image is small and, as it contains no weights, can be public.

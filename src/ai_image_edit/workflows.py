@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """
 Finding and reading workflow files (ai_image_edit/data/workflows/*.json, format
-described in doc/contribution/workflow_files.md). The files are package data, so
+described in doc/contributing/workflow_files.md). The files are package data, so
 they are installed with the app. Reading a file checks it against the JSON Schema
 (ai_image_edit/data/workflow.schema.json).
 """
