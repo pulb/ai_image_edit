@@ -30,9 +30,10 @@ def install_password_login(password: str) -> str:
     class AuthMiddleware(BaseHTTPMiddleware):
         async def dispatch(self, request: Request, call_next):
             path = request.url.path
+            target = path + (f"?{request.url.query}" if request.url.query else "")
             if app.storage.user.get("authenticated") or path in open_routes or path.startswith("/_nicegui"):
                 return await call_next(request)
-            return RedirectResponse(f"/login?redirect_to={quote(path)}")
+            return RedirectResponse(f"/login?redirect_to={quote(target, safe='')}")
 
     @ui.page("/login")
     def login_page(redirect_to: str = "/") -> Optional[RedirectResponse]:

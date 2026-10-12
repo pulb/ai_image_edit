@@ -89,7 +89,7 @@ class PromptCard:
     randomize_seed: ui.switch
 
 
-def build_prompt_card(caps: ModelCapabilities) -> PromptCard:
+def build_prompt_card() -> PromptCard:
     with ui.card().classes(CARD_CLASSES):
         prompt = ui.textarea(label="Prompt").props("rows=6 outlined dark").classes("w-full")
 
@@ -256,7 +256,6 @@ def build_reference_card(model: WorkflowModel, caps: ModelCapabilities) -> Refer
     return card
 
 
-
 # Aspect ratio + resolution + the unified image/mask editor. As soon
 # as a mask is drawn on a model that supports inpainting, dimensions
 # must come from the source image's own aspect ratio (a mask's
@@ -322,8 +321,7 @@ async def build_editor_card(model: WorkflowModel, caps: ModelCapabilities) -> Ed
 def run(model: WorkflowModel) -> None:
     # Everything below is model-dependent, so it lives inside run()
     # rather than at module scope: app.py builds the model once and
-    # calls this through ui.run()
-    # (see app.py and ui/__init__.py).
+    # passes it in (see app.py and ui/__init__.py).
 
     @ui.page("/")
     async def main_page() -> None:
@@ -352,7 +350,7 @@ def run(model: WorkflowModel) -> None:
         header = build_header(model)
 
         with ui.column().classes("w-full gap-3 aie-page"):
-            prompt_card = build_prompt_card(caps)
+            prompt_card = build_prompt_card()
 
             editor = await build_editor_card(model, caps)
 
@@ -420,7 +418,8 @@ def run(model: WorkflowModel) -> None:
                 ui.notify(describe_error(e), type="negative")
             finally:
                 generate_btn.props(remove="loading")
-                generate_btn.enable()
+                setup = model.setup_progress()
+                generate_btn.set_enabled(setup.done and not setup.error)
 
         generate_btn.on_click(do_generate)
 
@@ -488,7 +487,6 @@ def run(model: WorkflowModel) -> None:
             ui.download.file(after_path, filename=Path(after_path).name)
 
         result_card.download_btn.on_click(download_result)
-
 
     # Serve everything under WORK_DIR at /files/<n> so <img>/<canvas> loads in
     # the browser can reference uploaded/generated files directly by URL.

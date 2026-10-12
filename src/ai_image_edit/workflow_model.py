@@ -486,7 +486,9 @@ class WorkflowModel:
         checkpoint's outputs at the last loader. Only the outputs listed in the
         manifest (model/clip) are touched; the VAE is not.
         """
-        cfg = self._manifest["loras"]
+        cfg = self._manifest.get("loras")
+        if cfg is None:
+            raise ValueError(f"{self.name}: the workflow file has no 'loras' section, so it cannot use LoRAs")
         links = {name: list(link) for name, link in cfg["from"].items()}
         for i, lora_file in enumerate(lora_files):
             node_id = str(cfg["first_id"] + i)
@@ -565,8 +567,8 @@ class WorkflowModel:
 
 
 def get_model(workflow: str, variant: Optional[str] = None) -> WorkflowModel:
-    """The model of a bundled workflow (by name) or of a workflow file (by path).
-
+    """
+    The model of a bundled workflow (by name) or of a workflow file (by path).
     `variant` selects one of the workflow's variants.
     """
     bundled = available_workflows()

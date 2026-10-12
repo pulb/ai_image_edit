@@ -203,6 +203,15 @@ class ManifestModelTests(unittest.TestCase):
                         node, key = target.split(".", 1)
                         self.assertEqual(wf[node]["inputs"][key][0], last)
 
+    def test_loras_are_rejected_by_a_workflow_without_a_loras_section(self):
+        for path in MANIFESTS:
+            model = self.load(path)
+            if "loras" in model._manifest:
+                continue
+            with self.subTest(model=path.stem):
+                with self.assertRaisesRegex(ValueError, "no 'loras' section"):
+                    model._splice_loras({}, LORAS, 0.7)
+
     def run_generate(self, model, **params) -> int:
         real = imaging.run_masked_generation
         imaging.run_masked_generation = lambda *args: "/out.png"

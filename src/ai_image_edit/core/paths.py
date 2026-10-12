@@ -44,6 +44,8 @@ def parse_size(text: str) -> int:
 
 
 def format_size(n: int) -> str:
+    """A byte count as text, e.g. '512.0 MiB'."""
+    n = max(0, n)
     for unit in ("B", "KiB", "MiB", "GiB"):
         if n < 1024 or unit == "GiB":
             return f"{n:.0f} {unit}" if unit == "B" else f"{n:.1f} {unit}"

@@ -1,11 +1,11 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """
-Pixel-level helpers shared by every model that does external
-crop/mask/composite around inference: LAB color-space color matching,
+Pixel-level helpers for the crop/mask/composite steps around
+inference: LAB color-space color matching,
 uniform-scale cover-crop resizing, the mask-feathered composite that
 merges a generated result back into the original image, and
 run_masked_generation(), which orchestrates the crop -> infer -> composite
-sequence around a model-supplied inference callback.
+sequence around an inference callback.
 """
 import math
 import uuid
@@ -356,9 +356,9 @@ def run_masked_generation(
 ) -> str:
     """
     Orchestrates the crop -> infer -> composite/color-correct sequence
-    shared by every model that does external masking. `infer` is the only
-    model-specific piece: a callback taking the (possibly cropped) source
-    path and returning the path to the raw generated image.
+    around inference. `infer` is the only model-specific piece: a callback
+    taking the (possibly cropped) source path and returning the path to the
+    raw generated image.
 
     - If mask_path is set: the model's input image is cropped/resized to
       exactly (gen_width, gen_height) via prepare_inpaint_image before

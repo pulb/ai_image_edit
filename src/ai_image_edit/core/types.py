@@ -36,7 +36,7 @@ FEATHER_RANGE = RangeSpec(0, 16, 3, step=1)
 @dataclass(frozen=True)
 class ModelCapabilities:
     """
-    What a model supports, declared by the model itself. The UI
+    What a model supports, derived from its workflow file. The UI
     reads this once (via WorkflowModel.capabilities) to decide which
     controls to render, instead of hardcoding assumptions about any one
     model — e.g. how many reference-image upload boxes to draw, whether to
