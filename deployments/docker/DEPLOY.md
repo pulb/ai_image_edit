@@ -74,10 +74,7 @@ ai-image-edit --workflow qwen_image21_gguf --variant Q8_0`.
 The model folders are below `/home/user/app/models`. **Mount a volume there**
 (as above), or the weights (about 15 GB for `qwen_image21_gguf`) are
 downloaded again by every new container. Any other location works the same
-way: it is just the volume you mount. `MODEL_FILE`, `TEXT_ENCODER_FILE` and
-`VAE_FILE` (paths under `models/diffusion_models`, `models/text_encoders`
-and `models/vae`) can still name other files that exist in the container
-instead of the ones from the workflow file; set `MODEL_VERSION` to label them.
+way: it is just the volume you mount.
 `COMFY_GENERATION_TIMEOUT` (seconds, default 600) is for slow GPUs.
 
 The GPU needs at least 16 GB of VRAM for `qwen_image21_gguf`. `qwen_image21` with the bf16 weights needs far more; it was tested on an A100, and `MODEL_VARIANT=int8` uses less.

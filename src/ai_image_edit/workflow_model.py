@@ -29,21 +29,6 @@ from ai_image_edit.sizes import POLICIES, ResolvedSize, SizePolicy
 from ai_image_edit.workflows import available_workflows, read_workflow_file
 
 
-def configured_file(env_var: str, folder: Path) -> str:
-    """
-    The path (forward slashes, relative to `folder`) that environment variable
-    `env_var` names. Raises RuntimeError if it is unset or the file does not exist.
-    """
-    value = os.environ.get(env_var, "").strip().replace("\\", "/")
-    if not value:
-        raise RuntimeError(
-            f"{env_var} is not set: set it to the file's path relative to ComfyUI's {folder} folder."
-        )
-    if not (folder / value).is_file():
-        raise RuntimeError(f"File not found: {folder / value} (set by {env_var}).")
-    return value
-
-
 # Valid ComfyUI KSampler scheduler names (from comfy/samplers.py's SCHEDULER_HANDLERS).
 SCHEDULER_CHOICES = ["normal", "karras", "exponential", "simple", "ddim_uniform", "beta", "sgm_uniform", "linear_quadratic", "kl_optimal"]
 
@@ -177,10 +162,8 @@ class WorkflowModel:
             need_node(target, "constants")
         for spec in m.get("files", []):
             need_node(spec["set"], "files")
-            if "name" not in spec and "env" not in spec:
-                raise ValueError(f"{self.name}: files entry for {spec['set']!r} needs 'name' or 'env'")
-            if "name" in spec and "url" not in spec and "env" not in spec:
-                raise ValueError(f"{self.name}: files entry {spec['name']!r} needs a 'url'")
+            if "name" not in spec or "url" not in spec:
+                raise ValueError(f"{self.name}: files entry for {spec['set']!r} needs a 'name' and a 'url'")
             if spec.get("license") and spec["license"] not in m.get("licenses", {}):
                 raise ValueError(f"{self.name}: files entry {spec['set']!r}: unknown license {spec['license']!r}")
         for variant, chosen in m.get("variants", {}).items():
@@ -223,8 +206,8 @@ class WorkflowModel:
 
     @property
     def model_version(self) -> Optional[str]:
-        """The manifest's (or variant's) version; MODEL_VERSION overrides it, e.g. for weights set by MODEL_FILE."""
-        return os.environ.get("MODEL_VERSION", "").strip() or self._manifest.get("model_version")
+        """The manifest's (or variant's) version."""
+        return self._manifest.get("model_version")
 
     @property
     def display_name(self) -> str:
@@ -265,19 +248,8 @@ class WorkflowModel:
 
     # ------------------------------------------------------------ lifecycle
 
-    def _file_value(self, spec: dict) -> str:
-        """
-        The file name (relative to its folder) for a files entry: the environment
-        variable if it is set (that file is used as it is and never downloaded),
-        otherwise the manifest's name.
-        """
-        env_set = bool(spec.get("env") and os.environ.get(spec["env"], "").strip())
-        if env_set or "name" not in spec:  # without a name the variable is required
-            return configured_file(spec["env"], Path(spec["folder"]))
-        return spec["name"]
-
     def _pending_downloads(self) -> List[dict]:
-        wanted = [(spec, Path(spec["folder"]) / self._file_value(spec)) for spec in self._manifest.get("files", [])]
+        wanted = [(spec, Path(spec["folder"]) / spec["name"]) for spec in self._manifest.get("files", [])]
         # LoRA files: each goes into its own subfolder of loras.dir (the subfolder is the display name).
         loras = self._manifest.get("loras", {})
         wanted += [(spec, Path(loras["dir"]) / spec["dir"] / spec["name"]) for spec in loras.get("files", [])]
@@ -302,7 +274,7 @@ class WorkflowModel:
         """Total size of the model files (not the LoRAs), which ComfyUI loads for a generation."""
         total = 0
         for spec in self._manifest.get("files", []):
-            path = Path(spec["folder"]) / self._file_value(spec)
+            path = Path(spec["folder"]) / spec["name"]
             if path.is_file():
                 total += path.stat().st_size
         return total
@@ -435,7 +407,7 @@ class WorkflowModel:
             wf[node]["inputs"][key] = value
 
         for spec in m.get("files", []):
-            put(spec["set"], self._file_value(spec))
+            put(spec["set"], spec["name"])
         for target, value in m.get("constants", {}).items():
             put(target, value)
 

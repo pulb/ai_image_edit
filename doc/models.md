@@ -116,4 +116,4 @@ installed with pip.
 ## Versions
 
 The version shown in the UI is the manifest's `model_version`, or the variant's
-if it has one. Set `MODEL_VERSION` to show another text.
+if it has one.

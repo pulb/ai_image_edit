@@ -72,7 +72,7 @@
       "additionalProperties": false,
       "properties": {
         "model_name": {"type": "string", "minLength": 1},
-        "model_version": {"description": "The version shown after the name. MODEL_VERSION overrides it.", "type": "string", "minLength": 1},
+        "model_version": {"description": "The version shown after the name.", "type": "string", "minLength": 1},
         "vram_headroom_gb": {"description": "GPU memory in GB the generation needs on top of the weights. Used to decide whether ComfyUI keeps the weights on the GPU. Default 6.", "type": "number", "exclusiveMinimum": 0},
         "custom_nodes": {
           "description": "ComfyUI custom nodes to install into custom_nodes/<name> if that folder is missing: a git repository (or one folder of it) at an exact commit.",
@@ -128,12 +128,11 @@
           }
         },
         "files": {
-          "description": "Weight files, as names relative to 'folder' (a folder below the ComfyUI root), written to 'set'. A file that is missing is downloaded from 'url'. 'env' optionally names an environment variable that overrides the file (its value is then used as it is, nothing is downloaded); without 'name' it is required.",
+          "description": "Weight files, as names relative to 'folder' (a folder below the ComfyUI root), written to 'set'. A file that is missing is downloaded from 'url'.",
           "type": "array",
           "items": {
             "type": "object",
-            "required": ["folder", "set"],
-            "anyOf": [{"required": ["name", "url"]}, {"required": ["env"]}],
+            "required": ["name", "url", "folder", "set"],
             "additionalProperties": false,
             "properties": {
               "name": {"type": "string", "minLength": 1},
@@ -141,7 +140,6 @@
               "sha256": {"type": "string", "pattern": "^[0-9a-fA-F]{64}$"},
               "size": {"type": "integer", "minimum": 1},
               "license": {"type": "string"},
-              "env": {"type": "string"},
               "folder": {"type": "string"},
               "set": {"$ref": "#/$defs/target"}
             }

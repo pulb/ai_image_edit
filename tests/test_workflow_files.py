@@ -75,12 +75,8 @@ class ManifestModelTests(unittest.TestCase):
         """The model, with the weight files its manifest names created as empty placeholders."""
         model = WorkflowModel.from_file(path)
         for spec in model._manifest.get("files", []):
-            # A file with an env override is exercised through it; the others by their own name.
-            name = f"{spec['env'].lower()}.bin" if "env" in spec else spec["name"]
-            (self.tmp / spec["folder"] / name).parent.mkdir(parents=True, exist_ok=True)
-            (self.tmp / spec["folder"] / name).touch()
-            if "env" in spec:
-                os.environ[spec["env"]] = name
+            (self.tmp / spec["folder"] / spec["name"]).parent.mkdir(parents=True, exist_ok=True)
+            (self.tmp / spec["folder"] / spec["name"]).touch()
         return model
 
     def build(self, model: WorkflowModel, n_refs: int) -> dict:

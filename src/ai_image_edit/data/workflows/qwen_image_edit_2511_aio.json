@@ -15,7 +15,7 @@
 
     "files": [
       {
-        "name": "Qwen/Qwen-Rapid-AIO-v23.safetensors", "env": "MODEL_FILE",
+        "name": "Qwen/Qwen-Rapid-AIO-v23.safetensors",
         "url": "https://huggingface.co/Phr00t/Qwen-Image-Edit-Rapid-AIO/resolve/main/v23/Qwen-Rapid-AIO-NSFW-v23.safetensors?download=true",
         "folder": "models/checkpoints", "set": "1.ckpt_name"
       }

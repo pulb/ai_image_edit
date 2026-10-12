@@ -198,7 +198,7 @@ class ModelStartTests(ServerCase):
         manifest["licenses"] = {"lic": {"name": "Test License", "url": "https://example.org/lic"}}
         manifest["files"] = [dict(
             name="w.safetensors", url=self.url + "/f", folder="models/checkpoints", set="1.ckpt_name",
-            env="TEST_WEIGHTS", **file_extra,
+            **file_extra,
         )]
         return WorkflowModel("test", manifest, workflow)
 
@@ -207,7 +207,6 @@ class ModelStartTests(ServerCase):
         env = mock.patch.dict(os.environ)
         env.start()
         self.addCleanup(env.stop)
-        os.environ.pop("TEST_WEIGHTS", None)
         os.environ.pop("ACCEPT_LICENSES", None)
         launch = mock.patch.object(client, "launch_comfy_process", return_value=mock.Mock())
         self.launch = launch.start()
@@ -246,15 +245,6 @@ class ModelStartTests(ServerCase):
         self.model().start()
         self.assertEqual(Handler.hits, [])
         self.launch.assert_called_once()
-
-    def test_env_overrides_name_and_must_exist(self):
-        os.environ["TEST_WEIGHTS"] = "mine.safetensors"
-        with self.assertRaisesRegex(RuntimeError, "File not found"):
-            self.model().start()
-        (self.tmp / "models/checkpoints").mkdir(parents=True)
-        (self.tmp / "models/checkpoints/mine.safetensors").touch()
-        self.model().start()
-        self.assertEqual(Handler.hits, [])
 
     def test_license_must_be_accepted(self):
         model = self.model(license="lic")

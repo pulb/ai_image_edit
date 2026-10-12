@@ -34,7 +34,7 @@ class SelectionTests(unittest.TestCase):
         env = mock.patch.dict(os.environ)
         env.start()
         self.addCleanup(env.stop)
-        for name in ("MODEL_WORKFLOW", "MODEL_VARIANT", "REQUIRE_PASSWORD", "MODEL_VERSION"):
+        for name in ("MODEL_WORKFLOW", "MODEL_VARIANT", "REQUIRE_PASSWORD"):
             os.environ.pop(name, None)
         self.model = mock.Mock()
         self.run = mock.patch.object(app.ui, "run").start()
@@ -135,10 +135,6 @@ class VariantTests(unittest.TestCase):
         manifest["variants"]["bad"] = {"files": {"9.nothing": {"name": "x"}}}
         with self.assertRaisesRegex(ValueError, "not in files"):
             WorkflowModel("x", manifest, workflow)
-
-    def test_version_environment_override(self):
-        with mock.patch.dict(os.environ, {"MODEL_VERSION": "custom"}):
-            self.assertEqual(WorkflowModel.from_file(GGUF).model_version, "custom")
 
 
 class CustomNodeTests(unittest.TestCase):

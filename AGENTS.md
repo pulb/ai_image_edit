@@ -75,8 +75,7 @@ Rules for any AI coding agent working in this repository.
   a model with a new one adds a policy class there.
 - **ComfyUI code**: `comfy/` holds the client (`client.py`), downloads,
   custom node installation and the GPU argument choice. Weight files are
-  listed in the workflow file's `files` and downloaded when missing; an
-  environment variable such as `MODEL_FILE` can point to a local file instead.
+  listed in the workflow file's `files` and downloaded when missing.
 - **Default model**: `src/ai_image_edit/app.py` defaults `--workflow`/`MODEL_WORKFLOW` to
   `qwen_image21`; the `Dockerfile` leaves the default.
 - **Masking**: masked generation (crop → infer → composite/color-correct)

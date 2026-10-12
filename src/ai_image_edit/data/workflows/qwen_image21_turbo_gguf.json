@@ -71,17 +71,17 @@
     },
     "files": [
       {
-        "name": "qwen-image-2.1-turbo-Q4_K_M.gguf", "license": "qwen-research", "env": "MODEL_FILE",
+        "name": "qwen-image-2.1-turbo-Q4_K_M.gguf", "license": "qwen-research",
         "url": "https://huggingface.co/unsloth/Qwen-Image-2.1-Turbo-GGUF/resolve/main/qwen-image-2.1-turbo-Q4_K_M.gguf?download=true",
         "folder": "models/diffusion_models", "set": "1.unet_name"
       },
       {
-        "name": "qwen3vl_8b_int8_convrot.safetensors", "license": "qwen-research", "env": "TEXT_ENCODER_FILE",
+        "name": "qwen3vl_8b_int8_convrot.safetensors", "license": "qwen-research",
         "url": "https://huggingface.co/Comfy-Org/Qwen-Image-2.1/resolve/main/text_encoders/qwen3vl_8b_int8_convrot.safetensors?download=true",
         "folder": "models/text_encoders", "set": "2.clip_name"
       },
       {
-        "name": "qwen_image_2.1_vae_bf16.safetensors", "license": "qwen-research", "env": "VAE_FILE",
+        "name": "qwen_image_2.1_vae_bf16.safetensors", "license": "qwen-research",
         "url": "https://huggingface.co/Comfy-Org/Qwen-Image-2.1/resolve/main/vae/qwen_image_2.1_vae_bf16.safetensors?download=true",
         "folder": "models/vae", "set": "3.vae_name"
       }
