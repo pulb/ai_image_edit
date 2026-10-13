@@ -6,7 +6,7 @@ front of interchangeable image-generation models.
 
 <p align="center">
   <br>
-  <img src="doc/annotation-workflow.webp" alt="Annotation workflow: type a prompt, draw colored circles, generate" width="300">
+  <img src="doc/icon.png" alt="AI Image Edit" width="200">
   <br>
   <br>
 </p>
@@ -96,6 +96,10 @@ URL. Custom nodes installed for a workflow keep their own licenses.
 Copyright (C) 2026 AI Image Edit authors
 
 ## Examples
+
+<p align="center">
+  <img src="doc/annotation-workflow.webp" alt="Annotation workflow: type a prompt, draw colored circles, generate" width="300">
+</p>
 
 <a href="doc/screenshots/inpainting.png"><img src="doc/screenshots/inpainting.png" alt="Replacing an animal in a masked photo, using a reference image" width="22%" align="top"></a>
 <a href="doc/screenshots/sketch_to_figure.png"><img src="doc/screenshots/sketch_to_figure.png" alt="Turning a drawing into an action figure" width="22%" align="top"></a>
