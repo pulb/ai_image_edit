@@ -62,7 +62,7 @@ The `qwen_image21` model (Qwen-Image-2.1) on the datacenter GPUs available on Ru
 |---|---|---|
 | NVIDIA H200 | ~10 s | ~1 min |
 | NVIDIA A100 | ~20 s | ~2 min |
-| NVIDIA L40S | ~23 s | insufficient mem |
+| NVIDIA L40S | ~23 s | ~2 min 14 s |
 
 ### Consumer hardware
 
