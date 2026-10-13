@@ -190,20 +190,28 @@ async def build_result_card() -> ResultCard:
     with ui.card().classes(CARD_CLASSES):
         set_result_images, set_compare, reset_result, get_result_after_path = await create_compare_slider()
 
-        compare_switch = ui.switch("Compare input / output", value=False)
-        compare_switch.disable()
+        with ui.row().classes("w-full items-center no-wrap gap-0"):
+            compare_switch = ui.switch("Compare input / output", value=False)
+            compare_switch.disable()
+
+            ui.space()
+
+            use_as_input_btn = (
+                ui.button(icon="move_up").props('flat dense size=md aria-label="Use as input"')
+                .classes("text-xs").tooltip("Use as input")
+            )
+            use_as_input_btn.disable()
+
+            download_btn = (
+                ui.button(icon="download").props('flat dense size=md aria-label="Download result"')
+                .classes("text-xs").tooltip("Download result")
+            )
+            download_btn.disable()
 
         async def on_compare_change(e) -> None:
             await set_compare(e.value)
 
         compare_switch.on_value_change(on_compare_change)
-
-        with ui.row().classes("w-full items-center gap-3"):
-            use_as_input_btn = ui.button("Use as input").props("outline").classes("flex-1")
-            use_as_input_btn.disable()
-
-            download_btn = ui.button("Download result").props("outline").classes("flex-1")
-            download_btn.disable()
     return ResultCard(
         set_result_images, set_compare, reset_result, get_result_after_path,
         compare_switch, use_as_input_btn, download_btn,
