@@ -98,6 +98,6 @@ Copyright (C) 2026 AI Image Edit authors
 ## Examples
 
 <a href="doc/screenshots/inpainting.png"><img src="doc/screenshots/inpainting.png" alt="Replacing an animal in a masked photo, using a reference image" width="22%" align="top"></a>
-<a href="doc/screenshots/annotations.png"><img src="doc/screenshots/annotations.png" alt="Placing things in a photo with colored annotations" width="22%" align="top"></a>
+<a href="doc/screenshots/restoration.png"><img src="doc/screenshots/restoration.png" alt="Restoring the colors of an old, faded photo" width="22%" align="top"></a>
 <a href="doc/screenshots/sketch_to_figure.png"><img src="doc/screenshots/sketch_to_figure.png" alt="Turning a drawing into an action figure" width="22%" align="top"></a>
 <a href="doc/screenshots/perspective.png"><img src="doc/screenshots/perspective.png" alt="Changing the perspective of a photo" width="22%" align="top"></a>
