@@ -6,7 +6,7 @@ front of interchangeable image-generation models.
 
 <p align="center">
   <br>
-  <img src="doc/icon.png" alt="AI Image Edit">
+  <img src="doc/icon.png" alt="AI Image Edit" width="600">
   <br>
   <br>
 </p>
@@ -99,8 +99,6 @@ Copyright (C) 2026 AI Image Edit authors
 
 <p align="center">
   <img src="doc/annotation-workflow.webp" alt="Annotation workflow: type a prompt, draw colored circles, generate" width="300">
-  <br>
-  <br>
 </p>
 
 <hr>
