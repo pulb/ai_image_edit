@@ -154,7 +154,7 @@ def build_advanced_card(caps: ModelCapabilities) -> AdvancedCard:
             if caps.scheduler_choices:
                 scheduler = ui.select(caps.scheduler_choices, value=default_choice(caps.default_scheduler, caps.scheduler_choices), label="Scheduler").props("outlined dark").classes("w-full")
 
-            with ui.row().classes("w-full items-center no-wrap gap-0 q-mt-sm"):
+            with ui.row().classes("w-full items-center no-wrap q-mt-sm"):
                 rescale_mode = ui.select(
                     RESCALE_MODE_OPTIONS, value=RescaleMode.ORIGINAL.value, label="Masked edits"
                 ).props("outlined dark").classes("flex-1")
@@ -167,7 +167,7 @@ def build_advanced_card(caps: ModelCapabilities) -> AdvancedCard:
                                     ui.label(RESCALE_MODE_OPTIONS[mode]).classes("text-xs text-weight-bold")
                                     ui.label(description).classes("text-xs")
 
-            with ui.row().classes("items-center no-wrap gap-0 q-mt-sm"):
+            with ui.row().classes("items-center no-wrap q-mt-sm"):
                 color_correction = ui.switch("Apply color corrections", value=False)
                 with ui.button(icon="info").props("flat round dense size=sm").classes("text-gray-400"):
                     with ui.menu():
