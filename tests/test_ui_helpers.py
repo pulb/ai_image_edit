@@ -3,6 +3,7 @@ import os
 import unittest
 from unittest import mock
 
+from ai_image_edit.core.types import ModelCapabilities, RescaleMode
 from ai_image_edit.ui import helpers as common
 
 
@@ -42,6 +43,38 @@ class ResolutionTest(unittest.TestCase):
                 path = f"{tmp}/{size[0]}x{size[1]}.png"
                 Image.new("RGB", size).save(path)
                 self.assertEqual(Qwen21Tiers({}).resolution_for_source(path), expected, size)
+
+
+class RescaleModeParamTest(unittest.TestCase):
+    def params(self, *, inpainting=True, **overrides):
+        caps = ModelCapabilities(
+            max_reference_images=1, supports_loras=False, supports_inpainting=inpainting,
+            supported_aspect_ratios=["Original"], default_aspect_ratio="Original",
+            supported_resolutions=[1024], default_resolution=1024,
+        )
+        kwargs = dict(
+            prompt="p", source_image_path="s.png", mask_path="m.png", reference_images=[], seed=1,
+            randomize_seed=False, aspect_ratio="Original", resolution=1024, steps=8, lora_files=[],
+            apply_color_correction=False,
+        )
+        return common.params_from_ui(caps, **(kwargs | overrides))
+
+    def test_defaults_to_the_generated_size(self):
+        self.assertIs(self.params().rescale_mode, RescaleMode.ORIGINAL)
+
+    def test_takes_an_enum_or_its_value(self):
+        self.assertIs(self.params(rescale_mode=RescaleMode.EDIT).rescale_mode, RescaleMode.EDIT)
+        self.assertIs(self.params(rescale_mode="edit").rescale_mode, RescaleMode.EDIT)
+
+    def test_unknown_value_is_rejected(self):
+        with self.assertRaises(ValueError):
+            self.params(rescale_mode="huge")
+
+    def test_ignored_without_inpainting(self):
+        self.assertIs(self.params(inpainting=False, rescale_mode="edit").rescale_mode, RescaleMode.ORIGINAL)
+
+    def test_every_mode_has_a_label(self):
+        self.assertEqual(set(common.RESCALE_MODE_OPTIONS), {mode.value for mode in RescaleMode})
 
 
 class AssetsTest(unittest.TestCase):

@@ -15,6 +15,7 @@ import numpy as np
 from PIL import Image, ImageFilter, ImageOps
 
 from ai_image_edit.core.paths import WORK_DIR
+from ai_image_edit.core.types import RescaleMode
 
 # Minimum standard deviation (0-255 scale, matching PIL's LAB representation)
 # a channel needs before we trust it enough to rescale by a std-dev ratio.
@@ -240,29 +241,46 @@ def prepare_inpaint_image(image_path: str, gen_width: int, gen_height: int, resa
     return str(out_path)
 
 
-def composite_with_soft_transition(orig_img_path: str, gen_img_path: str, mask_img_path: Optional[str], feather_amount: int) -> str:
+def _feather_padding(feather_amount: int) -> int:
     """
-    Color-matches the generated image to the original (full frame), then
-    alpha-blends just the region around the mask's bounding box back into
-    the original — Gaussian-feathered if feather_amount > 0, else a hard
-    0/255 cutout. If resolutions differ, the ORIGINAL (and mask) are
-    resized to match the generated image via resize_to_cover_and_crop,
-    never the other way around, since upscaling the generated image would
-    soften its detail. Output is at the generated image's resolution.
+    The margin, in generated-image pixels, added around the mask's bounding
+    box before cropping. It gives the blurred mask room to fade to 0 before
+    the crop boundary; a still partly opaque mask there would show as a seam
+    where the pasted crop meets the untouched original. The margin costs
+    nothing visually: its pixels have mask value 0 and are pasted back
+    unchanged. A hard mask is already 0 at the bounding box's own edge, so it
+    needs none. 8x the blur radius matches the 64 px a radius-8 blur needed.
     """
-    if not mask_img_path:
-        return gen_img_path
+    return feather_amount * 8 if feather_amount > 0 else 0
 
-    with Image.open(gen_img_path) as gen_file, Image.open(orig_img_path) as orig_file:
-        gen = gen_file.convert("RGB")
-        orig = orig_file.convert("RGB")
+
+def _padded_box(bbox: Tuple[int, int, int, int], pad: int, bounds: Tuple[int, int, int, int]) -> Tuple[int, int, int, int]:
+    """bbox grown by pad on every side, clamped to bounds (all as left, top, right, bottom)."""
+    return (
+        max(bounds[0], bbox[0] - pad),
+        max(bounds[1], bbox[1] - pad),
+        min(bounds[2], bbox[2] + pad),
+        min(bounds[3], bbox[3] + pad),
+    )
+
+
+def _blend(gen_crop: Image.Image, orig_crop: Image.Image, mask_crop: Image.Image, blur_radius: float) -> Image.Image:
+    """
+    Alpha-blends gen_crop over orig_crop through mask_crop, Gaussian-blurred
+    if blur_radius > 0. Without blur the mask is used as it is: the canvas
+    draws a hard 0/255 cutout.
+    """
+    if blur_radius > 0:
+        mask_crop = mask_crop.filter(ImageFilter.GaussianBlur(radius=blur_radius))
+    return Image.composite(gen_crop, orig_crop, mask_crop)
+
+
+def _composite_at_generated_size(orig: Image.Image, gen: Image.Image, mask: Image.Image, feather_amount: int) -> Optional[Image.Image]:
+    """The result at the generated image's size, or None if nothing is masked."""
     gen_size = gen.size
     if orig.size != gen_size:
         print(f"[composite_with_soft_transition] Fitting original {orig.size} to {gen_size} for blending (uniform scale + center crop).", flush=True)
         orig = resize_to_cover_and_crop(orig, gen_size[0], gen_size[1], Image.Resampling.LANCZOS)
-
-    with Image.open(mask_img_path) as mask_img:
-        mask = mask_img.getchannel('A') if mask_img.mode == 'RGBA' else mask_img.convert("L")
 
     if mask.size != gen_size:
         print(f"[composite_with_soft_transition] Fitting mask {mask.size} to {gen_size} for feathering (uniform scale + center crop).", flush=True)
@@ -270,7 +288,7 @@ def composite_with_soft_transition(orig_img_path: str, gen_img_path: str, mask_i
 
     bbox = mask.getbbox()
     if not bbox:
-        return gen_img_path
+        return None
 
     # Calibrate the color correction from the whole of both (now
     # same-resolution) images — see compute_color_correction() docstring.
@@ -278,48 +296,118 @@ def composite_with_soft_transition(orig_img_path: str, gen_img_path: str, mask_i
     # separate concerns, so this still runs either way.
     corrections = compute_color_correction(gen, orig)
 
-    # Padding gives a blurred mask room to fade all the way to 0 before it
-    # hits the crop boundary. Without it, the mask could still be partially
-    # opaque right at the edge of the crop, and since everything outside the
-    # crop is untouched original, that would show up as a visible seam where
-    # the pasted crop meets the rest of the image. This has no visual cost
-    # otherwise: padding pixels start at mask value 0, so Image.composite()
-    # below already selects orig_crop there — they get pasted back onto
-    # themselves unchanged regardless of how large pad is. With no blur,
-    # there's no fade to make room for — a hard mask is already exactly 0
-    # right at bbox's own edge — so no padding is needed at all. Scaled with
-    # feather_amount (the Gaussian blur radius) rather than a fixed value,
-    # so a larger blur still gets enough room to fully fade out — 8x the
-    # radius matches the padding a radius-8 blur already needed (64px).
-    pad = feather_amount * 8 if feather_amount > 0 else 0
+    crop_box = _padded_box(bbox, _feather_padding(feather_amount), (0, 0, gen_size[0], gen_size[1]))
+    blended = _blend(
+        apply_color_correction(gen.crop(crop_box), corrections),
+        orig.crop(crop_box),
+        mask.crop(crop_box),
+        feather_amount,
+    )
+    orig.paste(blended, crop_box[:2])
+    return orig
 
-    left = max(0, bbox[0] - pad)
-    top = max(0, bbox[1] - pad)
-    right = min(gen_size[0], bbox[2] + pad)
-    bottom = min(gen_size[1], bbox[3] + pad)
-    crop_box = (left, top, right, bottom)
 
-    orig_crop = orig.crop(crop_box)
-    gen_crop = gen.crop(crop_box)
-    mask_crop = mask.crop(crop_box)
+def _composite_at_original_size(orig: Image.Image, gen: Image.Image, mask: Image.Image, feather_amount: int) -> Optional[Image.Image]:
+    """
+    The original with the blended region resampled from the generated image;
+    None if nothing is masked. The original's other pixels are not touched.
+    """
+    orig_w, orig_h = orig.size
+    gen_w, gen_h = gen.size
 
-    gen_crop_color_matched = apply_color_correction(gen_crop, corrections)
+    if mask.size != orig.size:
+        print(f"[composite_with_soft_transition] Fitting mask {mask.size} to {orig.size} for feathering (uniform scale + center crop).", flush=True)
+        mask = resize_to_cover_and_crop(mask, orig_w, orig_h, Image.Resampling.NEAREST)
 
-    if feather_amount > 0:
-        blurred_mask_crop = mask_crop.filter(ImageFilter.GaussianBlur(radius=feather_amount))
-        composite_mask_crop = blurred_mask_crop
-    else:
-        # No blur — the drawn mask is already a hard 0/255 cutout (that's
-        # exactly what the canvas produces), so it's used directly as the
-        # composite alpha with no softening and nothing further to compute.
-        composite_mask_crop = mask_crop
+    bbox = mask.getbbox()
+    if not bbox:
+        return None
 
-    blended_crop = Image.composite(gen_crop_color_matched, orig_crop, composite_mask_crop)
+    # Where the generated image sits on the original: prepare_inpaint_image
+    # scaled the original to cover the generated size, then center-cropped
+    # the overhang (see resize_to_cover_and_crop). Integer arithmetic keeps
+    # the covered region exact.
+    scale = max(gen_w / orig_w, gen_h / orig_h)
+    covered_w = max(gen_w, math.ceil(orig_w * scale))
+    covered_h = max(gen_h, math.ceil(orig_h * scale))
+    left, top = (covered_w - gen_w) // 2, (covered_h - gen_h) // 2
+    scale_x, scale_y = covered_w / orig_w, covered_h / orig_h
+    covered = (
+        -(-left * orig_w // covered_w),
+        -(-top * orig_h // covered_h),
+        (left + gen_w) * orig_w // covered_w,
+        (top + gen_h) * orig_h // covered_h,
+    )
 
-    orig.paste(blended_crop, (left, top))
+    pad = math.ceil(_feather_padding(feather_amount) / scale_x)
+    box = _padded_box(bbox, pad, covered)
+    if box[0] >= box[2] or box[1] >= box[3]:
+        return None
+
+    # The box in generated-image pixels (fractional), clamped against rounding.
+    src = (
+        max(0.0, box[0] * scale_x - left),
+        max(0.0, box[1] * scale_y - top),
+        min(float(gen_w), box[2] * scale_x - left),
+        min(float(gen_h), box[3] * scale_y - top),
+    )
+    if src[0] >= src[2] or src[1] >= src[3]:
+        return None
+
+    # Colour matching works at the generated size, on the same statistics as
+    # the generated-size composite, and is applied before resampling.
+    corrections = compute_color_correction(gen, resize_to_cover_and_crop(orig, gen_w, gen_h, Image.Resampling.LANCZOS))
+    x0, y0, x1, y1 = math.floor(src[0]), math.floor(src[1]), math.ceil(src[2]), math.ceil(src[3])
+    gen_region = apply_color_correction(gen.crop((x0, y0, x1, y1)), corrections)
+    gen_crop = gen_region.resize(
+        (box[2] - box[0], box[3] - box[1]),
+        Image.Resampling.LANCZOS,
+        box=(src[0] - x0, src[1] - y0, src[2] - x0, src[3] - y0),
+    )
+
+    blended = _blend(gen_crop, orig.crop(box), mask.crop(box), feather_amount / scale_x)
+    orig.paste(blended, box[:2])
+    return orig
+
+
+def composite_with_soft_transition(
+    orig_img_path: str,
+    gen_img_path: str,
+    mask_img_path: Optional[str],
+    feather_amount: int,
+    rescale_mode: RescaleMode = RescaleMode.ORIGINAL,
+) -> str:
+    """
+    Color-matches the generated image to the original (full frame), then
+    alpha-blends just the region around the mask's bounding box back into
+    the original — Gaussian-feathered if feather_amount > 0, else a hard
+    0/255 cutout. Returns gen_img_path if there is no mask or nothing is
+    masked.
+
+    RescaleMode.ORIGINAL: if resolutions differ, the original (and mask) are
+    resized to match the generated image via resize_to_cover_and_crop, never
+    the other way around, since upscaling the generated image would soften
+    its detail. The result has the generated image's size.
+
+    RescaleMode.EDIT: the result has the original's size and keeps all its
+    pixels outside the blended region; the generated image is resampled into
+    that region, with the feather scaled to match.
+    """
+    if not mask_img_path:
+        return gen_img_path
+
+    with Image.open(gen_img_path) as gen_file, Image.open(orig_img_path) as orig_file, Image.open(mask_img_path) as mask_file:
+        gen = gen_file.convert("RGB")
+        orig = orig_file.convert("RGB")
+        mask = mask_file.getchannel('A') if mask_file.mode == 'RGBA' else mask_file.convert("L")
+
+    composite = _composite_at_original_size if rescale_mode == RescaleMode.EDIT else _composite_at_generated_size
+    result = composite(orig, gen, mask, feather_amount)
+    if result is None:
+        return gen_img_path
 
     output_path = WORK_DIR / f"composited_{uuid.uuid4()}.png"
-    orig.save(output_path)
+    result.save(output_path)
     return str(output_path)
 
 
@@ -353,6 +441,7 @@ def run_masked_generation(
     apply_color_correction_enabled: bool,
     infer: Callable[[str], str],
     annotated_image_path: Optional[str] = None,
+    rescale_mode: RescaleMode = RescaleMode.ORIGINAL,
 ) -> str:
     """
     Orchestrates the crop -> infer -> composite/color-correct sequence
@@ -364,12 +453,12 @@ def run_masked_generation(
       exactly (gen_width, gen_height) via prepare_inpaint_image before
       infer(), then the result is composited back into the untouched
       original via composite_with_soft_transition, feathered by
-      feather_amount. gen_width/gen_height must be real dimensions in this
-      case.
+      feather_amount, as rescale_mode selects. gen_width/gen_height
+      must be real dimensions in this case.
     - Otherwise: the model's input image is passed to infer() unprepared,
       and the raw result is returned as-is, or color-corrected as a whole if
-      apply_color_correction_enabled is True. gen_width/gen_height are
-      ignored — infer() handles its own dimension needs.
+      apply_color_correction_enabled is True. gen_width/gen_height and
+      rescale_mode are ignored — infer() handles its own dimension needs.
 
     The model's input image is annotated_image_path if given, else
     source_image_path. Compositing and color correction always use the clean
@@ -385,7 +474,7 @@ def run_masked_generation(
     output_path = infer(model_input_path)
 
     if mask_path:
-        return composite_with_soft_transition(source_image_path, output_path, mask_path, feather_amount)
+        return composite_with_soft_transition(source_image_path, output_path, mask_path, feather_amount, rescale_mode)
     if apply_color_correction_enabled:
         return apply_whole_image_color_correction(source_image_path, output_path)
     return output_path

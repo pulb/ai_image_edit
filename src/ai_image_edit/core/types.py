@@ -4,6 +4,7 @@ Data contracts shared between the UI (ui/) and the model (workflow_model.py).
 Deliberately dependency-free of both, so neither side needs to import the other.
 """
 from dataclasses import dataclass, field
+from enum import Enum
 from typing import List, Optional
 
 
@@ -31,6 +32,18 @@ DEFAULT_SEED = 65454653
 # Inpainting mask edge softness (Gaussian blur radius), shared by the
 # UI's Feather slider and GenerationParams.feather_amount.
 FEATHER_RANGE = RangeSpec(0, 16, 3, step=1)
+
+
+class RescaleMode(str, Enum):
+    """
+    What a masked edit rescales: ORIGINAL scales the source image to the
+    generated size, and the result has that size; EDIT scales the edited
+    area to the source size, and the result keeps the source's size and
+    every pixel outside that area.
+    """
+
+    ORIGINAL = "original"
+    EDIT = "edit"
 
 
 @dataclass(frozen=True)
@@ -143,6 +156,9 @@ class GenerationParams:
 
     apply_color_correction_enabled: bool = False
     feather_amount: int = int(FEATHER_RANGE.default)
+
+    # Masked edits only.
+    rescale_mode: RescaleMode = RescaleMode.ORIGINAL
 
 
 @dataclass

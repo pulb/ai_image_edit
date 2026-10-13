@@ -534,6 +534,7 @@ class WorkflowModel:
             params.apply_color_correction_enabled,
             infer,
             params.annotated_image_path,
+            params.rescale_mode,
         )
         return GenerationResult(before_path=params.source_image_path, after_path=final_output_path, actual_seed=seed)
 

@@ -19,12 +19,13 @@ from nicegui import run as nicegui_run
 
 from ai_image_edit.core import imaging
 from ai_image_edit.core.paths import WORK_DIR, trim_work_dir
-from ai_image_edit.core.types import DEFAULT_SEED, ORIGINAL_ASPECT_RATIO, ModelCapabilities
+from ai_image_edit.core.types import DEFAULT_SEED, ORIGINAL_ASPECT_RATIO, ModelCapabilities, RescaleMode
 from ai_image_edit.ui.assets import CLIENT_JS, WIDGET_CSS
 from ai_image_edit.ui.compare_slider import create_compare_slider
 from ai_image_edit.ui.components import apply_dark_theme, create_simple_image_upload, create_value_slider
 from ai_image_edit.ui.helpers import (
     HOST,
+    RESCALE_MODE_OPTIONS,
     PORT,
     PRIMARY_COLOR,
     RECENT_FILES_KEPT,
@@ -44,6 +45,16 @@ COLOR_CORRECTION_INFO = (
     "It also dampens deliberate color changes, such as recoloring everything. "
     "With a mask, the new region is always matched to the surrounding image, so this switch has no effect."
 )
+
+RESCALE_MODE_INFO_INTRO = "Applies to edits with a mask."
+# Per RescaleMode value; the heading is the option's label in RESCALE_MODE_OPTIONS.
+RESCALE_MODE_INFO = {
+    RescaleMode.ORIGINAL.value: "Your original is scaled to the size the model generated at, and the result has that size.",
+    RescaleMode.EDIT.value: (
+        "The result keeps your original's size and every pixel outside the edited area; "
+        "only the edited area is taken from the generated image, scaled to fit."
+    ),
+}
 
 # Every top-level section on the page (Prompt/Seed, Aspect ratio + editor,
 # the settings accordions, the Result panel) is wrapped in a ui.card using
@@ -108,6 +119,7 @@ class AdvancedCard:
     denoise: Optional[ui.slider]
     sampler_name: Optional[ui.select]
     scheduler: Optional[ui.select]
+    rescale_mode: ui.select
     color_correction: ui.switch
 
 
@@ -142,12 +154,25 @@ def build_advanced_card(caps: ModelCapabilities) -> AdvancedCard:
             if caps.scheduler_choices:
                 scheduler = ui.select(caps.scheduler_choices, value=default_choice(caps.default_scheduler, caps.scheduler_choices), label="Scheduler").props("outlined dark").classes("w-full")
 
+            with ui.row().classes("w-full items-center no-wrap gap-0 q-mt-sm"):
+                rescale_mode = ui.select(
+                    RESCALE_MODE_OPTIONS, value=RescaleMode.ORIGINAL.value, label="Masked edits"
+                ).props("outlined dark").classes("flex-1")
+                with ui.button(icon="info").props("flat round dense size=sm").classes("text-gray-400"):
+                    with ui.menu():
+                        with ui.column().classes("q-pa-sm gap-2").style("max-width: 280px"):
+                            ui.label(RESCALE_MODE_INFO_INTRO).classes("text-xs")
+                            for mode, description in RESCALE_MODE_INFO.items():
+                                with ui.column().classes("gap-0"):
+                                    ui.label(RESCALE_MODE_OPTIONS[mode]).classes("text-xs text-weight-bold")
+                                    ui.label(description).classes("text-xs")
+
             with ui.row().classes("items-center no-wrap gap-0 q-mt-sm"):
                 color_correction = ui.switch("Apply color corrections", value=False)
                 with ui.button(icon="info").props("flat round dense size=sm").classes("text-gray-400"):
                     with ui.menu():
                         ui.label(COLOR_CORRECTION_INFO).classes("text-xs q-pa-sm").style("max-width: 280px")
-    return AdvancedCard(steps, cfg, negative_prompt, denoise, sampler_name, scheduler, color_correction)
+    return AdvancedCard(steps, cfg, negative_prompt, denoise, sampler_name, scheduler, rescale_mode, color_correction)
 
 
 @dataclass
@@ -405,6 +430,7 @@ def run(model: WorkflowModel) -> None:
                     lora_strength=references.lora_strength.value if references.lora_strength is not None else None,
                     apply_color_correction=advanced.color_correction.value,
                     feather_amount=editor_inputs.feather_amount,
+                    rescale_mode=advanced.rescale_mode.value,
                 )
                 result = await nicegui_run.io_bound(model.generate, params)
                 await nicegui_run.io_bound(trim_work_dir, RECENT_FILES_KEPT)
