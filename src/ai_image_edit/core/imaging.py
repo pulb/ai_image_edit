@@ -187,7 +187,6 @@ def compose_annotations(source_image_path: str, layer_path: str) -> str:
         base = source.convert("RGBA")
         layer = layer.convert("RGBA")
         if layer.size != base.size:
-            print(f"[compose_annotations] Scaling annotation layer {layer.size} to {base.size}.", flush=True)
             layer = layer.resize(base.size, Image.Resampling.BILINEAR)
         composed = Image.alpha_composite(base, layer)
         if "A" not in source.getbands():
@@ -357,11 +356,7 @@ def _composite_at_original_size(orig: Image.Image, gen: Image.Image, mask: Image
 
     # Colour matching works at the generated size, on the same statistics as
     # the generated-size composite, and is applied before resampling.
-    orig_at_gen_size = orig
-    if orig.size != gen.size:
-        print(f"[composite_with_soft_transition] Fitting original {orig.size} to {gen.size} for color matching (uniform scale + center crop).", flush=True)
-        orig_at_gen_size = resize_to_cover_and_crop(orig, gen_w, gen_h, Image.Resampling.LANCZOS)
-    corrections = compute_color_correction(gen, orig_at_gen_size)
+    corrections = compute_color_correction(gen, resize_to_cover_and_crop(orig, gen_w, gen_h, Image.Resampling.LANCZOS))
     x0, y0, x1, y1 = math.floor(src[0]), math.floor(src[1]), math.ceil(src[2]), math.ceil(src[3])
     gen_region = apply_color_correction(gen.crop((x0, y0, x1, y1)), corrections)
     patch_size = (box[2] - box[0], box[3] - box[1])
