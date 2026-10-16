@@ -29,6 +29,23 @@ COLOR_MATCH_STD_EPS = 4.0
 # Clamp on how aggressively we're allowed to rescale variance, for the same reason.
 COLOR_MATCH_RATIO_CLAMP = (0.5, 2.0)
 
+# Measurement of the model's output against its input (log_shift()), to
+# compare this older version with the current one. Edit models regenerate the
+# whole picture and do not keep it exactly in place; the displacement is
+# measured by phase correlation between the model's input and its raw output,
+# in a grid of blocks over the region around the mask (the whole image without
+# a mask), leaving the mask itself out. Nothing is corrected here, the output
+# is used as it is. Same method and limits as on the main line.
+SHIFT_SAMPLE_SIDE = 1024
+SHIFT_LOWPASS = 0.15
+SHIFT_MASK_MARGIN = 16
+ALIGN_REGION_MARGIN = 0.5
+ALIGN_GRID = 3
+ALIGN_MIN_BLOCK = 96
+ALIGN_MIN_COVERAGE = 0.3
+ALIGN_MIN_CONFIDENCE = 0.15
+ALIGN_MIN_BLOCKS = 3
+
 # sRGB (D65) <-> CIE XYZ matrices, used by rgb_to_lab()/lab_to_rgb() for the
 # LAB color-space conversion compute_color_correction()/apply_color_correction()
 # do their work in.
@@ -344,6 +361,176 @@ def apply_whole_image_color_correction(orig_img_path: str, gen_img_path: str) ->
     return str(output_path)
 
 
+def _phase_shift(ref: np.ndarray, moved: np.ndarray, weight: np.ndarray) -> Tuple[float, float, float]:
+    """
+    The (dx, dy) by which `moved` shows ref's content displaced, to 1/20 pixel,
+    and how strongly they correlate (1 for a perfect match, near 0 for
+    unrelated content): windowed, weighted phase correlation, refined on a fine
+    grid around the peak (an upsampled DFT, after Guizar-Sicairos).
+    """
+    h, w = ref.shape
+    win = np.outer(np.hanning(h), np.hanning(w)) * weight
+    total = max(float(win.sum()), 1e-9)
+
+    def spectrum(img: np.ndarray) -> np.ndarray:
+        return np.fft.fft2((img - (img * win).sum() / total) * win)
+
+    cross = np.conj(spectrum(ref)) * spectrum(moved)
+    cross /= np.abs(cross) + 1e-9
+    fy, fx = np.fft.fftfreq(h)[:, None], np.fft.fftfreq(w)[None, :]
+    lowpass = np.exp(-(fx ** 2 + fy ** 2) / (2 * SHIFT_LOWPASS ** 2))
+    cross *= lowpass
+    corr = np.fft.ifft2(cross).real
+    py, px = np.unravel_index(np.argmax(corr), corr.shape)
+    py, px = (py - h if py > h // 2 else py), (px - w if px > w // 2 else px)
+    steps = np.arange(-20, 21) / 20
+    rows = np.exp(2j * np.pi * np.outer(py + steps, np.fft.fftfreq(h) * h) / h)
+    cols = np.exp(2j * np.pi * np.outer(px + steps, np.fft.fftfreq(w) * w) / w)
+    fine = (rows @ cross @ cols.T).real
+    iy, ix = np.unravel_index(np.argmax(fine), fine.shape)
+    return float(px + steps[ix]), float(py + steps[iy]), float(fine.max() / lowpass.sum())
+
+
+def _splits(start: int, stop: int) -> List[Tuple[int, int]]:
+    """[start, stop) cut into at most ALIGN_GRID equal parts of at least ALIGN_MIN_BLOCK."""
+    count = max(1, min(ALIGN_GRID, (stop - start) // ALIGN_MIN_BLOCK))
+    edges = np.linspace(start, stop, count + 1).round().astype(int)
+    return list(zip(edges[:-1], edges[1:]))
+
+
+def measure_shift(ref: Image.Image, moved: Image.Image, mask: Optional[Image.Image] = None) -> Optional[dict]:
+    """
+    How far `moved` (the same size as ref) shows ref's content displaced
+    around the masked area (mask: same size, non-zero = edited), or over the
+    whole image without one: the region measured (left, top, right, bottom)
+    and, for each block of it, row by row, its centre, shift (None if
+    skipped), correlation strength and unmasked share, all in ref's pixels.
+    None if the mask leaves nothing to compare. _fit_displacement() turns
+    the blocks into a shift and stretch.
+    """
+    factor = min(1.0, SHIFT_SAMPLE_SIDE / max(ref.size))
+    size = (max(1, round(ref.width * factor)), max(1, round(ref.height * factor)))
+    a = np.asarray(ref.convert("L").resize(size, Image.Resampling.BOX), dtype=np.float64)
+    b = np.asarray(moved.convert("L").resize(size, Image.Resampling.BOX), dtype=np.float64)
+    h, w = a.shape
+    weight = np.ones_like(a)
+    region = (0, 0, w, h)
+    if mask is not None:
+        small = mask.convert("L").resize(size, Image.Resampling.BOX)
+        box = small.getbbox()
+        if box is not None:
+            mx = max(ALIGN_MIN_BLOCK, round((box[2] - box[0]) * ALIGN_REGION_MARGIN))
+            my = max(ALIGN_MIN_BLOCK, round((box[3] - box[1]) * ALIGN_REGION_MARGIN))
+            region = (max(0, box[0] - mx), max(0, box[1] - my), min(w, box[2] + mx), min(h, box[3] + my))
+        grown = small.filter(ImageFilter.BoxBlur(SHIFT_MASK_MARGIN))
+        outside = Image.fromarray(np.where(np.asarray(grown) > 0, 0, 255).astype(np.uint8))
+        weight = np.asarray(outside.filter(ImageFilter.GaussianBlur(SHIFT_MASK_MARGIN / 2)), dtype=np.float64) / 255
+    if weight[region[1]:region[3], region[0]:region[2]].mean() < 0.01:
+        return None
+
+    blocks = []
+    for y0, y1 in _splits(region[1], region[3]):
+        for x0, x1 in _splits(region[0], region[2]):
+            wb = weight[y0:y1, x0:x1]
+            coverage = float(wb.mean())
+            shift, confidence = None, 0.0
+            if coverage >= ALIGN_MIN_COVERAGE:
+                dx, dy, confidence = _phase_shift(a[y0:y1, x0:x1], b[y0:y1, x0:x1], wb)
+                if confidence >= ALIGN_MIN_CONFIDENCE:
+                    shift = (dx / factor, dy / factor)
+            blocks.append({
+                "centre": ((x0 + x1) / 2 / factor, (y0 + y1) / 2 / factor),
+                "shift": shift, "confidence": confidence, "coverage": coverage,
+            })
+    return {"region": tuple(v / factor for v in region), "blocks": blocks}
+
+
+def _fit_displacement(result: dict) -> Optional[Tuple[Tuple[float, float], Tuple[float, float], float]]:
+    """
+    The shift (tx, ty) at the region's centre and the stretch (kx, ky) per axis
+    (0 for none, or where the counting blocks share one position) that best
+    explain the counting blocks' shifts of a measure_shift() result, as
+    displacement = t + k * (point - region centre), and the largest
+    distance of a block from it in pixels. None with fewer than
+    ALIGN_MIN_BLOCKS counting blocks.
+    """
+    used = [blk for blk in result["blocks"] if blk["shift"] is not None]
+    if len(used) < ALIGN_MIN_BLOCKS:
+        return None
+    left, top, right, bottom = result["region"]
+    centre = ((left + right) / 2, (top + bottom) / 2)
+    t, k = [], []
+    for axis in (0, 1):
+        pos = np.array([blk["centre"][axis] - centre[axis] for blk in used])
+        shift = np.array([blk["shift"][axis] for blk in used])
+        if np.ptp(pos) < 1:
+            slope, offset = 0.0, float(shift.mean())
+        else:
+            slope, offset = np.polyfit(pos, shift, 1)
+        t.append(float(offset))
+        k.append(float(slope))
+    residual = max(float(np.hypot(*_left_over(blk, centre, (t[0], t[1]), (k[0], k[1])))) for blk in used)
+    return (t[0], t[1]), (k[0], k[1]), residual
+
+
+def _left_over(
+    blk: dict, centre: Tuple[float, float], shift: Tuple[float, float], stretch: Tuple[float, float]
+) -> Tuple[float, float]:
+    """A measured block's displacement that the fitted shift and stretch do not explain."""
+    return tuple(blk["shift"][a] - shift[a] - stretch[a] * (blk["centre"][a] - centre[a]) for a in (0, 1))
+
+
+def log_shift(model_input_path: str, output_path: str, mask_path: Optional[str]) -> None:
+    """
+    Measures how far the model moved its input's content around the mask and
+    logs it ([model_shift]); changes nothing. Only measures when the output has
+    the input's size; never raises.
+    """
+    try:
+        with Image.open(model_input_path) as model_input, Image.open(output_path) as output:
+            if model_input.size != output.size:
+                print(f"[model_shift] Not measured: the output {output.size} has another size than the model's input {model_input.size}.", flush=True)
+                return
+            size = model_input.size
+            mask = None
+            if mask_path:
+                with Image.open(mask_path) as mask_file:
+                    alpha = mask_file.getchannel("A") if mask_file.mode == "RGBA" else mask_file.convert("L")
+                    mask = resize_to_cover_and_crop(alpha, *size, Image.Resampling.NEAREST)
+            result = measure_shift(model_input, output, mask)
+        if result is None:
+            print("[model_shift] Not measured: too little unchanged image to compare.", flush=True)
+            return
+
+        def fmt(shift: Tuple[float, float]) -> str:
+            return f"({shift[0]:+.1f}, {shift[1]:+.1f})"
+
+        def block(blk: dict) -> str:
+            if blk["coverage"] < ALIGN_MIN_COVERAGE:
+                return f"masked ({blk['coverage']:.0%} free)"
+            if blk["shift"] is None:
+                return f"weak {blk['confidence']:.2f}"
+            return f"{fmt(blk['shift'])} {blk['confidence']:.2f}"
+
+        left, top, right, bottom = (round(v) for v in result["region"])
+        blocks = ", ".join(block(blk) for blk in result["blocks"])
+        fit = _fit_displacement(result)
+        described = ""
+        if fit is not None:
+            shift, stretch, residual = fit
+            described = f"shift {fmt(shift)} px at the region's centre, stretch x {stretch[0] * 100:+.2f}%, y {stretch[1] * 100:+.2f}%"
+        where = "around the mask" if mask_path else "over the whole image"
+        print(
+            f"[model_shift] The model's output against its input, {where} (px, x right, y down), "
+            f"region ({left}, {top})-({right}, {bottom}): {described + '; ' if described else ''}"
+            f"blocks (shift, correlation; row by row): {blocks}.",
+            flush=True,
+        )
+    except Exception as e:  # noqa: BLE001 — the measurement must never break a generation
+        print(f"[model_shift] Not measured: failed ({e}).", flush=True)
+        return
+
+
 def run_masked_generation(
     source_image_path: str,
     mask_path: Optional[str],
@@ -383,6 +570,7 @@ def run_masked_generation(
     )
 
     output_path = infer(model_input_path)
+    log_shift(model_input_path, output_path, mask_path)
 
     if mask_path:
         return composite_with_soft_transition(source_image_path, output_path, mask_path, feather_amount)
