@@ -10,12 +10,13 @@ name: Build qwen_image21 Docker image
 
 on:
   push:
-    branches: [main]
+    branches: [main, test-diffusers]
     tags: ["v*"]
     paths:
       - "deployments/docker/Dockerfile.qwen_image21"
       - "pyproject.toml"
       - "src/**"
+      - ".github/workflows/docker-qwen-image21.yml"
   workflow_dispatch: {}
 
 env:
