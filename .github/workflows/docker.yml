@@ -7,12 +7,13 @@ name: Build Docker image
 
 on:
   push:
-    branches: [main]
+    branches: [main, test-original-node]
     tags: ["v*"]
     paths:
       - "deployments/docker/Dockerfile"
       - "pyproject.toml"
       - "src/**"
+      - ".github/workflows/docker.yml"
   workflow_dispatch: {}
 
 env:
