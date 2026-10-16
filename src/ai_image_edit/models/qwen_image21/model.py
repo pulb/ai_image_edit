@@ -32,7 +32,13 @@ from ai_image_edit.models.base import ModelBackend
 from ai_image_edit.models._shared.qwen21_size import (
     ASPECT_RATIOS,
     AUTO_ASPECT_RATIO,
+    DEFAULT_CFG,
     DEFAULT_MEGAPIXELS,
+    DEFAULT_STEPS,
+    MAX_CFG,
+    MAX_STEPS,
+    MIN_CFG,
+    MIN_STEPS,
     SUPPORTED_MEGAPIXELS,
     dimensions_from_source,
     megapixels_for_source as source_megapixels,
