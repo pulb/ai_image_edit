@@ -6,6 +6,7 @@ where uploaded and generated files live so the browser can load them.
 import os
 import shutil
 from pathlib import Path
+from typing import Iterable
 from urllib.parse import quote, unquote
 
 # Where uploaded, generated, and composited images live for the lifetime of
@@ -77,13 +78,17 @@ def _effective_max_bytes() -> int:
 WORK_MAX_BYTES = _effective_max_bytes()
 
 
-def trim_work_dir(keep: int = 0) -> None:
+def trim_work_dir(keep: int = 0, protect: Iterable[str] = ()) -> None:
     """
     Deletes the oldest files under WORK_DIR (ComfyUI's folders included)
     until the total is within WORK_MAX_BYTES. The `keep` newest files are
     never deleted, so the files of the generation in progress survive even
-    a tiny cap.
+    a tiny cap, and neither are the `protect`ed paths, the files the page
+    still uses (its input image, however old, and the result on show). They
+    count towards the total, so the folder stays above the cap if nothing
+    else is left to delete.
     """
+    protected = {Path(p).resolve() for p in protect}
     files = []
     for p in WORK_DIR.rglob("*"):
         try:
@@ -97,6 +102,8 @@ def trim_work_dir(keep: int = 0) -> None:
     for _, size, p in reversed(files[keep:]):
         if total <= WORK_MAX_BYTES:
             break
+        if p.resolve() in protected:
+            continue
         try:
             p.unlink()
             total -= size

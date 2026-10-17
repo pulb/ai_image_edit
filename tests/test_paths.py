@@ -1,7 +1,12 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
+import os
+import tempfile
 import unittest
+from pathlib import Path
+from unittest import mock
 
-from ai_image_edit.core.paths import WORK_DIR, from_url, to_url
+from ai_image_edit.core import paths
+from ai_image_edit.core.paths import WORK_DIR, from_url, to_url, trim_work_dir
 
 
 class UrlTest(unittest.TestCase):
@@ -22,3 +27,42 @@ class UrlTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TrimWorkDirTest(unittest.TestCase):
+    """Eight 100-byte files, f0 the oldest; a cap of 450 bytes leaves room for four."""
+
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.dir = Path(tmp.name)
+        for patcher in (mock.patch.object(paths, "WORK_DIR", self.dir), mock.patch.object(paths, "WORK_MAX_BYTES", 450)):
+            patcher.start()
+            self.addCleanup(patcher.stop)
+        for i in range(8):
+            path = self.dir / f"f{i}"
+            path.write_bytes(b"x" * 100)
+            os.utime(path, (1000 + i, 1000 + i))
+
+    def remaining(self):
+        return sorted(p.name for p in self.dir.iterdir())
+
+    def test_the_oldest_files_go_first(self):
+        trim_work_dir()
+        self.assertEqual(self.remaining(), ["f4", "f5", "f6", "f7"])
+
+    def test_the_newest_files_are_kept(self):
+        trim_work_dir(keep=6)
+        self.assertEqual(self.remaining(), ["f2", "f3", "f4", "f5", "f6", "f7"])
+
+    def test_a_protected_file_survives_however_old_it_is(self):
+        trim_work_dir(protect=[str(self.dir / "f0")])
+        self.assertEqual(self.remaining(), ["f0", "f5", "f6", "f7"])
+
+    def test_the_folder_stays_above_the_cap_if_only_protected_files_are_left(self):
+        trim_work_dir(protect=[str(self.dir / f"f{i}") for i in range(6)])
+        self.assertEqual(self.remaining(), ["f0", "f1", "f2", "f3", "f4", "f5"])
+
+    def test_a_protected_path_that_is_not_there_is_ignored(self):
+        trim_work_dir(protect=[str(self.dir / "gone.png")])
+        self.assertEqual(self.remaining(), ["f4", "f5", "f6", "f7"])

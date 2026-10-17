@@ -443,7 +443,11 @@ def run(model: WorkflowModel) -> None:
                     rescale_mode=advanced.rescale_mode.value,
                 )
                 result = await nicegui_run.io_bound(model.generate, params)
-                await nicegui_run.io_bound(trim_work_dir, RECENT_FILES_KEPT)
+                # The input image (which may be an older result that was used as
+                # the input), the references and the result on show must outlive
+                # the trim, however many files later generations add.
+                in_use = [source_image_path, result.after_path, *[h["path"] for h in references.reference_holders if h["path"]]]
+                await nicegui_run.io_bound(trim_work_dir, RECENT_FILES_KEPT, in_use)
 
                 prompt_card.seed_input.value = result.actual_seed
                 await result_card.set_result_images(result.before_path, result.after_path)

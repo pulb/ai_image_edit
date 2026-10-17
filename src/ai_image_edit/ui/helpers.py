@@ -11,7 +11,8 @@ from ai_image_edit.core.types import DEFAULT_RESCALE_MODE, GenerationParams, Mod
 PRIMARY_COLOR = "#7c3aed"
 
 # Newest work-dir files trim_work_dir() never deletes: the files of the
-# generation that just finished (source, mask, annotated, result, ...).
+# generation that just finished (source, mask, annotated, result, ...). The
+# files the page still uses are protected separately, however old they are.
 RECENT_FILES_KEPT = 8
 
 HOST = "0.0.0.0"
