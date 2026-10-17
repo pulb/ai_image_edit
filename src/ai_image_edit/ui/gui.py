@@ -40,12 +40,13 @@ from ai_image_edit.workflow_model import WorkflowModel
 
 
 COLOR_CORRECTION_INFO = (
-    "Applies to edits without a mask. The result's brightness, contrast and color cast are adjusted "
-    "to match your original image, which helps when the model shifts the overall tones. "
-    "It also dampens deliberate color changes, such as recoloring everything. "
-    "With a mask, this switch has no effect: the new region is matched to the surrounding image "
-    "automatically, whenever the model noticeably shifted the colors outside the mask or tinted the edit "
-    "where it meets the rest of the image."
+    "Applies to edits without a mask. If the model shifts the colors of the whole picture, so the result "
+    "looks duller, darker or tinted next to your photo, this evens the shift out, while what you asked "
+    "to change keeps its new colors. Small shifts that don't show are left alone. A color change you "
+    "asked for across the whole picture may be toned down, and when nearly all colors changed, nothing "
+    "is corrected. It only works when the result keeps your photo's aspect ratio; otherwise the result "
+    "is left as it is. "
+    "With a mask, this switch has no effect: the edited area's colors are always matched to your photo."
 )
 
 RESCALE_MODE_INFO_INTRO = "Applies to edits with a mask."

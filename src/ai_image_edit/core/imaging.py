@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """
 Pixel-level helpers around inference: preparing uploads (prepare_upload()),
-LAB color-space color matching,
+LAB color-space color matching of masked and unmasked edits,
 uniform-scale cover-crop resizing, the mask-feathered composite that
 merges a generated result back into the original image, the alignment
 that undoes the model's own drift before that (align_to_input()), and
@@ -26,7 +26,7 @@ from ai_image_edit.core.types import DEFAULT_RESCALE_MODE, RescaleMode
 # Below this, we only shift the mean — rescaling by ratio when src_std is
 # tiny can blow up small noise into huge swings (e.g. tgt_std/src_std =
 # 45/0.8 =~ 56x), which clips at 0/255 and shows up as blown-out / wrong
-# colors in the pasted region. Applies to L, a, and b alike; a/b
+# colors in the corrected image. Applies to L, a, and b alike; a/b
 # (chrominance) channels are typically lower-variance than L in natural
 # photos, so they'll fall back to a mean-only shift more often — that's
 # expected and conservative, not a sign anything's wrong.
@@ -35,7 +35,8 @@ COLOR_MATCH_STD_EPS = 4.0
 COLOR_MATCH_RATIO_CLAMP = (0.5, 2.0)
 
 # Masked edits are colour-corrected only when the model shifted the colours
-# outside the mask, where nothing should change. The drift is the average
+# outside the mask, where nothing should change (unmasked ones likewise
+# outside what the edit changed, see whole_image_color_match()). The drift is the average
 # CIE76 delta E the correction would apply there: below the first value
 # nothing is corrected, from the second on the correction applies in full, and
 # in between it is blended in linearly, so near-identical results don't jump.
@@ -52,8 +53,9 @@ COLOR_DRIFT_SAMPLE_SIDE = 512
 # Pixels (at the sample size) around the mask left out of the measurement:
 # models often alter a halo around the edit.
 COLOR_DRIFT_MASK_MARGIN = 8
-# The smallest share of the image outside the mask (and its margin) that
-# gives a reliable measurement; with less, nothing is corrected.
+# The smallest share of the image outside the mask (and its margin), or
+# outside what an unmasked edit changed, that gives a reliable measurement;
+# with less, nothing is corrected.
 COLOR_DRIFT_MIN_REFERENCE = 0.1
 
 # Detail matching for an enlarged patch (RescaleMode.EDIT with an original
@@ -103,6 +105,30 @@ COLOR_LOCAL_SIGMA = 0.1
 # The most (in delta E, per L*, a* and b*) the local correction may change a colour.
 COLOR_LOCAL_LIMIT_DE = 15.0
 
+# Colour matching of an unmasked edit (whole_image_color_match()), when the
+# "Apply color corrections" switch is on: the global correction made outside a
+# mask, with its ramp (COLOR_DRIFT_RAMP), measured on every pixel the edit did
+# not change. Pixels beyond the outlier limit (COLOR_LOCAL_OUTLIER_DE) hold
+# what the edit changed and are left out, as a mask's area is, so a recoloured
+# object doesn't tint the rest of the image; if that leaves too little
+# (COLOR_DRIFT_MIN_REFERENCE), the edit changed nearly all colours (a night
+# scene, a restyle) and nothing is corrected.
+#
+# It is a safety net for a model that clearly tints or dulls the whole image.
+# In edits of a selfie and a sandwich (October 2026) the model's own drift was
+# a delta E of 1.2 to 1.3 over the whole image, 1.3 to 1.8 on average in
+# 32-pixel cells (at COLOR_DRIFT_SAMPLE_SIDE) and 3 to 4 at most: below the
+# ramp, and not visible without a seam to compare it against, unlike along a
+# mask's border. A local correction as there, made across the whole image,
+# made no visible difference to the selfie, while correcting such small
+# differences pulls back colour changes asked for.
+#
+# It compares pixel by pixel, so it needs the output to show the input's
+# framing (the source was fitted to the output's size). A recomposed output
+# (another aspect ratio) is not corrected: its colours differ because its
+# content does (more wall, less sky), which its statistics can't tell from a
+# drift.
+
 # Alignment of the model's output with its input (align_to_input()).
 #
 # Why: a masked edit is pasted back onto the original, so any displacement of
@@ -138,13 +164,14 @@ COLOR_LOCAL_LIMIT_DE = 15.0
 #
 # What is done: the displacement is measured by phase correlation between the
 # model's input and its raw output, in a grid of blocks over the region around
-# the mask (the mask's bounding box and a margin), leaving the mask itself out. Blocks with too little unmasked area or
-# too weak a correlation (plain areas, redrawn content) are skipped. A shift
-# plus a stretch per axis is fitted to the rest and, for a masked edit, undone
-# before compositing. A model that redraws the area around the edit (a relight,
-# a restyle) can make that measurement wrong, so the correction is only applied
-# when it is plausible (the limits below); otherwise the output is used as it
-# is. An unmasked edit has nothing to line up with and is left as it is.
+# the mask (the mask's bounding box and a margin), leaving the mask itself out.
+# Blocks with too little unmasked area or too weak a correlation (plain areas,
+# redrawn content) are skipped. A shift plus a stretch per axis is fitted to the
+# rest and undone before compositing. A model that redraws the area around the
+# edit (a relight, a restyle) can make that measurement wrong, so the
+# correction is only applied when it is plausible (the limits below); otherwise
+# the output is used as it is. An unmasked edit has nothing to line up with and
+# is left as it is.
 # Uneven drift within the region cannot be undone this way.
 #
 # The measurement runs at this longest side (shifts are scaled back to full
@@ -190,8 +217,7 @@ ALIGN_MAX_SHIFT = 0.02
 ALIGN_MAX_STRETCH = 0.01
 
 # sRGB (D65) <-> CIE XYZ matrices, used by rgb_to_lab()/lab_to_rgb() for the
-# LAB color-space conversion compute_color_correction()/apply_color_correction()
-# do their work in.
+# LAB color-space conversion the colour matching does its work in.
 _RGB_TO_XYZ = np.array([
     [0.4124564, 0.3575761, 0.1804375],
     [0.2126729, 0.7151522, 0.0721750],
@@ -270,24 +296,14 @@ def lab_to_rgb(arr: np.ndarray) -> np.ndarray:
     return np.clip(srgb * 255.0, 0, 255).astype(np.float32)
 
 
-def compute_color_correction(source_img: Image.Image, target_img: Image.Image) -> List[Tuple[float, float]]:
-    """
-    Computes a per-channel (shift, scale) correction that maps source_img's
-    color statistics onto target_img's, in LAB space (separates luminance
-    from color, so a brightness fix can't bleed into a color-cast fix).
-    Returns one (shift, scale) tuple per L/a/b channel; apply with
-    apply_color_correction().
-
-    Always call with the FULL images, not a masked-down crop — a small
-    region gives an unstable statistical estimate.
-    """
-    src_arr = rgb_to_lab(np.array(source_img, dtype=np.float32)).reshape(-1, 3)
-    tgt_arr = rgb_to_lab(np.array(target_img, dtype=np.float32)).reshape(-1, 3)
-    return _correction_from_lab(src_arr, tgt_arr)
-
-
 def _correction_from_lab(src_arr: np.ndarray, tgt_arr: np.ndarray) -> List[Tuple[float, float]]:
-    """compute_color_correction() on (N, 3) arrays of LAB pixels."""
+    """
+    A per-channel (shift, scale) correction that maps the colour statistics
+    (mean and spread) of src_arr's L*a*b* pixels, an (N, 3) array, onto
+    tgt_arr's, one (shift, scale) per channel. In L*a*b*, a brightness fix
+    can't bleed into a colour-cast fix. Needs many pixels: a small sample
+    gives an unstable estimate.
+    """
     ratio_lo, ratio_hi = COLOR_MATCH_RATIO_CLAMP
     corrections = []
 
@@ -312,9 +328,10 @@ def _correction_from_lab(src_arr: np.ndarray, tgt_arr: np.ndarray) -> List[Tuple
 @dataclass(frozen=True)
 class ColorMatch:
     """
-    How to colour-match the generated image of a masked edit: the global
-    per-channel (shift, scale) corrections, and a smooth field of L*a*b*
-    offsets on a coarse grid over the whole generated image. Either may be None.
+    How to colour-match the generated image of an edit (masked_color_match(),
+    whole_image_color_match()): the global per-channel (shift, scale)
+    corrections, and, for a masked edit, a smooth field of L*a*b* offsets on a
+    coarse grid over the whole generated image. Either may be None.
     """
 
     size: Tuple[int, int]
@@ -348,12 +365,20 @@ def _samples(gen: Image.Image, orig: Image.Image, mask: Image.Image) -> Tuple[np
     )
 
 
-def _global_correction(gen_lab: np.ndarray, orig_lab: np.ndarray, masked: np.ndarray) -> Optional[List[Tuple[float, float]]]:
-    """The (shift, scale) per L*a*b* channel that undoes the drift outside the mask, scaled by its size, or None if none is needed."""
-    reference = ~_dilate(masked, COLOR_DRIFT_MASK_MARGIN)
+def _global_correction(
+    gen_lab: np.ndarray, orig_lab: np.ndarray, masked: np.ndarray, where: str = "outside the mask",
+    margin: int = COLOR_DRIFT_MASK_MARGIN,
+) -> Optional[List[Tuple[float, float]]]:
+    """
+    The (shift, scale) per L*a*b* channel that undoes the drift outside
+    `masked` (and `margin` pixels around it), scaled by its size (see
+    COLOR_DRIFT_RAMP), or None if none is needed. `where` names the measured
+    area in the log.
+    """
+    reference = ~_dilate(masked, margin)
     share = float(reference.mean())
     if share < COLOR_DRIFT_MIN_REFERENCE:
-        print(f"[color_correction] Only {share:.0%} of the image is outside the mask, too little to measure color drift; not correcting.", flush=True)
+        print(f"[color_correction] Only {share:.0%} of the image could be compared ({where}), too little to measure color drift; not correcting.", flush=True)
         return None
 
     gen_ref, orig_ref = gen_lab[reference], orig_lab[reference]
@@ -365,7 +390,7 @@ def _global_correction(gen_lab: np.ndarray, orig_lab: np.ndarray, masked: np.nda
 
     low, high = COLOR_DRIFT_RAMP
     strength = min(1.0, max(0.0, (drift - low) / (high - low)))
-    print(f"[color_correction] Color drift outside the mask: delta E {drift:.1f} (measured on {share:.0%} of the image), correcting at {strength:.0%}.", flush=True)
+    print(f"[color_correction] Color drift {where}: delta E {drift:.1f} (measured on {share:.0%} of the image), correcting at {strength:.0%}.", flush=True)
     if strength == 0:
         return None
     return [(s * strength, 1 + (r - 1) * strength) for s, r in corrections]
@@ -453,26 +478,28 @@ def masked_color_match(gen: Image.Image, orig: Image.Image, mask: Image.Image) -
     return ColorMatch(gen.size, corrections, field)
 
 
-def apply_color_correction(img: Image.Image, corrections: List[Tuple[float, float]]) -> Image.Image:
+def whole_image_color_match(gen: Image.Image, orig: Image.Image) -> Optional[ColorMatch]:
     """
-    Applies the per-channel (shift, scale) corrections from
-    compute_color_correction() — converts img to the same LAB representation
-    those corrections were computed in (see rgb_to_lab()), applies them, and
-    converts back to RGB.
+    How to colour-match the generated image of an unmasked edit to the
+    original, or None if it needs nothing or can't be matched (see the notes
+    below COLOR_LOCAL_LIMIT_DE). gen must show orig's framing, cropped to its
+    aspect ratio.
     """
-    arr = rgb_to_lab(np.array(img, dtype=np.float32))
-    for i, (shift, scale) in enumerate(corrections):
-        arr[:, :, i] = arr[:, :, i] * scale + shift
-    rgb = lab_to_rgb(arr)
-    return Image.fromarray(rgb.astype(np.uint8), mode="RGB")
+    orig = resize_to_cover_and_crop(orig, gen.width, gen.height, Image.Resampling.LANCZOS)
+    gen_lab, orig_lab, _ = _samples(gen, orig, Image.new("L", gen.size, 0))
+    # Pixels that changed a lot hold edited content, not a tint. They are left
+    # out as a mask's area is, without its margin, as they are scattered.
+    changed = _delta_e(orig_lab - gen_lab) > COLOR_LOCAL_OUTLIER_DE
+    corrections = _global_correction(gen_lab, orig_lab, changed, "outside what the edit changed", margin=0)
+    return ColorMatch(gen.size, corrections, None) if corrections else None
 
 
 def apply_color_match(img: Image.Image, match: ColorMatch, box: Tuple[int, int, int, int]) -> Image.Image:
     """
     Applies a ColorMatch to img, the part of the generated image at `box`
     (left, top, right, bottom, in generated-image pixels): the global
-    corrections as in apply_color_correction(), then the local offsets,
-    interpolated to img's pixels.
+    per-channel corrections in L*a*b* (see rgb_to_lab()), then the local
+    offsets, interpolated to img's pixels.
     """
     arr = rgb_to_lab(np.array(img, dtype=np.float32))
     for i, (shift, scale) in enumerate(match.corrections or []):
@@ -898,19 +925,21 @@ def composite_with_soft_transition(
 
 def apply_whole_image_color_correction(orig_img_path: str, gen_img_path: str) -> str:
     """
-    Color-matches the whole generated image to the whole original — every
-    pixel gets the same per-channel correction, no mask or crop. The
-    no-mask counterpart to composite_with_soft_transition()'s masked blend,
-    used when the "Apply color corrections" toggle is on. orig and gen
-    don't need matching resolutions here, since correction only uses each
-    image's aggregate per-channel mean/std.
+    Color-matches the whole generated image to the original (see
+    whole_image_color_match(); gen must show orig's framing) and returns the
+    corrected file's path, or gen_img_path if nothing was corrected. The no-mask
+    counterpart to composite_with_soft_transition()'s masked blend, used when
+    the "Apply color corrections" toggle is on. orig and gen may have
+    different sizes.
     """
     with Image.open(gen_img_path) as gen_file, Image.open(orig_img_path) as orig_file:
         gen = gen_file.convert("RGB")
         orig = orig_file.convert("RGB")
 
-    corrections = compute_color_correction(gen, orig)
-    corrected = apply_color_correction(gen, corrections)
+    match = whole_image_color_match(gen, orig)
+    if match is None:
+        return gen_img_path
+    corrected = apply_color_match(gen, match, (0, 0, gen.width, gen.height))
 
     output_path = WORK_DIR / f"color_corrected_{uuid.uuid4()}.png"
     corrected.save(output_path)
@@ -1171,9 +1200,10 @@ def run_generation(
       composite_with_soft_transition, feathered by feather_amount, as
       rescale_mode selects.
     - Otherwise the raw result is returned as-is, or color-corrected as a
-      whole if apply_color_correction_enabled is True (with a mask that flag
-      has no effect: composite_with_soft_transition() matches colours by
-      itself). rescale_mode is ignored.
+      whole if apply_color_correction_enabled is True and it shows the
+      input's framing (with a mask that flag has no effect:
+      composite_with_soft_transition() matches colours by itself).
+      rescale_mode is ignored.
 
     The model's input image is annotated_image_path if given, else
     source_image_path. Compositing and color correction always use the clean
@@ -1195,5 +1225,13 @@ def run_generation(
         output_path = align_to_input(model_input_path, output_path, mask_path)
         return composite_with_soft_transition(source_image_path, output_path, mask_path, feather_amount, rescale_mode)
     if apply_color_correction_enabled:
+        # The output shows the input's framing when it has the input's size:
+        # the source fitted to it, or a source already that size. Otherwise it
+        # was recomposed, and its colours differ because its content does.
+        with Image.open(model_input_path) as model_input, Image.open(output_path) as output:
+            framed = model_input.size == output.size
+        if not framed:
+            print("[color_correction] Not corrected: the output has another framing than the input, so its colours can't be compared.", flush=True)
+            return output_path
         return apply_whole_image_color_correction(source_image_path, output_path)
     return output_path

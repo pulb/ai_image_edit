@@ -662,6 +662,92 @@ class ModelShiftTest(unittest.TestCase):
             self.assertEqual(result, str(out))
 
 
+class WholeImageColorTest(unittest.TestCase):
+    """whole_image_color_match(): an unmasked edit with the input's framing, matched globally outside what it changed."""
+
+    @classmethod
+    def setUpClass(cls):
+        rng = np.random.default_rng(3)
+        coarse = rng.random((12, 16, 3)) * 120 + 60
+        cls.orig = Image.fromarray(coarse.astype(np.uint8)).resize((320, 240), Image.Resampling.BICUBIC)
+
+    def shifted(self, img, region, d_lab):
+        """img with d_lab (L* on its 0-100 scale, a*, b*) added inside region (left, top, right, bottom)."""
+        lab = imaging.rgb_to_lab(np.asarray(img, dtype=np.float32))
+        x0, y0, x1, y1 = region
+        lab[y0:y1, x0:x1] += np.array([d_lab[0] * imaging._LAB_L_SCALE, d_lab[1], d_lab[2]], dtype=np.float32)
+        return Image.fromarray(imaging.lab_to_rgb(lab).astype(np.uint8))
+
+    def difference(self, img, region):
+        """The mean delta E between img and self.orig inside region."""
+        x0, y0, x1, y1 = region
+        a = imaging.rgb_to_lab(np.asarray(img, dtype=np.float32))[y0:y1, x0:x1]
+        b = imaging.rgb_to_lab(np.asarray(self.orig, dtype=np.float32))[y0:y1, x0:x1]
+        return float(imaging._delta_e(a - b).mean())
+
+    def corrected(self, gen):
+        log = io.StringIO()
+        with contextlib.redirect_stdout(log):
+            match = imaging.whole_image_color_match(gen, self.orig)
+        out = gen if match is None else imaging.apply_color_match(gen, match, (0, 0, *gen.size))
+        return out, log.getvalue()
+
+    def test_a_drift_too_small_to_see_is_left_alone(self):
+        gen = self.shifted(self.orig, (0, 0, 320, 240), (1.5, 0, 0))
+        with contextlib.redirect_stdout(io.StringIO()) as log:
+            self.assertIsNone(imaging.whole_image_color_match(gen, self.orig))
+        self.assertIn("correcting at 0%", log.getvalue())
+
+    def test_a_loss_of_saturation_is_restored(self):
+        # The model's output a quarter less saturated.
+        lab = imaging.rgb_to_lab(np.asarray(self.orig, dtype=np.float32))
+        lab[:, :, 1:] *= 0.75
+        gen = Image.fromarray(imaging.lab_to_rgb(lab).astype(np.uint8))
+        out, _ = self.corrected(gen)
+        whole = (0, 0, *self.orig.size)
+        self.assertGreater(self.difference(gen, whole), 2)
+        self.assertLess(self.difference(out, whole), 1.0)
+
+    def test_an_edit_that_changed_nearly_all_colours_is_left_alone(self):
+        gen = self.shifted(self.orig, (0, 0, 320, 240), (-25, 10, -30))  # a night scene, say
+        with contextlib.redirect_stdout(io.StringIO()) as log:
+            self.assertIsNone(imaging.whole_image_color_match(gen, self.orig))
+        self.assertIn("could be compared", log.getvalue())
+
+    def test_a_strong_change_is_kept(self):
+        patch = (100, 80, 220, 160)
+        gen = self.shifted(self.orig, patch, (0, 40, -40))  # recoloured on purpose
+        out, _ = self.corrected(gen)
+        self.assertGreater(self.difference(out, patch), 40)
+        self.assertLess(self.difference(out, (0, 0, 80, 240)), 1.0)  # the rest stays as it was
+
+    def test_an_unchanged_image_needs_nothing(self):
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.assertIsNone(imaging.whole_image_color_match(self.orig.copy(), self.orig))
+
+    def test_a_few_pixels_of_drift_is_not_taken_for_a_colour_change(self):
+        # A 2K-like image moved by 3 px, as the model does: barely changed by the correction.
+        rng = np.random.default_rng(4)
+        fine = Image.fromarray((rng.random((768, 1024, 3)) * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(2))
+        coarse = self.orig.resize((1024, 768), Image.Resampling.BICUBIC)
+        textured = Image.fromarray(((np.asarray(fine, float) + np.asarray(coarse, float)) / 2).astype(np.uint8))
+        moved = textured.transform(textured.size, Image.Transform.AFFINE, (1, 0, 3, 0, 1, -1), Image.Resampling.BICUBIC)
+        inside = (8, 8, 1016, 760)  # without the edges the move left black
+        gen, orig = moved.crop(inside), textured.crop(inside)
+        with contextlib.redirect_stdout(io.StringIO()):
+            match = imaging.whole_image_color_match(gen, orig)
+        out = gen if match is None else imaging.apply_color_match(gen, match, (0, 0, *gen.size))
+        change = imaging._delta_e(
+            imaging.rgb_to_lab(np.asarray(out, dtype=np.float32)) - imaging.rgb_to_lab(np.asarray(gen, dtype=np.float32))
+        )
+        self.assertLess(float(np.percentile(change, 99)), 1.0)  # not visible
+
+    def test_a_global_tint_is_corrected(self):
+        gen = self.shifted(self.orig, (0, 0, 320, 240), (6, 4, -4))
+        out, _ = self.corrected(gen)
+        self.assertLess(self.difference(out, (0, 0, 320, 240)), 1.0)
+
+
 class OtherHelpersTest(unittest.TestCase):
     def test_resize_to_cover_and_crop_hits_the_exact_size(self):
         for size in ((100, 50), (50, 100), (33, 77)):
@@ -697,21 +783,37 @@ class OtherHelpersTest(unittest.TestCase):
     def test_whole_image_colour_correction_keeps_the_size(self):
         with tempfile.TemporaryDirectory() as tmp, mock.patch.object(imaging, "WORK_DIR", Path(tmp)):
             orig, gen = Path(tmp) / "o.png", Path(tmp) / "g.png"
-            Image.new("RGB", (16, 16), RED).save(orig)
-            Image.new("RGB", (32, 32), GREEN).save(gen)
-            out = imaging.apply_whole_image_color_correction(str(orig), str(gen))
-            self.assertEqual(Image.open(out).size, (32, 32))
+            Image.new("RGB", (16, 16), (100, 100, 100)).save(orig)
+            Image.new("RGB", (32, 32), (110, 100, 92)).save(gen)
+            with contextlib.redirect_stdout(io.StringIO()):
+                out = imaging.apply_whole_image_color_correction(str(orig), str(gen))
+            self.assertNotEqual(out, str(gen))
+            with Image.open(out) as corrected:
+                self.assertEqual(corrected.size, (32, 32))
 
     def test_an_unmasked_generation_is_colour_corrected_only_when_asked(self):
-        grey, tinted = (100, 100, 100), (140, 120, 100)
+        grey, tinted = (100, 100, 100), (110, 100, 92)
         with tempfile.TemporaryDirectory() as tmp, mock.patch.object(imaging, "WORK_DIR", Path(tmp)):
             source, output = Path(tmp) / "s.png", Path(tmp) / "o.png"
             Image.new("RGB", (64, 64), grey).save(source)
             Image.new("RGB", (64, 64), tinted).save(output)
             for corrected in (False, True):
-                with self.subTest(corrected=corrected):
+                with self.subTest(corrected=corrected), contextlib.redirect_stdout(io.StringIO()):
                     result = imaging.run_generation(str(source), None, None, None, 0, corrected, lambda path: str(output))
-                    self.assertEqual(Image.open(result).getpixel((5, 5)), grey if corrected else tinted)
+                    with Image.open(result) as img:
+                        pixel = np.array(img.getpixel((5, 5)), dtype=float)
+                    target = np.array(grey if corrected else tinted, dtype=float)
+                    self.assertLessEqual(float(np.abs(pixel - target).max()), 1)
+
+    def test_a_recomposed_unmasked_generation_is_not_colour_corrected(self):
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(imaging, "WORK_DIR", Path(tmp)):
+            source, output = Path(tmp) / "s.png", Path(tmp) / "o.png"
+            Image.new("RGB", (64, 64), (100, 100, 100)).save(source)
+            Image.new("RGB", (96, 54), (110, 100, 92)).save(output)  # another aspect ratio
+            with contextlib.redirect_stdout(io.StringIO()) as log:
+                result = imaging.run_generation(str(source), None, None, None, 0, True, lambda path: str(output))
+            self.assertEqual(result, str(output))
+            self.assertIn("another framing", log.getvalue())
 
 
 
