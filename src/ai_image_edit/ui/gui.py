@@ -19,7 +19,7 @@ from nicegui import run as nicegui_run
 
 from ai_image_edit.core import imaging
 from ai_image_edit.core.paths import WORK_DIR, trim_work_dir
-from ai_image_edit.core.types import DEFAULT_SEED, ORIGINAL_ASPECT_RATIO, ModelCapabilities, RescaleMode
+from ai_image_edit.core.types import DEFAULT_RESCALE_MODE, DEFAULT_SEED, ORIGINAL_ASPECT_RATIO, ModelCapabilities, RescaleMode
 from ai_image_edit.ui.assets import CLIENT_JS, WIDGET_CSS
 from ai_image_edit.ui.compare_slider import create_compare_slider
 from ai_image_edit.ui.components import apply_dark_theme, create_simple_image_upload, create_value_slider
@@ -43,7 +43,9 @@ COLOR_CORRECTION_INFO = (
     "Applies to edits without a mask. The result's brightness, contrast and color cast are adjusted "
     "to match your original image, which helps when the model shifts the overall tones. "
     "It also dampens deliberate color changes, such as recoloring everything. "
-    "With a mask, the new region is always matched to the surrounding image, so this switch has no effect."
+    "With a mask, this switch has no effect: the new region is matched to the surrounding image "
+    "automatically, whenever the model noticeably shifted the colors outside the mask or tinted the edit "
+    "where it meets the rest of the image."
 )
 
 RESCALE_MODE_INFO_INTRO = "Applies to edits with a mask."
@@ -156,7 +158,7 @@ def build_advanced_card(caps: ModelCapabilities) -> AdvancedCard:
 
             with ui.row().classes("w-full items-center no-wrap q-mt-sm"):
                 rescale_mode = ui.select(
-                    RESCALE_MODE_OPTIONS, value=RescaleMode.ORIGINAL.value, label="Masked edits"
+                    RESCALE_MODE_OPTIONS, value=DEFAULT_RESCALE_MODE.value, label="Masked edits"
                 ).props("outlined dark").classes("flex-1")
                 with ui.button(icon="info").props("flat round dense size=sm").classes("text-gray-400"):
                     with ui.menu():

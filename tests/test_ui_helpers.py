@@ -59,8 +59,8 @@ class RescaleModeParamTest(unittest.TestCase):
         )
         return common.params_from_ui(caps, **(kwargs | overrides))
 
-    def test_defaults_to_the_generated_size(self):
-        self.assertIs(self.params().rescale_mode, RescaleMode.ORIGINAL)
+    def test_defaults_to_the_edited_area(self):
+        self.assertIs(self.params().rescale_mode, RescaleMode.EDIT)
 
     def test_takes_an_enum_or_its_value(self):
         self.assertIs(self.params(rescale_mode=RescaleMode.EDIT).rescale_mode, RescaleMode.EDIT)
@@ -71,7 +71,7 @@ class RescaleModeParamTest(unittest.TestCase):
             self.params(rescale_mode="huge")
 
     def test_ignored_without_inpainting(self):
-        self.assertIs(self.params(inpainting=False, rescale_mode="edit").rescale_mode, RescaleMode.ORIGINAL)
+        self.assertIs(self.params(inpainting=False, rescale_mode="original").rescale_mode, RescaleMode.EDIT)
 
     def test_every_mode_has_a_label(self):
         self.assertEqual(set(common.RESCALE_MODE_OPTIONS), {mode.value for mode in RescaleMode})

@@ -5,7 +5,7 @@ import os
 from typing import List, Optional, Sequence
 
 from ai_image_edit.core.errors import GenerationError
-from ai_image_edit.core.types import GenerationParams, ModelCapabilities, RescaleMode
+from ai_image_edit.core.types import DEFAULT_RESCALE_MODE, GenerationParams, ModelCapabilities, RescaleMode
 
 # This app's one accent colour: the UI reads its purple from here.
 PRIMARY_COLOR = "#7c3aed"
@@ -108,5 +108,5 @@ def params_from_ui(
         lora_strength=lora_strength if caps.supports_loras and lora_strength is not None else caps.lora_strength_range.default,
         apply_color_correction_enabled=bool(apply_color_correction),
         feather_amount=int(feather_amount) if caps.supports_inpainting and feather_amount is not None else 0,
-        rescale_mode=RescaleMode(rescale_mode) if caps.supports_inpainting and rescale_mode is not None else RescaleMode.ORIGINAL,
+        rescale_mode=RescaleMode(rescale_mode) if caps.supports_inpainting and rescale_mode is not None else DEFAULT_RESCALE_MODE,
     )

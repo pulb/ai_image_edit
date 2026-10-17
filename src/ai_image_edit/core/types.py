@@ -46,6 +46,9 @@ class RescaleMode(str, Enum):
     EDIT = "edit"
 
 
+DEFAULT_RESCALE_MODE = RescaleMode.EDIT
+
+
 @dataclass(frozen=True)
 class ModelCapabilities:
     """
@@ -158,7 +161,7 @@ class GenerationParams:
     feather_amount: int = int(FEATHER_RANGE.default)
 
     # Masked edits only.
-    rescale_mode: RescaleMode = RescaleMode.ORIGINAL
+    rescale_mode: RescaleMode = DEFAULT_RESCALE_MODE
 
 
 @dataclass
