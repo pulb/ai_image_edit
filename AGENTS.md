@@ -78,9 +78,11 @@ Rules for any AI coding agent working in this repository.
   listed in the workflow file's `files` and downloaded when missing.
 - **Default model**: `src/ai_image_edit/app.py` defaults `--workflow`/`MODEL_WORKFLOW` to
   `qwen_image21`; the `Dockerfile` leaves the default.
-- **Masking**: masked generation (crop → infer → composite/color-correct)
-  is handled externally via `core/imaging.py`'s `run_masked_generation()`,
-  shared by every model that supports inpainting. A model does
+- **Masking**: masked generation (crop → infer → align → composite/color-correct)
+  is handled externally via `core/imaging.py`'s `run_generation()`,
+  shared by every model that supports inpainting. It measures how far the
+  model moved its input's content around the mask and undoes a plausible
+  shift and stretch before compositing (`align_to_input()`). A model does
   not need its own mask-blending logic; it only needs to accept a
   (possibly cropped) source path and hand back a result path.
 - **Working directory**: generated/uploaded/composited files live under

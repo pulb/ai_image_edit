@@ -31,6 +31,14 @@ class ResolvedSize:
     # Extra identity of the request for the result cache (besides width/height).
     cache_kwargs: Dict[str, Any] = field(default_factory=dict)
     description: str = ""
+    # Set when the app, not the model, scales the input images: the source is
+    # fitted to input_size (width, height) before inference, and the reference
+    # images are scaled to reference_resolution's area, keeping their own
+    # aspect ratio. Unset, the images are sent as they are and the model's
+    # workflow scales them. A masked edit needs input_size to be width x height,
+    # or unset (then it is fitted to width x height all the same).
+    input_size: Optional[Tuple[int, int]] = None
+    reference_resolution: Optional[int] = None
 
 
 class SizePolicy:
@@ -73,6 +81,12 @@ QWEN21_ASPECT_RATIOS: Dict[str, Tuple[int, int]] = {
 QWEN21_RESOLUTIONS = [1024, 1536, 2048]
 QWEN21_DEFAULT_RESOLUTION = 1024
 
+# How far (as a share) a source's aspect ratio may be from the chosen ratio for
+# the source to be fitted to the generation size, which trims at most about
+# this much off one edge. Beyond it the ratios differ on purpose: the source
+# keeps its own ratio and the model recomposes it into the chosen one.
+QWEN21_FIT_ASPECT_TOLERANCE = 0.02
+
 
 def _round32(v: float) -> int:
     """Rounds to the nearest multiple of 32, minimum 32."""
@@ -84,7 +98,7 @@ def _tier_size(resolution: int, aspect_ratio: str) -> Tuple[Optional[int], Optio
     Width/height for a resolution and a named aspect ratio: the model
     card's size for that ratio, scaled by resolution / QWEN21_BASE_RESOLUTION.
     Returns (None, None) for ORIGINAL_ASPECT_RATIO and for unknown names; use
-    _dimensions_from_source() then.
+    dimensions_from_source() then.
     """
     if not aspect_ratio or aspect_ratio == ORIGINAL_ASPECT_RATIO or aspect_ratio not in QWEN21_ASPECT_RATIOS:
         return None, None
@@ -93,7 +107,7 @@ def _tier_size(resolution: int, aspect_ratio: str) -> Tuple[Optional[int], Optio
     return _round32(base_w * scale), _round32(base_h * scale)
 
 
-def _dimensions_from_source(source_image_path: str, resolution: int) -> Tuple[int, int]:
+def dimensions_from_source(source_image_path: str, resolution: int) -> Tuple[int, int]:
     """
     Derives concrete (width, height) from the source image's own aspect
     ratio at the given resolution tier, for when _tier_size has no size (the
@@ -121,12 +135,23 @@ def _nearest_resolution(source_image_path: str) -> int:
     return min(QWEN21_RESOLUTIONS, key=lambda r: abs(math.log(side / r)))
 
 
+def _ratio_matches(source_image_path: str, width: int, height: int) -> bool:
+    """Whether the source's aspect ratio is within QWEN21_FIT_ASPECT_TOLERANCE of width:height."""
+    with Image.open(source_image_path) as img:
+        source_ratio = img.width / img.height
+    return abs(source_ratio / (width / height) - 1) <= QWEN21_FIT_ASPECT_TOLERANCE
+
+
 class Qwen21Tiers(SizePolicy):
     """
     Qwen-Image-2.1: resolution tiers (1K/1.5K/2K) and the model card's aspect ratios.
-    The encode node scales the reference images to the tier, and the workflow
-    samples an empty latent of width x height, so the output size is independent
-    of the source's own shape.
+    The workflow samples an empty latent of width x height, so the output size is
+    independent of the source's own shape. The app scales every input image
+    and the encode node gets resolution 0, so it keeps their sizes: where the
+    source keeps its framing (a mask, the "Original" ratio, or a chosen ratio
+    close to its own) it is fitted to exactly width x height, so that it and
+    the latent have the same size; otherwise it keeps its own ratio at the
+    tier, as the node would have scaled it, and the model recomposes it.
     """
 
     aspect_ratios = [ORIGINAL_ASPECT_RATIO, *QWEN21_ASPECT_RATIOS]
@@ -144,10 +169,27 @@ class Qwen21Tiers(SizePolicy):
         aspect = ORIGINAL_ASPECT_RATIO if params.mask_path else params.aspect_ratio
         resolution = self.resolution_for_source(params.source_image_path) if params.mask_path else params.resolution
         width, height = _tier_size(resolution, aspect)
-        if width is None or height is None:
-            width, height = _dimensions_from_source(params.source_image_path, resolution)
-        values = {"resolution": resolution, "width": width, "height": height}
-        return ResolvedSize(width, height, values, {"resolution": resolution}, f"resolution={resolution}")
+        from_source = width is None or height is None
+        if from_source:
+            width, height = dimensions_from_source(params.source_image_path, resolution)
+        # A mask always takes the from_source path (its aspect ratio is forced
+        # to "Original" above), so it needs no check of its own here.
+        if from_source or _ratio_matches(params.source_image_path, width, height):
+            input_size = (width, height)
+        else:
+            # A clearly different ratio: the whole image, at its own ratio.
+            input_size = dimensions_from_source(params.source_image_path, resolution)
+        # The encode node would rescale the images by a rule of its own, which
+        # can land a few pixels off the size the latent is sampled at, and
+        # sampling at another size than the scaled input shifts the edit
+        # against the original. Resolution 0 makes it keep each image's size
+        # (rounded to a multiple of 32, which ours already are).
+        values = {"resolution": 0, "width": width, "height": height}
+        return ResolvedSize(
+            width, height, values, {"resolution": resolution},
+            f"resolution={resolution} input={input_size[0]}x{input_size[1]}",
+            input_size=input_size, reference_resolution=resolution,
+        )
 
 
 class FixedArea(SizePolicy):

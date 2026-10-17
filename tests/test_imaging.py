@@ -198,7 +198,7 @@ class CompositeAtOriginalSizeTest(CompositeBase):
                 orig = Image.fromarray(np.clip(30 + 200 * field, 0, 255).astype(np.uint8)).convert("RGB")
                 orig_path = self.save("o.png", orig)
                 with mock.patch("builtins.print"):
-                    gen_path = imaging.prepare_inpaint_image(orig_path, *gen_size, Image.Resampling.LANCZOS)
+                    gen_path = imaging.fit_image_to_size(orig_path, *gen_size, Image.Resampling.LANCZOS)
                 mask = self.mask(orig_size, (round(w * 0.05), round(h * 0.05), round(w * 0.95), round(h * 0.95)))
                 with mock.patch.object(imaging, "DETAIL_ENLARGEMENT_RAMP", (100.0, 101.0)):
                     out = Image.open(imaging.composite_with_soft_transition(
@@ -470,11 +470,229 @@ class DetailMatchTest(unittest.TestCase):
         self.assertGreater(imaging._noise_level(edited), 1.5)  # a flat patch would be 0
 
 
+class ModelShiftTest(unittest.TestCase):
+    """measure_shift() and align_to_input(): textured images, displaced by known amounts."""
+
+    MASK_BOX = (300, 200, 600, 460)
+
+    @classmethod
+    def setUpClass(cls):
+        rng = np.random.default_rng(0)
+        fine = Image.fromarray((rng.random((660, 900)) * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(2))
+        coarse = Image.fromarray((rng.random((66, 90)) * 255).astype(np.uint8)).resize((900, 660), Image.Resampling.BICUBIC)
+        cls.image = Image.fromarray(((np.asarray(fine, float) + np.asarray(coarse, float)) / 2).astype(np.uint8)).convert("RGB")
+
+    def moved(self, dx=0.0, dy=0.0, zoom=1.0, centre=None):
+        cx, cy = centre or (self.image.width / 2, self.image.height / 2)
+        matrix = (1 / zoom, 0, cx - (cx + dx) / zoom, 0, 1 / zoom, cy - (cy + dy) / zoom)
+        return self.image.transform(self.image.size, Image.Transform.AFFINE, matrix, Image.Resampling.BICUBIC)
+
+    def mask(self):
+        mask = Image.new("L", self.image.size, 0)
+        mask.paste(255, self.MASK_BOX)
+        return mask
+
+    def edited(self, img):
+        img = img.copy()
+        img.paste((250, 10, 10), self.MASK_BOX)
+        return img
+
+    def test_a_shift_is_measured_to_a_tenth_of_a_pixel(self):
+        for dx, dy in ((2.5, -1.25), (0.3, 0.0), (-4.0, 3.7), (0.0, 0.0)):
+            with self.subTest(dx=dx, dy=dy):
+                shift, stretch, _ = imaging._fit_displacement(imaging.measure_shift(self.image, self.moved(dx, dy)))
+                self.assertAlmostEqual(shift[0], dx, delta=0.1)
+                self.assertAlmostEqual(shift[1], dy, delta=0.1)
+                self.assertAlmostEqual(stretch[0], 0.0, delta=0.001)
+                self.assertAlmostEqual(stretch[1], 0.0, delta=0.001)
+
+    def test_a_mask_is_measured_around_and_left_out(self):
+        result = imaging.measure_shift(self.image, self.edited(self.moved(1.5, -2.0)), self.mask())
+        left, top, right, bottom = result["region"]
+        self.assertTrue(left < 300 and top < 200 and right > 600 and bottom > 460)
+        self.assertTrue(left > 0 or right < 900)  # not the whole image
+        centre = [blk for blk in result["blocks"] if blk["coverage"] < imaging.ALIGN_MIN_COVERAGE]
+        self.assertEqual(len(centre), 1)  # the block over the mask
+        shift, _, _ = imaging._fit_displacement(result)
+        self.assertAlmostEqual(shift[0], 1.5, delta=0.1)
+        self.assertAlmostEqual(shift[1], -2.0, delta=0.1)
+
+    def test_a_stretch_is_measured(self):
+        _, stretch, _ = imaging._fit_displacement(imaging.measure_shift(self.image, self.moved(zoom=1.01)))
+        self.assertAlmostEqual(stretch[0], 0.01, delta=0.001)
+        self.assertAlmostEqual(stretch[1], 0.01, delta=0.001)
+
+    def test_plain_or_redrawn_blocks_are_skipped(self):
+        output = np.asarray(self.moved(-3.0, 0.0)).copy()
+        rng = np.random.default_rng(1)
+        output[440:, :300] = 30 + rng.normal(0, 2, (220, 300, 1))  # a plain area, redrawn: nothing to match
+        result = imaging.measure_shift(self.image, Image.fromarray(output))
+        self.assertIsNone(result["blocks"][6]["shift"])  # bottom left
+        shift, _, residual = imaging._fit_displacement(result)
+        self.assertAlmostEqual(shift[0], -3.0, delta=0.1)
+        self.assertLess(residual, 0.2)
+
+    def test_nothing_to_compare_gives_none(self):
+        self.assertIsNone(imaging.measure_shift(self.image, self.image, Image.new("L", self.image.size, 255)))
+
+    def align(self, output, mask=None):
+        """
+        align_to_input() on self.image and `output` around `mask`: (the aligned
+        image or None if unchanged, the log). Without a mask an empty one is
+        used, which measures blocks over the whole image.
+        """
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(imaging, "WORK_DIR", Path(tmp)):
+            src, out, mask_path = Path(tmp) / "in.png", Path(tmp) / "out.png", Path(tmp) / "m.png"
+            self.image.save(src)
+            output.save(out)
+            (mask if mask is not None else Image.new("L", self.image.size, 0)).save(mask_path)
+            log = io.StringIO()
+            with contextlib.redirect_stdout(log):
+                path = imaging.align_to_input(str(src), str(out), str(mask_path))
+            aligned = None if path == str(out) else Image.open(path).copy()
+        return aligned, log.getvalue()
+
+    def remaining(self, aligned, mask=None):
+        result = imaging.measure_shift(self.image, aligned, mask)
+        return max(abs(v) for blk in result["blocks"] if blk["shift"] for v in blk["shift"])
+
+    def test_the_log_reports_the_measurement(self):
+        _, log = self.align(self.edited(self.moved(2.0, 1.0)), self.mask())
+        self.assertIn("around the mask", log)
+        self.assertIn("shift (+2.0, +1.0) px", log)
+
+    def test_a_shift_around_the_mask_is_undone(self):
+        aligned, log = self.align(self.edited(self.moved(-2.6, 1.4)), self.mask())
+        self.assertIn("Corrected", log)
+        self.assertLess(self.remaining(aligned, self.mask()), 0.2)
+
+    def test_a_stretch_is_undone(self):
+        aligned, log = self.align(self.moved(1.0, 0.0, zoom=1.004))
+        self.assertIn("Corrected", log)
+        self.assertLess(self.remaining(aligned), 0.2)
+
+    def test_movement_away_from_the_mask_does_not_count(self):
+        output = self.moved(-3.0, 0.0)
+        output.paste(self.moved(2.0, 0.0).crop((0, 0, 120, 660)), (0, 0))  # the far left drifts the other way
+        aligned, log = self.align(self.edited(output), self.mask())
+        self.assertIn("Corrected", log)
+        self.assertLess(self.remaining(aligned, self.mask()), 0.2)
+
+    def test_slightly_uneven_movement_is_corrected(self):
+        # The middle third moves 1 px further than the rest: no fit matches all
+        # blocks, but undoing the average brings every block closer.
+        output = self.moved(-3.0, 0.0)
+        output.paste(self.moved(-4.0, 0.0).crop((0, 220, 900, 440)), (0, 220))
+        aligned, log = self.align(output)
+        self.assertIn("Corrected", log)
+        self.assertLess(self.remaining(aligned), 1.0)
+
+    # Block shifts and correlations measured on a 12 MP selfie (mask over the
+    # eyes), as logged, with the region scaled to this test image: blocks that
+    # barely moved end up to 0.3 px further off, the rest much closer.
+    SELFIE_RUNS = (
+        [(-0.1, -0.2, .18), (-1.4, -1.0, .68), (-1.5, -0.8, .57), (-0.5, -0.6, .21), None,
+         (-0.8, 0.0, .21), (-0.1, -0.6, .22), (-1.4, 0.0, .67), (-1.9, -0.1, .62)],
+        [(-2.0, -0.9, .46), (-3.5, -0.6, .67), (-4.6, -0.1, .47), (-0.7, -1.9, .18), None,
+         (-2.5, 0.7, .24), (-1.2, 0.1, .28), (-3.4, 0.7, .69), (-4.4, 0.5, .52)],
+    )
+
+    def test_real_uneven_drift_is_corrected(self):
+        for blocks in self.SELFIE_RUNS:
+            with self.subTest(blocks=blocks[0]):
+                xs, ys = np.linspace(100, 800, 4), np.linspace(150, 510, 4)
+                result = {"region": (100, 150, 800, 510), "blocks": [{
+                    "centre": ((xs[i % 3] + xs[i % 3 + 1]) / 2, (ys[i // 3] + ys[i // 3 + 1]) / 2),
+                    "shift": None if b is None else b[:2], "confidence": 0.0 if b is None else b[2],
+                    "coverage": 0.0 if b is None else 1.0,
+                } for i, b in enumerate(blocks)]}
+                with mock.patch.object(imaging, "measure_shift", return_value=result):
+                    aligned, log = self.align(self.image, self.mask())
+                self.assertIsNotNone(aligned)
+                self.assertIn("Corrected", log)
+
+    def test_a_correction_that_moves_a_block_much_further_off_is_refused(self):
+        # The top third stays put and the rest moves 3 px: the fit would move the top well off.
+        output = self.moved(-3.0, 0.0)
+        output.paste(self.image.crop((0, 0, 900, 220)), (0, 0))
+        aligned, log = self.align(output)
+        self.assertIsNone(aligned)
+        self.assertIn("further from where they belong", log)
+
+    def test_a_tiny_shift_is_left_alone(self):
+        aligned, log = self.align(self.moved(0.2, -0.1))
+        self.assertIsNone(aligned)
+        self.assertIn("below", log)
+
+    def test_uneven_movement_is_left_alone(self):
+        # The top half moves right and the bottom half left: no shift and stretch explains that.
+        output = self.moved(3.0, 0.0)
+        output.paste(self.moved(-3.0, 0.0).crop((0, 330, 900, 660)), (0, 330))
+        aligned, log = self.align(output)
+        self.assertIsNone(aligned)
+        self.assertIn("further from where they belong", log)
+
+    def test_an_implausibly_large_shift_is_left_alone(self):
+        aligned, log = self.align(self.moved(25.0, 0.0))
+        self.assertIsNone(aligned)
+        self.assertIn("recomposition", log)
+
+    def test_a_masked_generation_composites_the_aligned_output(self):
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(imaging, "WORK_DIR", Path(tmp)):
+            src, out, mask = Path(tmp) / "in.png", Path(tmp) / "out.png", Path(tmp) / "m.png"
+            self.image.save(src)
+            self.edited(self.moved(2.0, -1.5)).save(out)
+            self.mask().save(mask)
+            with mock.patch.object(imaging, "composite_with_soft_transition", return_value="/final.png") as composite, \
+                    contextlib.redirect_stdout(io.StringIO()):
+                imaging.run_generation(str(src), str(mask), *self.image.size, 0, False, lambda path: str(out))
+            composited = composite.call_args[0][1]
+            self.assertNotEqual(composited, str(out))
+            self.assertLess(self.remaining(Image.open(composited), self.mask()), 0.2)
+
+
+    def test_an_unmasked_generation_is_not_aligned(self):
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(imaging, "WORK_DIR", Path(tmp)):
+            src, out = Path(tmp) / "in.png", Path(tmp) / "out.png"
+            self.image.save(src)
+            self.moved(2.0, -1.5).save(out)
+            with mock.patch.object(imaging, "align_to_input") as align:
+                result = imaging.run_generation(str(src), None, None, None, 0, False, lambda path: str(out))
+            align.assert_not_called()
+            self.assertEqual(result, str(out))
+
+
 class OtherHelpersTest(unittest.TestCase):
     def test_resize_to_cover_and_crop_hits_the_exact_size(self):
         for size in ((100, 50), (50, 100), (33, 77)):
             out = imaging.resize_to_cover_and_crop(Image.new("RGB", size), 64, 48, Image.Resampling.LANCZOS)
             self.assertEqual(out.size, (64, 48))
+
+    def run_generation(self, size, input_size, mask=None):
+        """The path infer() receives for a source of `size` that is to be generated at (64, 48)."""
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(imaging, "WORK_DIR", Path(tmp)):
+            source = Path(tmp) / "s.png"
+            Image.new("RGB", size, RED).save(source)
+            received = []
+            with mock.patch.object(imaging, "composite_with_soft_transition", return_value="/out.png"):
+                imaging.run_generation(
+                    str(source), mask, 64, 48, 0, False, lambda path: received.append(path) or str(source), input_size=input_size,
+                )
+            self.assertEqual(len(received), 1)
+            return received[0] == str(source), Image.open(received[0]).size
+
+    def test_the_source_is_fitted_to_the_input_size(self):
+        self.assertEqual(self.run_generation((100, 80), (64, 48)), (False, (64, 48)))
+        self.assertEqual(self.run_generation((100, 80), (96, 64)), (False, (96, 64)))
+
+    def test_a_masked_source_is_fitted_to_the_generation_size(self):
+        self.assertEqual(self.run_generation((100, 80), None, mask="m.png"), (False, (64, 48)))
+        self.assertEqual(self.run_generation((100, 80), (64, 48), mask="m.png"), (False, (64, 48)))
+        with self.assertRaises(ValueError):
+            self.run_generation((100, 80), (96, 64), mask="m.png")
+
+    def test_the_source_is_passed_on_as_it_is_without_an_input_size(self):
+        self.assertEqual(self.run_generation((100, 80), None), (True, (100, 80)))
 
     def test_whole_image_colour_correction_keeps_the_size(self):
         with tempfile.TemporaryDirectory() as tmp, mock.patch.object(imaging, "WORK_DIR", Path(tmp)):
@@ -483,6 +701,17 @@ class OtherHelpersTest(unittest.TestCase):
             Image.new("RGB", (32, 32), GREEN).save(gen)
             out = imaging.apply_whole_image_color_correction(str(orig), str(gen))
             self.assertEqual(Image.open(out).size, (32, 32))
+
+    def test_an_unmasked_generation_is_colour_corrected_only_when_asked(self):
+        grey, tinted = (100, 100, 100), (140, 120, 100)
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(imaging, "WORK_DIR", Path(tmp)):
+            source, output = Path(tmp) / "s.png", Path(tmp) / "o.png"
+            Image.new("RGB", (64, 64), grey).save(source)
+            Image.new("RGB", (64, 64), tinted).save(output)
+            for corrected in (False, True):
+                with self.subTest(corrected=corrected):
+                    result = imaging.run_generation(str(source), None, None, None, 0, corrected, lambda path: str(output))
+                    self.assertEqual(Image.open(result).getpixel((5, 5)), grey if corrected else tinted)
 
 
 if __name__ == "__main__":

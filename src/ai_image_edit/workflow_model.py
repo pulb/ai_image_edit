@@ -19,13 +19,15 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+from PIL import Image
+
 from ai_image_edit.comfy import client as comfy_client
 from ai_image_edit.comfy import custom_nodes, downloads, gpu
 from ai_image_edit.core import imaging
 from ai_image_edit.core.errors import GenerationError
 from ai_image_edit.core.result_cache import cached_infer
 from ai_image_edit.core.types import GenerationParams, GenerationResult, ModelCapabilities, RangeSpec
-from ai_image_edit.sizes import POLICIES, ResolvedSize, SizePolicy
+from ai_image_edit.sizes import POLICIES, ResolvedSize, SizePolicy, dimensions_from_source
 from ai_image_edit.workflows import available_workflows, read_workflow_file
 
 
@@ -486,12 +488,14 @@ class WorkflowModel:
 
     def generate(self, params: GenerationParams) -> GenerationResult:
         """
-        Resolves the target size, then hands off to imaging.run_masked_generation
+        Resolves the target size, then hands off to imaging.run_generation
         for the crop -> infer -> composite sequence; _infer() builds and submits
-        the ComfyUI workflow and fetches the result. Only a masked request has
-        its source cropped to the generation size; otherwise the output size
-        comes from the workflow, through the values the manifest binds
-        (size.bind). Reference images are passed as they are.
+        the ComfyUI workflow and fetches the result. The source is fitted to
+        size.input_size when the size policy sets one (the reference images are
+        then scaled too, to size.reference_resolution), and to the generation
+        size for any masked request. Otherwise the images are passed as they
+        are and the model scales them. The output size comes from the
+        workflow, through the values the manifest binds (size.bind).
         """
         self._check_downloads()
         prompt = (params.prompt or "").strip()
@@ -512,9 +516,21 @@ class WorkflowModel:
 
         def _infer(model_input_path: str) -> str:
             self._check_nodes()
+            reference_paths = params.reference_images
+            if size.reference_resolution:
+                # Each reference keeps its own aspect ratio at reference_resolution's
+                # area, in multiples of 32: the Qwen-Image 2.1 encode node's own rule
+                # (dimensions_from_source() in sizes.py), the only policy that sets
+                # it. Another policy setting it may need a rule of its own.
+                reference_paths = [
+                    imaging.fit_image_to_size(
+                        p, *dimensions_from_source(p, size.reference_resolution), Image.Resampling.LANCZOS
+                    )
+                    for p in reference_paths
+                ]
             workflow = self.build_workflow(
                 prompt=prompt, negative_prompt=params.negative_prompt, source_path=model_input_path,
-                reference_paths=params.reference_images, seed=seed, steps=params.steps, cfg=params.cfg,
+                reference_paths=reference_paths, seed=seed, steps=params.steps, cfg=params.cfg,
                 denoise=params.denoise, sampler=params.sampler_name, scheduler=params.scheduler,
                 lora_files=params.lora_files, lora_strength=params.lora_strength, size_values=size.values,
             )
@@ -525,7 +541,7 @@ class WorkflowModel:
 
         infer = cached_infer(_infer, self.display_name, params, seed=seed, **size.cache_kwargs, width=size.width, height=size.height)
 
-        final_output_path = imaging.run_masked_generation(
+        final_output_path = imaging.run_generation(
             params.source_image_path,
             params.mask_path,
             size.width,
@@ -535,6 +551,7 @@ class WorkflowModel:
             infer,
             params.annotated_image_path,
             params.rescale_mode,
+            input_size=size.input_size,
         )
         return GenerationResult(before_path=params.source_image_path, after_path=final_output_path, actual_seed=seed)
 

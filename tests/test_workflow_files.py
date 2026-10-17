@@ -34,6 +34,7 @@ from ai_image_edit.core.types import GenerationParams
 from ai_image_edit.workflows import available_workflows
 from ai_image_edit import workflows as workflow_files
 from ai_image_edit.comfy import client
+from ai_image_edit import sizes
 from ai_image_edit.sizes import POLICIES
 from ai_image_edit.workflow_model import WorkflowModel
 
@@ -209,14 +210,14 @@ class ManifestModelTests(unittest.TestCase):
                     model._splice_loras({}, LORAS, 0.7)
 
     def run_generate(self, model, **params) -> int:
-        real = imaging.run_masked_generation
-        imaging.run_masked_generation = lambda *args: "/out.png"
+        real = imaging.run_generation
+        imaging.run_generation = lambda *args, **kwargs: "/out.png"
         try:
             return model.generate(GenerationParams(
                 prompt="a hat", source_image_path=str(self.tmp / "source.png"), mask_path=None, steps=10, **params
             )).actual_seed
         finally:
-            imaging.run_masked_generation = real
+            imaging.run_generation = real
 
     def test_turbo_workflows_default_to_eight_steps_without_guidance(self):
         for name in ("qwen_image21_turbo", "qwen_image21_turbo_gguf"):
@@ -243,7 +244,36 @@ class ManifestModelTests(unittest.TestCase):
                 latent_id = wf["6"]["inputs"]["latent_image"][0]
                 self.assertEqual("EmptyLatentImage", wf[latent_id]["class_type"])
                 self.assertEqual((1376, 768), (wf[latent_id]["inputs"]["width"], wf[latent_id]["inputs"]["height"]))
-                self.assertEqual(1024, wf["5"]["inputs"]["resolution"])
+                self.assertEqual(0, wf["5"]["inputs"]["resolution"])
+
+    def test_qwen21_fits_the_source_to_the_output_only_where_it_keeps_its_framing(self):
+        Image.new("RGB", (1200, 896), (10, 20, 30)).save(self.tmp / "four_by_three.png")
+        cases = [  # source file, mask, aspect ratio, fitted?
+            ("source.png", "m.png", "16:9", True),  # a mask: always
+            ("source.png", None, "Original", True),
+            ("source.png", None, "16:9", False),  # 1000 x 777 recomposed into 16:9
+            ("four_by_three.png", None, "4:3", True),  # already the chosen ratio
+            ("four_by_three.png", None, "16:9", False),
+        ]
+        for name in ("qwen_image21", "qwen_image21_gguf", "qwen_image21_turbo", "qwen_image21_turbo_gguf"):
+            model = self.load(workflow_files.available_workflows()[name])
+            for source, mask, aspect, fitted in cases:
+                with self.subTest(workflow=name, source=source, mask=mask, aspect=aspect):
+                    params = GenerationParams(
+                        prompt="p", source_image_path=str(self.tmp / source), mask_path=mask, steps=4,
+                        aspect_ratio=aspect, resolution=1024,
+                    )
+                    size = model._size.resolve(params)
+                    own_ratio = sizes.dimensions_from_source(params.source_image_path, size.reference_resolution)
+                    self.assertEqual((size.width, size.height) if fitted else own_ratio, size.input_size)
+                    self.assertEqual(model._size.resolution_for_source(params.source_image_path) if mask else 1024, size.reference_resolution)
+                    self.assertEqual(0, size.values["resolution"])
+                    self.assertEqual((size.width, size.height), (size.values["width"], size.values["height"]))
+                    wf = model.build_workflow(
+                        prompt="p", negative_prompt="", source_path="/x/source.png", reference_paths=[], seed=1, steps=4,
+                        cfg=1.0, denoise=1.0, sampler="euler", scheduler="simple", size_values=size.values,
+                    )
+                    self.assertEqual(size.values["resolution"], wf["5"]["inputs"]["resolution"])
 
     def test_size_policies_resolve_exactly_the_values_they_declare(self):
         source = str(self.tmp / "source.png")
