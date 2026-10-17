@@ -18,7 +18,7 @@ from nicegui import app, ui
 from nicegui import run as nicegui_run
 
 from ai_image_edit.core import imaging
-from ai_image_edit.core.paths import WORK_DIR, trim_work_dir
+from ai_image_edit.core.paths import WORK_DIR, to_url, trim_work_dir
 from ai_image_edit.core.types import DEFAULT_RESCALE_MODE, DEFAULT_SEED, ORIGINAL_ASPECT_RATIO, ModelCapabilities, RescaleMode
 from ai_image_edit.ui.assets import CLIENT_JS, WIDGET_CSS
 from ai_image_edit.ui.compare_slider import create_compare_slider
@@ -525,7 +525,9 @@ def run(model: WorkflowModel) -> None:
             if not after_path:
                 ui.notify("No generated image to download yet.", type="negative")
                 return
-            ui.download.file(after_path, filename=Path(after_path).name)
+            # The file's regular address, not a single-use link: phone browsers
+            # may fetch a download twice, and the second fetch of such a link fails.
+            ui.download.from_url(to_url(after_path), filename=Path(after_path).name)
 
         result_card.download_btn.on_click(download_result)
 

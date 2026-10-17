@@ -714,5 +714,141 @@ class OtherHelpersTest(unittest.TestCase):
                     self.assertEqual(Image.open(result).getpixel((5, 5)), grey if corrected else tinted)
 
 
+
+def _wide_gamut_profile() -> bytes:
+    """A minimal ICC v2 RGB profile with Adobe RGB (1998) primaries and gamma 2.2, wider than sRGB."""
+    import struct
+
+    def s15(v: float) -> bytes:
+        return struct.pack(">i", round(v * 65536))
+
+    def xyz(x: float, y: float, z: float) -> bytes:
+        return b"XYZ " + b"\0" * 4 + s15(x) + s15(y) + s15(z)
+
+    name = b"Wide gamut test\0"
+    desc = b"desc" + b"\0" * 4 + struct.pack(">I", len(name)) + name + b"\0" * 8 + b"\0" * 3 + b"\0" * 67
+    curve = b"curv" + b"\0" * 4 + struct.pack(">I", 1) + struct.pack(">H", 563) + b"\0\0"  # 563/256 = 2.2
+    tags = [
+        (b"desc", desc), (b"wtpt", xyz(0.9642, 1.0, 0.8249)),
+        (b"rXYZ", xyz(0.6097, 0.3111, 0.0195)), (b"gXYZ", xyz(0.2053, 0.6257, 0.0609)),
+        (b"bXYZ", xyz(0.1492, 0.0632, 0.7446)),
+        (b"rTRC", curve), (b"gTRC", curve), (b"bTRC", curve),
+    ]
+    offset = 128 + 4 + 12 * len(tags)
+    table, data = b"", b""
+    for sig, body in tags:
+        body += b"\0" * (-len(body) % 4)
+        table += sig + struct.pack(">II", offset + len(data), len(body))
+        data += body
+    size = offset + len(data)
+    header = (
+        struct.pack(">I", size) + b"\0" * 4 + bytes([2, 0x10, 0, 0]) + b"mntrRGB XYZ " + b"\0" * 12 + b"acsp"
+        + b"\0" * 24 + b"\0" * 4 + s15(0.9642) + s15(1.0) + s15(0.8249) + b"\0" * 4 + b"\0" * 16 + b"\0" * 28
+    )
+    assert len(header) == 128
+    return header + struct.pack(">I", len(tags)) + table + data
+
+
+class PrepareUploadTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.dir = Path(self.tmp.name)
+        # A grey, a skin tone and a strong red, side by side.
+        self.colors = [(128, 128, 128), (200, 150, 120), (200, 40, 30)]
+        arr = np.zeros((20, 30, 3), dtype=np.uint8)
+        for i, c in enumerate(self.colors):
+            arr[:, i * 10:(i + 1) * 10] = c
+        self.image = Image.fromarray(arr)
+
+    def prepare(self, path: Path):
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            result = imaging.prepare_upload(str(path))
+        return Path(result), out.getvalue()
+
+    def colors_of(self, path: Path):
+        with Image.open(path) as img:
+            arr = np.array(img.convert("RGB"), dtype=np.int16)
+        return [tuple(arr[10, i * 10 + 5]) for i in range(3)]
+
+    def test_an_image_without_a_profile_is_left_untouched(self):
+        path = self.dir / "photo.jpg"
+        self.image.save(path, quality=90)
+        before = path.read_bytes()
+        result, log = self.prepare(path)
+        self.assertEqual(result, path)
+        self.assertEqual(path.read_bytes(), before)
+        self.assertEqual(log, "")
+
+    def test_an_srgb_image_is_left_untouched(self):
+        from PIL import ImageCms
+        path = self.dir / "photo.jpg"
+        srgb = ImageCms.ImageCmsProfile(ImageCms.createProfile("sRGB")).tobytes()
+        self.image.save(path, quality=90, icc_profile=srgb)
+        before = path.read_bytes()
+        result, log = self.prepare(path)
+        self.assertEqual(result, path)
+        self.assertEqual(path.read_bytes(), before)
+        self.assertEqual(log, "")
+
+    def test_a_wide_gamut_image_is_converted_to_srgb_and_saved_as_png(self):
+        path = self.dir / "photo.png"
+        self.image.save(path, icc_profile=_wide_gamut_profile())
+        result, log = self.prepare(path)
+        self.assertEqual(result.suffix, ".png")
+        with Image.open(result) as img:
+            self.assertNotIn("icc_profile", img.info)
+        grey, skin, red = self.colors_of(result)
+        # Grey stays grey; colours stored for a wider gamut come out more saturated in sRGB.
+        self.assertLessEqual(max(grey) - min(grey), 1)
+        self.assertGreater(skin[0] - skin[2], 200 - 120)
+        self.assertGreater(red[0] - red[1], 200 - 40)
+        self.assertIn("converted from Wide gamut test to sRGB", log)
+
+    def test_a_converted_jpeg_is_replaced_by_a_png(self):
+        path = self.dir / "photo.jpg"
+        self.image.save(path, quality=95, icc_profile=_wide_gamut_profile())
+        result, log = self.prepare(path)
+        self.assertEqual(result, self.dir / "photo.png")
+        self.assertTrue(result.exists())
+        self.assertFalse(path.exists())
+        self.assertIn("replaced by photo.png", log)
+
+    def test_transparency_is_kept_when_converting(self):
+        path = self.dir / "photo.png"
+        rgba = self.image.convert("RGBA")
+        rgba.putalpha(Image.new("L", rgba.size, 77))
+        rgba.save(path, icc_profile=_wide_gamut_profile())
+        result, _ = self.prepare(path)
+        with Image.open(result) as img:
+            self.assertEqual(img.mode, "RGBA")
+            self.assertEqual(img.getchannel("A").getextrema(), (77, 77))
+
+    def test_a_rotated_photo_is_turned_upright_without_loss(self):
+        path = self.dir / "photo.jpg"
+        exif = Image.Exif()
+        exif[0x0112] = 6  # stored turned left: shown rotated 90 degrees clockwise
+        self.image.save(path, quality=95, exif=exif)
+        with Image.open(path) as img:
+            expected = np.array(img.transpose(Image.Transpose.ROTATE_270))
+        result, log = self.prepare(path)
+        self.assertEqual(result.suffix, ".png")
+        with Image.open(result) as img:
+            self.assertEqual(img.size, (20, 30))
+            self.assertEqual(img.getexif().get(0x0112), None)
+            np.testing.assert_array_equal(np.array(img), expected)  # the decoded JPEG, not compressed again
+        self.assertIn("turned upright (EXIF orientation 6)", log)
+
+    def test_a_rotated_cmyk_photo_is_saved_as_rgb(self):
+        path = self.dir / "photo.jpg"
+        exif = Image.Exif()
+        exif[0x0112] = 6
+        self.image.convert("CMYK").save(path, quality=95, exif=exif)
+        result, _ = self.prepare(path)
+        with Image.open(result) as img:
+            self.assertEqual((img.mode, img.size), ("RGB", (20, 30)))
+
+
 if __name__ == "__main__":
     unittest.main()

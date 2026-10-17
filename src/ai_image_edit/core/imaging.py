@@ -1,20 +1,22 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """
-Pixel-level helpers for the crop/mask/composite steps around
-inference: LAB color-space color matching,
+Pixel-level helpers around inference: preparing uploads (prepare_upload()),
+LAB color-space color matching,
 uniform-scale cover-crop resizing, the mask-feathered composite that
 merges a generated result back into the original image, the alignment
 that undoes the model's own drift before that (align_to_input()), and
 run_generation(), which orchestrates the crop -> infer -> align -> composite
 sequence around an inference callback.
 """
+import io
 import math
 import uuid
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Callable, List, Optional, Tuple
 
 import numpy as np
-from PIL import Image, ImageFilter, ImageOps
+from PIL import Image, ImageCms, ImageFilter, ImageOps
 
 from ai_image_edit.core.paths import WORK_DIR
 from ai_image_edit.core.types import DEFAULT_RESCALE_MODE, RescaleMode
@@ -485,21 +487,107 @@ def apply_color_match(img: Image.Image, match: ColorMatch, box: Tuple[int, int, 
     return Image.fromarray(lab_to_rgb(arr).astype(np.uint8), mode="RGB")
 
 
-def apply_exif_orientation(image_path: str) -> None:
+# Preparing uploads (prepare_upload()).
+#
+# Why: browsers apply an image's EXIF orientation and embedded colour profile,
+# while PIL, the model and the colour matching read the pixels as stored.
+# Phone photos carry both (iPhones tag every photo Display P3). What was found
+# (October 2026): a selfie in Display P3 showed full colour in the browser,
+# but the model got its stored numbers, read as sRGB, so a duller face. An
+# unmasked result has no profile, so the browser showed it as sRGB, about 15
+# to 20% less saturated than the input, most of all on skin, although its
+# numbers matched the input's within a delta E of 1.7. A masked result looked
+# right only because it is built on the original and keeps its profile.
+#
+# So uploads are converted to sRGB rather than their profile carried along:
+# every step from the model to the colour matching to the browser then reads
+# the same numbers the same way. Colours beyond sRGB (rare in photos) are
+# clipped (relative colorimetric). Whether a profile is sRGB is tested by its
+# effect, not its name, as there are many sRGB profiles. A changed file is
+# saved as PNG, so it isn't compressed again.
+_SRGB = ImageCms.ImageCmsProfile(ImageCms.createProfile("sRGB"))
+# The colours that tell whether a profile describes sRGB (_profile_to_convert()).
+_PROFILE_TEST_COLORS = np.array(
+    [(r, g, b) for r in range(0, 256, 51) for g in range(0, 256, 51) for b in range(0, 256, 51)], dtype=np.uint8
+).reshape(6, 36, 3)
+
+
+def _profile_to_convert(img: Image.Image) -> Optional[ImageCms.ImageCmsProfile]:
     """
-    Rotates/flips the image file in place if its EXIF orientation says so, so
-    the stored pixels are upright. Browsers show such images upright while
-    PIL (and a model fed raw pixels) sees them sideways, which misaligns
-    anything drawn in the browser, such as the mask. Files without an
-    orientation, or an upright one, are left untouched.
+    img's embedded colour profile if its colours need converting to sRGB, or
+    None: without a profile (browsers show such images as sRGB too), with one
+    that describes sRGB (no test colour moves by more than 1 of 255), or in a
+    mode without a profile conversion here (only RGB, RGBA and CMYK have one).
+    """
+    icc = img.info.get("icc_profile")
+    if not icc or img.mode not in ("RGB", "RGBA", "CMYK"):
+        return None
+    try:
+        profile = ImageCms.ImageCmsProfile(io.BytesIO(icc))
+        if img.mode == "CMYK":
+            return profile
+        test = Image.fromarray(_PROFILE_TEST_COLORS, mode="RGB")
+        converted = ImageCms.profileToProfile(
+            test, profile, _SRGB, renderingIntent=ImageCms.Intent.RELATIVE_COLORIMETRIC, outputMode="RGB"
+        )
+    except (OSError, ImageCms.PyCMSError) as exc:
+        print(f"[upload] Colour profile unreadable ({exc}); colours kept as stored.", flush=True)
+        return None
+    moved = np.abs(np.array(converted, dtype=np.int16) - _PROFILE_TEST_COLORS.astype(np.int16)).max()
+    return profile if moved > 1 else None
+
+
+def _to_srgb(img: Image.Image, profile: ImageCms.ImageCmsProfile) -> Image.Image:
+    """img converted from `profile` to sRGB (relative colorimetric: colours sRGB can't show are clipped), alpha kept."""
+    alpha = img.getchannel("A") if img.mode == "RGBA" else None
+    colors = img.convert("RGB") if alpha is not None else img
+    converted = ImageCms.profileToProfile(
+        colors, profile, _SRGB, renderingIntent=ImageCms.Intent.RELATIVE_COLORIMETRIC, outputMode="RGB"
+    )
+    if alpha is not None:
+        converted.putalpha(alpha)
+    return converted
+
+
+# The modes PNG stores.
+_PNG_MODES = ("1", "L", "LA", "I", "I;16", "P", "RGB", "RGBA")
+
+
+def prepare_upload(image_path: str) -> str:
+    """
+    Makes an uploaded image's stored pixels what the browser shows, which
+    applies an EXIF orientation and an embedded colour profile while PIL, the
+    model and the colour matching read the pixels as stored: turned upright,
+    and converted to sRGB if its profile isn't sRGB (see
+    _profile_to_convert()). A file that needs neither is left untouched and
+    its path returned; otherwise it is replaced by a PNG (lossless, without a
+    profile) next to it, whose path is returned. Both steps are logged.
     """
     with Image.open(image_path) as img:
-        if img.getexif().get(0x0112, 1) == 1:
-            return
-        fmt = img.format
-        upright = ImageOps.exif_transpose(img)
-    options = {"quality": 95} if fmt in ("JPEG", "WEBP") else {}
-    upright.save(image_path, format=fmt, **options)
+        orientation = img.getexif().get(0x0112, 1)
+        rotated = orientation in range(2, 9)  # 1 is upright, anything else not an orientation
+        profile = _profile_to_convert(img)
+        if not rotated and profile is None:
+            return image_path
+        prepared = ImageOps.exif_transpose(img)
+    name = Path(image_path).name
+    if rotated:
+        print(f"[upload] {name}: turned upright (EXIF orientation {orientation}).", flush=True)
+    if profile is not None:
+        description = ImageCms.getProfileDescription(profile).strip() or "its colour profile"
+        prepared = _to_srgb(prepared, profile)
+        print(f"[upload] {name}: converted from {description} to sRGB.", flush=True)
+    if prepared.mode not in _PNG_MODES:  # an untagged CMYK photo, say: as PIL reads it everywhere else
+        prepared = prepared.convert("RGBA" if "A" in prepared.getbands() else "RGB")
+    prepared.info.pop("icc_profile", None)
+    png_path = Path(image_path).with_suffix(".png")
+    prepared.save(png_path, format="PNG")
+    if png_path != Path(image_path):
+        Path(image_path).unlink(missing_ok=True)
+        print(f"[upload] {name}: replaced by {png_path.name}.", flush=True)
+    else:
+        print(f"[upload] {name}: saved again.", flush=True)
+    return str(png_path)
 
 
 def compose_annotations(source_image_path: str, layer_path: str) -> str:

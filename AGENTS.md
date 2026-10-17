@@ -91,7 +91,9 @@ Rules for any AI coding agent working in this repository.
   (RAM-backed), is overridable with `AI_IMAGE_EDIT_WORK_DIR`, and is capped by
   `AI_IMAGE_EDIT_WORK_MAX_SIZE` through `trim_work_dir()`, which never deletes
   the newest files or the ones the page still uses. ComfyUI keeps
-  its input/output/temp folders under it too.
+  its input/output/temp folders under it too. Uploads pass through
+  `imaging.prepare_upload()`, which makes their stored pixels what the
+  browser shows (upright, sRGB) and saves them as PNG when it changes them.
 - **License headers**: this project is GPL-3.0-or-later. Every source
   file starts with `# SPDX-License-Identifier: GPL-3.0-or-later` (or the
   file-format-appropriate comment syntax) as its very first line, before

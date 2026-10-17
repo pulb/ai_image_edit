@@ -24,15 +24,15 @@ async def save_uploaded_file(file) -> str:
     documented method for this (nicegui.elements.upload_files.FileUpload.save).
     Always writes to a fresh, server-generated name — file.name (already
     sanitized by NiceGUI itself) is only used for its extension, read via
-    pathlib so it can't smuggle in a path. The saved file is made upright
-    if it carries an EXIF orientation (see imaging.apply_exif_orientation).
+    pathlib so it can't smuggle in a path. The saved file is then prepared
+    (upright, sRGB; see imaging.prepare_upload()), which may replace it with a
+    PNG: the returned path is the one to use.
     """
     suffix = Path(file.name).suffix or ".png"
     stem = Path(file.name).stem or "upload"
     path = WORK_DIR / f"{stem}_{uuid.uuid4().hex}{suffix}"
     await file.save(path)
-    await nicegui_run.io_bound(imaging.apply_exif_orientation, str(path))
-    return str(path)
+    return await nicegui_run.io_bound(imaging.prepare_upload, str(path))
 
 
 def save_data_url(data_url: str, filename_hint: str = "mask.png") -> str:
@@ -86,9 +86,9 @@ def create_hidden_uploader() -> ui.upload:
     accept="*/*" rather than "image/*": on Android, restricting to images
     forces a limited gallery-style picker and hides the full file browser
     (folder navigation, cloud storage sources, etc.), which is often the
-    only practical way to reach a downloaded or shared image file. Nothing
-    downstream validates file type either way; it is only a hint to the OS
-    picker.
+    only practical way to reach a downloaded or shared image file. The type
+    is only a hint to the OS picker; a file that isn't an image fails when it
+    is opened (imaging.prepare_upload()).
     """
     # Hidden with a CSS class, not set_visibility(False): since NiceGUI 3.18
     # the upload route rejects (403) uploads to elements that are not visible.
