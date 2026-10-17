@@ -5,7 +5,7 @@ and generation. It provides a web based UI optimized for mobile devices in
 front of interchangeable image-generation models.
 
 <p align="center">
-  <img src="doc/icon.png" alt="AI Image Edit" width="480">
+  <img src="doc/logo.png" alt="AI Image Edit" width="480">
 </p>
 
 ## Features

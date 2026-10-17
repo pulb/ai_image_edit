@@ -1,7 +1,9 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Password login for the UI."""
 import asyncio
+import base64
 import hmac
+from pathlib import Path
 from typing import Optional
 from urllib.parse import quote
 
@@ -12,6 +14,10 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 from ai_image_edit.ui.components import apply_dark_theme
 from ai_image_edit.ui.helpers import storage_secret
+
+# The logo is embedded in the page, so it needs no route that would have to be
+# open to visitors who have not logged in yet.
+LOGO_URI = "data:image/png;base64," + base64.b64encode((Path(__file__).parent / "static" / "logo.png").read_bytes()).decode()
 
 
 def install_password_login(password: str) -> str:
@@ -53,6 +59,7 @@ def install_password_login(password: str) -> str:
 
         apply_dark_theme()
         with ui.card().classes("absolute-center items-stretch"):
+            ui.image(LOGO_URI).props("width=512px ratio=1").classes("self-center").style("max-width: 80vw")
             field = ui.input("Password", password=True, password_toggle_button=True).props("autofocus")
             field.on("keydown.enter", try_login)
             ui.button("Log in", on_click=try_login)
