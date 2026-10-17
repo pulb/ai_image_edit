@@ -49,13 +49,16 @@ SAMPLER_CHOICES = [
 
 @dataclass(frozen=True)
 class SetupProgress:
-    """How far the model's background setup (downloads, installs) is."""
+    """How far the model's background setup (downloads, installs, the start of ComfyUI) is."""
 
     done: bool = True
     message: str = ""  # what is being done right now, e.g. "Downloading x.safetensors (2/5): 42%"
     error: Optional[str] = None
     fraction: Optional[float] = None  # 0 to 1 over the whole setup, None while that is not known
 
+
+# Seconds between the checks whether a freshly launched ComfyUI answers yet.
+COMFY_POLL_SECONDS = 0.5
 
 _NAMED_CHOICES = {"comfy_samplers": SAMPLER_CHOICES, "comfy_schedulers": SCHEDULER_CHOICES}
 _BINDABLE = {"prompt", "negative_prompt", "seed", "steps", "cfg", "sampler", "scheduler", "denoise"}
@@ -82,8 +85,9 @@ class WorkflowModel:
 
     The UI needs four things from it: what it can do (capabilities), how to
     start and stop it (start(), shutdown(); setup_progress() reports the
-    downloads start() continues in the background), and how to run one
-    generation (generate()), plus a name and version to show.
+    downloads and the start of ComfyUI that start() continues in the
+    background), and how to run one generation (generate()), plus a name
+    and version to show.
     """
 
     def __init__(self, name: str, manifest: dict, workflow: dict, variant: Optional[str] = None) -> None:
@@ -94,6 +98,8 @@ class WorkflowModel:
         self._nodes_checked = False
         self._download_status: Optional[downloads.DownloadStatus] = None
         self._cancel_downloads = threading.Event()
+        self._comfy_ready = threading.Event()  # set once the launched ComfyUI answers
+        self._comfy_error: Optional[str] = None  # set if its process ends before that
         self._lora_warned: set = set()
 
         size = manifest["size"]
@@ -285,6 +291,19 @@ class WorkflowModel:
         args, reason = gpu.comfy_extra_args(self._weights_bytes(), self._manifest.get("vram_headroom_gb"))
         print(f"ComfyUI arguments: {' '.join(args) or '(none)'} ({reason})", flush=True)
         self._process = comfy_client.launch_comfy_process(args)
+        threading.Thread(target=self._watch_comfy, args=(self._process,), name=f"{self.name}-comfy-start", daemon=True).start()
+
+    def _watch_comfy(self, process: subprocess.Popen) -> None:
+        """Waits for the launched ComfyUI to answer, or notes that its process ended first."""
+        while not self._cancel_downloads.is_set():
+            code = process.poll()
+            if code is not None:
+                self._comfy_error = f"ComfyUI stopped while starting (exit code {code}). Check its log, then restart the app."
+                return
+            if comfy_client.is_ready():
+                self._comfy_ready.set()
+                return
+            time.sleep(COMFY_POLL_SECONDS)
 
     def start(self) -> None:
         # Checked before anything starts, so a missing setting or file fails fast.
@@ -312,21 +331,30 @@ class WorkflowModel:
 
     def setup_progress(self) -> SetupProgress:
         status = self._download_status
-        if status is None:
+        if status is not None:
+            if status.error:
+                return SetupProgress(done=True, error=f"Setting up the model failed: {status.error}")
+            if not status.finished.is_set():
+                return SetupProgress(done=False, message=status.message, fraction=status.fraction)
+        if self._process is None:
             return SetupProgress()
-        if status.error:
-            return SetupProgress(done=True, error=f"Setting up the model failed: {status.error}")
-        done = status.finished.is_set()
-        return SetupProgress(done=done, message="" if done else status.message, fraction=status.fraction)
+        if self._comfy_error:
+            return SetupProgress(done=True, error=self._comfy_error)
+        if not self._comfy_ready.is_set():
+            return SetupProgress(done=False, message="Starting ComfyUI")
+        return SetupProgress(fraction=status.fraction if status is not None else None)
 
-    def _check_downloads(self) -> None:
+    def _check_setup(self) -> None:
         status = self._download_status
-        if status is None:
-            return
-        if status.error:
-            raise GenerationError(f"Setting up the model failed: {status.error}. Restart the app to retry.")
-        if not status.finished.is_set():
-            raise GenerationError(f"The model is still being set up. {status.message}".strip())
+        if status is not None:
+            if status.error:
+                raise GenerationError(f"Setting up the model failed: {status.error}. Restart the app to retry.")
+            if not status.finished.is_set():
+                raise GenerationError(f"The model is still being set up. {status.message}".strip())
+        if self._comfy_error:
+            raise GenerationError(self._comfy_error)
+        if self._process is not None and not self._comfy_ready.is_set():
+            raise GenerationError("ComfyUI is still starting. Please wait a moment and try again.")
 
     def shutdown(self) -> None:
         self._cancel_downloads.set()
@@ -497,7 +525,7 @@ class WorkflowModel:
         are and the model scales them. The output size comes from the
         workflow, through the values the manifest binds (size.bind).
         """
-        self._check_downloads()
+        self._check_setup()
         prompt = (params.prompt or "").strip()
         if not prompt:
             raise GenerationError("Please enter a prompt.")

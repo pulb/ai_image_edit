@@ -25,6 +25,7 @@ except ImportError:
 from ai_image_edit.core.errors import GenerationError
 from ai_image_edit.core.types import GenerationParams
 from ai_image_edit.comfy import client, downloads
+from ai_image_edit import workflow_model
 from ai_image_edit.workflow_model import SetupProgress, WorkflowModel
 
 PAYLOAD = bytes(range(256)) * 4000  # ~1 MB
@@ -208,9 +209,24 @@ class ModelStartTests(ServerCase):
         env.start()
         self.addCleanup(env.stop)
         os.environ.pop("ACCEPT_LICENSES", None)
-        launch = mock.patch.object(client, "launch_comfy_process", return_value=mock.Mock())
+        self.process = mock.Mock(**{"poll.return_value": None})
+        launch = mock.patch.object(client, "launch_comfy_process", return_value=self.process)
         self.launch = launch.start()
         self.addCleanup(launch.stop)
+        self.comfy_answers = threading.Event()  # ComfyUI answers once this is set
+        ready = mock.patch.object(client, "is_ready", side_effect=self.comfy_answers.is_set)
+        ready.start()
+        self.addCleanup(ready.stop)
+        poll = mock.patch.object(workflow_model, "COMFY_POLL_SECONDS", 0.01)
+        poll.start()
+        self.addCleanup(poll.stop)
+        self.addCleanup(self.comfy_answers.set)  # ends any watcher still polling
+
+    def wait_for(self, condition) -> None:
+        deadline = time.time() + 10
+        while not condition() and time.time() < deadline:
+            time.sleep(0.01)
+        self.assertTrue(condition())
 
     def params(self):
         return mock.Mock(spec=GenerationParams)  # the download check comes before any use
@@ -232,12 +248,40 @@ class ModelStartTests(ServerCase):
         Handler.gate.set()
         self.assertTrue(model._download_status.finished.wait(10))
         self.assertIsNone(model._download_status.error)
+        self.comfy_answers.set()
+        self.wait_for(lambda: model.setup_progress().done)
         final = model.setup_progress()
         self.assertTrue(final.done)
         self.assertEqual((final.message, final.error, final.fraction), ("", None, 1.0))
         self.assertEqual((self.tmp / "models/checkpoints/w.safetensors").read_bytes(), PAYLOAD)
         self.launch.assert_called_once()
-        model._check_downloads()  # no longer raises
+        model._check_setup()  # no longer raises
+
+    def test_setup_is_not_done_until_comfy_answers(self):
+        (self.tmp / "models/checkpoints").mkdir(parents=True)
+        (self.tmp / "models/checkpoints/w.safetensors").touch()
+        model = self.model()
+        model.start()
+        progress = model.setup_progress()
+        self.assertEqual((progress.done, progress.message, progress.error, progress.fraction), (False, "Starting ComfyUI", None, None))
+        with self.assertRaisesRegex(GenerationError, "still starting"):
+            model._check_setup()
+        self.comfy_answers.set()
+        self.wait_for(lambda: model.setup_progress().done)
+        self.assertEqual(model.setup_progress(), SetupProgress(done=True))
+        model._check_setup()  # no longer raises
+
+    def test_comfy_ending_while_starting_is_an_error(self):
+        (self.tmp / "models/checkpoints").mkdir(parents=True)
+        (self.tmp / "models/checkpoints/w.safetensors").touch()
+        self.process.poll.return_value = 3
+        model = self.model()
+        model.start()
+        self.wait_for(lambda: model.setup_progress().done)
+        progress = model.setup_progress()
+        self.assertIn("exit code 3", progress.error)
+        with self.assertRaisesRegex(GenerationError, "exit code 3"):
+            model._check_setup()
 
     def test_nothing_downloaded_if_file_exists(self):
         (self.tmp / "models/checkpoints").mkdir(parents=True)

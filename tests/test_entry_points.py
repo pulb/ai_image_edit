@@ -11,6 +11,7 @@ import os
 import subprocess
 import sys
 import tempfile
+import time
 import types
 import unittest
 from pathlib import Path
@@ -207,12 +208,17 @@ class CustomNodeTests(unittest.TestCase):
         old = os.getcwd()
         os.chdir(self.tmp)
         try:
-            with mock.patch.object(client, "launch_comfy_process") as launch:
-                launch.side_effect = lambda *_: self.assertTrue((Path("custom_nodes/My-Node/node.py")).is_file()) or mock.Mock()
+            running = mock.Mock(**{"poll.return_value": None})
+            with mock.patch.object(client, "launch_comfy_process") as launch, \
+                    mock.patch.object(client, "is_ready", return_value=True):
+                launch.side_effect = lambda *_: self.assertTrue((Path("custom_nodes/My-Node/node.py")).is_file()) or running
                 model.start()
                 self.assertTrue(model._download_status.finished.wait(20))
                 self.assertIsNone(model._download_status.error)
                 launch.assert_called_once()
+                deadline = time.time() + 10
+                while not model.setup_progress().done and time.time() < deadline:
+                    time.sleep(0.01)
                 progress = model.setup_progress()
                 self.assertTrue(progress.done)
                 self.assertEqual(progress.message, "")

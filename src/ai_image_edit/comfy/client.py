@@ -64,6 +64,14 @@ def launch_comfy_process(extra_args: Optional[List[str]] = None) -> subprocess.P
     return subprocess.Popen([sys.executable, "-u", "main.py", *args], env=gpu.environment())
 
 
+def is_ready() -> bool:
+    """True once the ComfyUI server answers requests."""
+    try:
+        return requests.get(f"http://{SERVER_ADDRESS}/system_stats", timeout=2).ok
+    except requests.exceptions.RequestException:
+        return False
+
+
 def missing_nodes(class_names: List[str]) -> List[str]:
     """The node classes among `class_names` that the running ComfyUI does not know."""
     try:

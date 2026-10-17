@@ -108,8 +108,10 @@ the UI.
 
 When a model starts, the app lists the weight files, LoRAs and custom nodes its
 workflow needs and fetches only what is missing, with parallel ranged downloads,
-resume support and a checksum check. Until the last file is there, generating
-answers that the model is still being set up and shows the progress. Mount a
+resume support and a checksum check. Until the last file is there and ComfyUI
+has started, the Generate button stays off and the page shows the progress
+(a failed download or a ComfyUI that stops while starting is reported there
+too). Mount a
 volume at the models folder (see the Docker guide) so the weights are downloaded
 only once.
 

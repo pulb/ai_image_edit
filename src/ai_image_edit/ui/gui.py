@@ -488,8 +488,8 @@ def run(model: WorkflowModel) -> None:
         result_card.use_as_input_btn.on_click(use_as_input)
 
         # While the model sets itself up in the background (weights and LoRAs
-        # downloading, custom nodes installing) show how far it is, and add the
-        # LoRAs to the list as their files arrive.
+        # downloading, custom nodes installing, ComfyUI starting) show how far
+        # it is, and add the LoRAs to the list as their files arrive.
         def refresh_setup() -> None:
             progress = model.setup_progress()
             text = progress.error or progress.message
