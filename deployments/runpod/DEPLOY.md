@@ -6,8 +6,7 @@ specific to RunPod.
 
 A public [RunPod template](https://console.runpod.io/hub/template/ayt3pyrp7w?ref=e1nr94ls)
 works with any model workflow. You only need to replace its container image with
-your own and, if your registry is private, add registry credentials (see
-[Pod setup](#pod-setup)).
+your own (see [Pod setup](#pod-setup)).
 
 | Model workflow (`MODEL_WORKFLOW`) | Weights |
 |---|---|
@@ -23,16 +22,12 @@ the image.
 ## Pod setup
 
 1. Create a Pod from the image, exposing HTTP port `7860`, e.g.
-   `ghcr.io/<owner>/<repo>:latest`. The default is `qwen_image21`; select another with
+   `ghcr.io/pulb/ai_image_edit:latest`. The default is `qwen_image21`; select another with
    `MODEL_WORKFLOW`. Accept the weights' license with `ACCEPT_LICENSES=qwen-research` (for the
    Qwen-Image-2.1 models). Choose one of the GPUs the template recommends
    that has enough memory: at least 48 GB of VRAM for `qwen_image21`, at least
    16 GB for `qwen_image21_gguf`.
-2. If the registry package is private (GHCR packages are by default), add a
-   registry credential under **Settings → Container Registry Auth** in the
-   RunPod console. For GHCR that is your GitHub username and a PAT with
-   `read:packages`; making the package public skips this.
-3. Optional: attach a network volume (a Pod mounts it at `/workspace`) so the
+2. Optional: attach a network volume (a Pod mounts it at `/workspace`) so the
    multi-GB weights download once instead of on every fresh container. Mount it at `/home/user/app/models` if the Pod lets you choose the
    mount path (otherwise the weights are stored on the Pod's disk).
 
