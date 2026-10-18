@@ -99,7 +99,7 @@ async def create_mask_editor(
     mask_radio = brush_slider = feather_slider = None
 
     if supports_mask or num_annotation_colors > 0:
-        with ui.column().classes(GROUP_CLASSES):
+        with ui.column().classes(GROUP_CLASSES + " p-4"):
             # One q-radio per row (ui.radio is a single vertical option list and
             # cannot hold the sliders), all showing the same current mode.
             zoom_radio = ui.element("q-radio").props('val=zoom model-value=zoom label="Pinch to zoom"')

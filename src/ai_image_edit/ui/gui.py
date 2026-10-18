@@ -139,7 +139,7 @@ class AdvancedCard:
 def build_advanced_card(caps: ModelCapabilities) -> AdvancedCard:
     with ui.card().classes(CARD_CLASSES):
         with ui.expansion("Advanced settings").props("dense").classes("w-full"):
-            with ui.column().classes(GROUP_CLASSES):
+            with ui.column().classes(GROUP_CLASSES + " p-6"):
                 ui.label("Generation").classes("text-sm text-weight-bold").style(f"color: {PRIMARY_COLOR}")
                 with ui.column().classes("w-full gap-0"):
                     ui.label("Inference steps").classes("text-xs text-gray-400")
@@ -169,12 +169,12 @@ def build_advanced_card(caps: ModelCapabilities) -> AdvancedCard:
                 if caps.scheduler_choices:
                     scheduler = ui.select(caps.scheduler_choices, value=default_choice(caps.default_scheduler, caps.scheduler_choices), label="Scheduler").props("outlined dark").classes("w-full")
 
-            with ui.column().classes(GROUP_CLASSES + " q-mt-md"):
+            with ui.column().classes(GROUP_CLASSES + " p-6"):
                 ui.label("Postprocessing").classes("text-sm text-weight-bold").style(f"color: {PRIMARY_COLOR}")
                 with ui.row().classes("w-full items-center no-wrap"):
                     rescale_mode = ui.select(
                         RESCALE_MODE_OPTIONS, value=DEFAULT_RESCALE_MODE.value, label="Masked edits"
-                    ).props("outlined dark").classes("flex-1")
+                    ).props("outlined dark").classes("flex-1 min-w-0")
                     with ui.button(icon="info").props("flat round dense size=sm").classes("text-gray-400"):
                         with ui.menu():
                             with ui.column().classes("q-pa-sm gap-2").style("max-width: 280px"):
