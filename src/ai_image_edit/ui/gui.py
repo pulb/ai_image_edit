@@ -22,7 +22,7 @@ from ai_image_edit.core.paths import WORK_DIR, to_url, trim_work_dir
 from ai_image_edit.core.types import DEFAULT_RESCALE_MODE, DEFAULT_SEED, ORIGINAL_ASPECT_RATIO, ModelCapabilities, RescaleMode
 from ai_image_edit.ui.assets import CLIENT_JS, WIDGET_CSS
 from ai_image_edit.ui.compare_slider import create_compare_slider
-from ai_image_edit.ui.components import apply_dark_theme, create_simple_image_upload, create_value_slider
+from ai_image_edit.ui.components import GROUP_CLASSES, apply_dark_theme, create_simple_image_upload, create_value_slider
 from ai_image_edit.ui.helpers import (
     HOST,
     RESCALE_MODE_OPTIONS,
@@ -139,61 +139,62 @@ class AdvancedCard:
 def build_advanced_card(caps: ModelCapabilities) -> AdvancedCard:
     with ui.card().classes(CARD_CLASSES):
         with ui.expansion("Advanced settings").props("dense").classes("w-full"):
-            ui.label("Generation").classes("text-sm text-weight-bold").style(f"color: {PRIMARY_COLOR}")
-            sr = caps.step_range
-            ui.label("Inference steps").classes("text-xs text-gray-400")
-            steps = create_value_slider(sr)
+            with ui.column().classes(GROUP_CLASSES):
+                ui.label("Generation").classes("text-sm text-weight-bold").style(f"color: {PRIMARY_COLOR}")
+                sr = caps.step_range
+                ui.label("Inference steps").classes("text-xs text-gray-400")
+                steps = create_value_slider(sr)
 
-            cfg = None
-            if caps.supports_cfg:
-                cr = caps.cfg_range
-                ui.label("CFG scale").classes("text-xs text-gray-400 q-mt-sm")
-                cfg = create_value_slider(cr)
+                cfg = None
+                if caps.supports_cfg:
+                    cr = caps.cfg_range
+                    ui.label("CFG scale").classes("text-xs text-gray-400 q-mt-sm")
+                    cfg = create_value_slider(cr)
 
-            negative_prompt = None
-            if caps.supports_negative_prompt:
-                negative_prompt = ui.textarea(label="Negative prompt").props("rows=2 outlined dark").classes("w-full q-mt-sm")
+                negative_prompt = None
+                if caps.supports_negative_prompt:
+                    negative_prompt = ui.textarea(label="Negative prompt").props("rows=2 outlined dark").classes("w-full q-mt-sm")
 
-            denoise = None
-            if caps.supports_denoise:
-                dr = caps.denoise_range
-                ui.label("Denoise").classes("text-xs text-gray-400 q-mt-sm")
-                denoise = create_value_slider(dr)
+                denoise = None
+                if caps.supports_denoise:
+                    dr = caps.denoise_range
+                    ui.label("Denoise").classes("text-xs text-gray-400 q-mt-sm")
+                    denoise = create_value_slider(dr)
 
-            sampler_name = None
-            if caps.sampler_choices:
-                sampler_name = ui.select(caps.sampler_choices, value=default_choice(caps.default_sampler, caps.sampler_choices), label="Sampler name").props("outlined dark").classes("w-full q-mt-sm")
+                sampler_name = None
+                if caps.sampler_choices:
+                    sampler_name = ui.select(caps.sampler_choices, value=default_choice(caps.default_sampler, caps.sampler_choices), label="Sampler name").props("outlined dark").classes("w-full q-mt-sm")
 
-            scheduler = None
-            if caps.scheduler_choices:
-                scheduler = ui.select(caps.scheduler_choices, value=default_choice(caps.default_scheduler, caps.scheduler_choices), label="Scheduler").props("outlined dark").classes("w-full")
+                scheduler = None
+                if caps.scheduler_choices:
+                    scheduler = ui.select(caps.scheduler_choices, value=default_choice(caps.default_scheduler, caps.scheduler_choices), label="Scheduler").props("outlined dark").classes("w-full")
 
-            ui.separator().classes("q-mt-md")
-            ui.label("Postprocessing").classes("text-sm text-weight-bold q-mt-sm").style(f"color: {PRIMARY_COLOR}")
-            with ui.row().classes("w-full items-center no-wrap q-mt-sm"):
-                rescale_mode = ui.select(
-                    RESCALE_MODE_OPTIONS, value=DEFAULT_RESCALE_MODE.value, label="Masked edits"
-                ).props("outlined dark").classes("flex-1")
-                with ui.button(icon="info").props("flat round dense size=sm").classes("text-gray-400"):
-                    with ui.menu():
-                        with ui.column().classes("q-pa-sm gap-2").style("max-width: 280px"):
-                            ui.label(RESCALE_MODE_INFO_INTRO).classes("text-xs")
-                            for mode, description in RESCALE_MODE_INFO.items():
-                                with ui.column().classes("gap-0"):
-                                    ui.label(RESCALE_MODE_OPTIONS[mode]).classes("text-xs text-weight-bold")
-                                    ui.label(description).classes("text-xs")
+            with ui.column().classes(GROUP_CLASSES + " q-mt-sm"):
+                ui.label("Postprocessing").classes("text-sm text-weight-bold").style(f"color: {PRIMARY_COLOR}")
+                with ui.row().classes("w-full items-center no-wrap q-mt-sm"):
+                    rescale_mode = ui.select(
+                        RESCALE_MODE_OPTIONS, value=DEFAULT_RESCALE_MODE.value, label="Masked edits"
+                    ).props("outlined dark").classes("flex-1")
+                    with ui.button(icon="info").props("flat round dense size=sm").classes("text-gray-400"):
+                        with ui.menu():
+                            with ui.column().classes("q-pa-sm gap-2").style("max-width: 280px"):
+                                ui.label(RESCALE_MODE_INFO_INTRO).classes("text-xs")
+                                for mode, description in RESCALE_MODE_INFO.items():
+                                    with ui.column().classes("gap-0"):
+                                        ui.label(RESCALE_MODE_OPTIONS[mode]).classes("text-xs text-weight-bold")
+                                        ui.label(description).classes("text-xs")
 
-            with ui.row().classes("items-center no-wrap q-mt-sm"):
-                color_correction = ui.switch("Apply color corrections", value=False)
-                with ui.button(icon="info").props("flat round dense size=sm").classes("text-gray-400"):
-                    with ui.menu():
-                        ui.label(COLOR_CORRECTION_INFO).classes("text-xs q-pa-sm").style("max-width: 280px")
+                with ui.row().classes("items-center no-wrap q-mt-sm"):
+                    match_detail = ui.switch("Match sharpness and grain", value=True)
+                    with ui.button(icon="info").props("flat round dense size=sm").classes("text-gray-400"):
+                        with ui.menu():
+                            ui.label(MATCH_DETAIL_INFO).classes("text-xs q-pa-sm").style("max-width: 280px")
 
-            with ui.row().classes("items-center no-wrap"):
-                match_detail = ui.switch("Match sharpness and grain", value=True)
-                with ui.button(icon="info").props("flat round dense size=sm").classes("text-gray-400"):
-                    with ui.menu():
-                        ui.label(MATCH_DETAIL_INFO).classes("text-xs q-pa-sm").style("max-width: 280px")
+                with ui.row().classes("items-center no-wrap"):
+                    color_correction = ui.switch("Apply color corrections", value=False)
+                    with ui.button(icon="info").props("flat round dense size=sm").classes("text-gray-400"):
+                        with ui.menu():
+                            ui.label(COLOR_CORRECTION_INFO).classes("text-xs q-pa-sm").style("max-width: 280px")
     return AdvancedCard(
         steps, cfg, negative_prompt, denoise, sampler_name, scheduler, rescale_mode, color_correction, match_detail
     )

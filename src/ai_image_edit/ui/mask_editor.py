@@ -8,7 +8,7 @@ from nicegui import ui
 from ai_image_edit.core.paths import to_url
 from ai_image_edit.core.types import ANNOTATION_COLORS, FEATHER_RANGE
 from ai_image_edit.ui.assets import DEFAULT_BRUSH_SIZE, DEFAULT_FEATHER_AMOUNT
-from ai_image_edit.ui.components import PLACEHOLDER_TEXT, attach_file_picker, call_js, create_image_frame, init_widget, save_data_url
+from ai_image_edit.ui.components import GROUP_CLASSES, PLACEHOLDER_TEXT, attach_file_picker, call_js, create_image_frame, init_widget, save_data_url
 
 
 class EditorInputs(NamedTuple):
@@ -99,7 +99,7 @@ async def create_mask_editor(
     mask_radio = brush_slider = feather_slider = None
 
     if supports_mask or num_annotation_colors > 0:
-        with ui.column().classes("w-full gap-1 p-2 bg-neutral-900 rounded-lg"):
+        with ui.column().classes(GROUP_CLASSES):
             # One q-radio per row (ui.radio is a single vertical option list and
             # cannot hold the sliders), all showing the same current mode.
             zoom_radio = ui.element("q-radio").props('val=zoom model-value=zoom label="Pinch to zoom"')
