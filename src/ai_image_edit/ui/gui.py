@@ -140,7 +140,7 @@ def build_advanced_card(caps: ModelCapabilities) -> AdvancedCard:
     with ui.card().classes(CARD_CLASSES):
         with ui.expansion("Advanced settings").props("dense").classes("w-full"):
             with ui.column().classes(GROUP_CLASSES + " p-6"):
-                ui.label("Generation").classes("text-sm text-weight-bold").style(f"color: {PRIMARY_COLOR}")
+                ui.label("Generation").classes("text-sm text-weight-bold q-mb-xs").style(f"color: {PRIMARY_COLOR}")
                 with ui.column().classes("w-full gap-0"):
                     ui.label("Inference steps").classes("text-xs text-gray-400")
                     steps = create_value_slider(caps.step_range)
@@ -170,7 +170,7 @@ def build_advanced_card(caps: ModelCapabilities) -> AdvancedCard:
                     scheduler = ui.select(caps.scheduler_choices, value=default_choice(caps.default_scheduler, caps.scheduler_choices), label="Scheduler").props("outlined dark").classes("w-full")
 
             with ui.column().classes(GROUP_CLASSES + " p-6"):
-                ui.label("Postprocessing").classes("text-sm text-weight-bold").style(f"color: {PRIMARY_COLOR}")
+                ui.label("Postprocessing").classes("text-sm text-weight-bold q-mb-xs").style(f"color: {PRIMARY_COLOR}")
                 with ui.row().classes("w-full items-center no-wrap"):
                     rescale_mode = ui.select(
                         RESCALE_MODE_OPTIONS, value=DEFAULT_RESCALE_MODE.value, label="Masked edits"
