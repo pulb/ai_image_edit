@@ -35,7 +35,7 @@ the bf16 diffusion model, text encoder and VAE.
 - **Variants:** `int8`, which uses less memory.
 - **Steps:** 8 to 60, 40 by default. The official pipeline uses 40 to 50 steps
   with the euler sampler; ComfyUI's own template defaults to 25.
-- **LoRA:** the official Turbo LoRA (`Turbo`, from the same repository) is
+- **LoRA:** the official Turbo LoRA (listed as `8-Step Turbo`, from the same repository) is
   downloaded with the model and can be applied from the reference images section
   (strength 1 by default). It makes the model work like `qwen_image21_turbo`:
   set the steps to 8 and keep CFG at 1.

@@ -60,7 +60,7 @@
     "loras": {
       "dir": "models/loras",
       "files": [
-        {"dir": "Turbo", "name": "qwen_image_2.1_turbo_lora_avg_rank_178_bf16.safetensors", "license": "qwen-research",
+        {"dir": "8-Step Turbo", "name": "qwen_image_2.1_turbo_lora_avg_rank_178_bf16.safetensors", "license": "qwen-research",
          "sha256": "208dd43250e1e01467ba190572ae2e7107a7870ec1ff026bc65f791fa1e80e95",
          "url": "https://huggingface.co/Comfy-Org/Qwen-Image-2.1/resolve/main/loras/qwen_image_2.1_turbo_lora_avg_rank_178_bf16.safetensors?download=true"}
       ],
