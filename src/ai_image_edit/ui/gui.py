@@ -36,6 +36,7 @@ from ai_image_edit.ui.helpers import (
 )
 from ai_image_edit.ui.login import install_password_login
 from ai_image_edit.ui.mask_editor import create_mask_editor
+from ai_image_edit.version import VERSION
 from ai_image_edit.workflow_model import WorkflowModel
 
 
@@ -87,6 +88,7 @@ class Header:
 def build_header(model: WorkflowModel) -> Header:
     ui.label("AI Image Edit").classes("text-2xl font-bold text-white w-full text-center")
     with ui.column().classes("w-full gap-0 items-center q-mb-md"):
+        ui.label(f"Version {VERSION}").classes("text-xs w-full text-center text-gray-400")
         ui.label(f"Model: {model.display_name}").classes("text-sm w-full text-center").style(f"color: {PRIMARY_COLOR}")
         # The same width as the cards below (aie-page).
         with ui.column().classes("w-full gap-0 aie-page"):

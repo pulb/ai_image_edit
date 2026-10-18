@@ -6,7 +6,9 @@ repository, no network):
 
     PYTHONPATH=src python -m unittest discover -s tests -v
 """
+import contextlib
 import copy
+import io
 import os
 import subprocess
 import sys
@@ -73,6 +75,20 @@ class SelectionTests(unittest.TestCase):
         self.assertNotIn("hunter2", printed)
         self.assertNotIn("hf_secret", printed)
 
+    def test_startup_prints_the_version(self):
+        with mock.patch("builtins.print") as out, mock.patch.object(app, "VERSION", "9.8.7"):
+            app.main([])
+        printed = "\n".join(str(call.args[0]) for call in out.call_args_list if call.args)
+        self.assertRegex(printed, r"version:\s+9\.8\.7")
+
+    def test_version_option_prints_the_version_and_exits(self):
+        out = io.StringIO()
+        with mock.patch.object(app, "VERSION", "9.8.7"), contextlib.redirect_stdout(out):
+            with self.assertRaises(SystemExit) as raised:
+                app.parse_args(["--version"])
+        self.assertEqual(raised.exception.code, 0)
+        self.assertEqual(out.getvalue().strip(), "ai-image-edit 9.8.7")
+
     def test_list_workflows(self):
         with mock.patch("builtins.print") as out:
             app.main(["--list-workflows"])
@@ -90,6 +106,21 @@ class SelectionTests(unittest.TestCase):
             with self.assertRaisesRegex(SystemExit, str(error)):
                 app.main([])
         self.run.assert_not_called()
+
+
+class VersionTests(unittest.TestCase):
+    def test_installed_version_is_the_package_metadata(self):
+        from ai_image_edit import version
+
+        with mock.patch.object(version.metadata, "version", return_value="1.2.3") as lookup:
+            self.assertEqual(version.installed_version(), "1.2.3")
+        lookup.assert_called_once_with("ai-image-edit")
+
+    def test_version_is_unknown_without_the_package(self):
+        from ai_image_edit import version
+
+        with mock.patch.object(version.metadata, "version", side_effect=version.metadata.PackageNotFoundError):
+            self.assertEqual(version.installed_version(), "unknown")
 
 
 class GetModelTests(unittest.TestCase):

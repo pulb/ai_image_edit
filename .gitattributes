@@ -1,0 +1,3 @@
+# Lets git fill in .git_archival.txt when it builds an archive (GitHub's
+# "Download ZIP" included), so the version can be found without a .git folder.
+.git_archival.txt export-subst

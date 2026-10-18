@@ -46,7 +46,7 @@ Rules for any AI coding agent working in this repository.
 - **Package layout**: the app is the `ai_image_edit` package under
   `src/`: `app.py` (entry point), `workflow_model.py` (the model),
   `workflows.py` (finding, reading and schema-checking workflow files),
-  `sizes.py` (output-size policies), `comfy/` (client, downloads, custom
+  `sizes.py` (output-size policies), `version.py` (the version setuptools-scm derives from the git tags), `comfy/` (client, downloads, custom
   nodes, GPU arguments), `ui/` (the NiceGUI UI: `gui.py` is the page, built from one function per section, with `login.py`,
   `components.py`, `mask_editor.py` and `compare_slider.py`; its CSS and JS are
   in `ui/static/`) and `core/` (types, imaging, paths, result cache). It is started with `ai-image-edit`.
