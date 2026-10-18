@@ -60,7 +60,7 @@ def install_password_login(password: str) -> str:
         apply_dark_theme()
         with ui.card().classes("absolute-center items-stretch"):
             ui.image(LOGO_URI).props("width=512px ratio=1").classes("self-center").style("max-width: 80vw")
-            field = ui.input("Password", password=True, password_toggle_button=True).props("autofocus")
+            field = ui.input("Password", password=True, password_toggle_button=True).props("outlined dark autofocus")
             field.on("keydown.enter", try_login)
             ui.button("Log in", on_click=try_login)
         return None

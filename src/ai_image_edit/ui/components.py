@@ -66,7 +66,7 @@ async def init_widget(ns: str, widget_id: str, label: str) -> None:
         print(f"[{label}] {ns}.init('{widget_id}') timed out — the widget may not respond until the page is reloaded.", flush=True)
 
 
-GROUP_CLASSES = "w-full gap-1 p-2 bg-neutral-800 rounded-lg"
+GROUP_CLASSES = "w-full gap-3 p-4 bg-neutral-800 rounded-lg"
 """A box that groups controls on a card, a shade brighter than the card."""
 
 
