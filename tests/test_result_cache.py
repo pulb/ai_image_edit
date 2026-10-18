@@ -42,7 +42,7 @@ class CacheKeyTest(unittest.TestCase):
 
     def test_what_happens_after_inference_does_not_change_the_key(self):
         self.run_with(self.params())
-        self.run_with(self.params(rescale_mode=RescaleMode.EDIT, feather_amount=9, apply_color_correction_enabled=True))
+        self.run_with(self.params(rescale_mode=RescaleMode.EDIT, feather_amount=9, apply_color_correction_enabled=True, match_detail_enabled=False))
         self.assertEqual(self.calls, 1)
 
     def test_an_inference_setting_changes_the_key(self):

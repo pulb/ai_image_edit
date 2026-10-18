@@ -58,7 +58,7 @@ _cache = _LastResult()
 # inference, and the raw seed settings (the resolved seed is passed in instead).
 _NOT_KEYED = frozenset({
     "source_image_path", "annotated_image_path", "mask_path", "reference_images",
-    "feather_amount", "apply_color_correction_enabled", "rescale_mode", "seed", "randomize_seed",
+    "feather_amount", "apply_color_correction_enabled", "match_detail_enabled", "rescale_mode", "seed", "randomize_seed",
 })
 
 

@@ -466,8 +466,10 @@ class DetailMatchTest(unittest.TestCase):
                 paths.append(str(Path(tmp) / f"{name}.png"))
                 img.save(paths[-1])
             out = Image.open(imaging.composite_with_soft_transition(*paths, 0, RescaleMode.EDIT)).convert("RGB")
+            plain = Image.open(imaging.composite_with_soft_transition(*paths, 0, RescaleMode.EDIT, match_detail=False)).convert("RGB")
         edited = out.crop((140, 140, 260, 260))
         self.assertGreater(imaging._noise_level(edited), 1.5)  # a flat patch would be 0
+        self.assertEqual(imaging._noise_level(plain.crop((140, 140, 260, 260))), 0)  # switched off
 
 
 class ModelShiftTest(unittest.TestCase):

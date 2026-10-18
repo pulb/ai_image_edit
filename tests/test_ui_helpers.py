@@ -70,6 +70,10 @@ class RescaleModeParamTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.params(rescale_mode="huge")
 
+    def test_detail_matching_is_on_unless_switched_off(self):
+        self.assertTrue(self.params().match_detail_enabled)
+        self.assertFalse(self.params(match_detail=False).match_detail_enabled)
+
     def test_ignored_without_inpainting(self):
         self.assertIs(self.params(inpainting=False, rescale_mode="original").rescale_mode, RescaleMode.EDIT)
 

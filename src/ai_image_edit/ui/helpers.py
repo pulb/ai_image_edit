@@ -79,6 +79,7 @@ def params_from_ui(
     apply_color_correction: bool,
     feather_amount: Optional[int] = None,
     rescale_mode: Optional[str] = None,
+    match_detail: bool = True,
 ) -> GenerationParams:
     """
     Builds the GenerationParams for one generation. A control the model
@@ -108,6 +109,7 @@ def params_from_ui(
         lora_files=lora_files if caps.supports_loras else [],
         lora_strength=lora_strength if caps.supports_loras and lora_strength is not None else caps.lora_strength_range.default,
         apply_color_correction_enabled=bool(apply_color_correction),
+        match_detail_enabled=bool(match_detail),
         feather_amount=int(feather_amount) if caps.supports_inpainting and feather_amount is not None else 0,
         rescale_mode=RescaleMode(rescale_mode) if caps.supports_inpainting and rescale_mode is not None else DEFAULT_RESCALE_MODE,
     )

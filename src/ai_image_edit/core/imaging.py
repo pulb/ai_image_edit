@@ -807,7 +807,9 @@ def _match_detail(patch: Image.Image, orig: Image.Image, box: Tuple[int, int, in
     return Image.fromarray(np.clip(np.rint(grainy), 0, 255).astype(np.uint8), mode="RGB")
 
 
-def _composite_at_original_size(orig: Image.Image, gen: Image.Image, mask: Image.Image, feather_amount: int) -> Optional[Image.Image]:
+def _composite_at_original_size(
+    orig: Image.Image, gen: Image.Image, mask: Image.Image, feather_amount: int, match_detail: bool = True
+) -> Optional[Image.Image]:
     """
     The original with the blended region resampled from the generated image;
     None if nothing is masked. The original's other pixels are not touched.
@@ -875,7 +877,8 @@ def _composite_at_original_size(orig: Image.Image, gen: Image.Image, mask: Image
             Image.Resampling.LANCZOS,
             box=(src[0] - x0, src[1] - y0, src[2] - x0, src[3] - y0),
         )
-    gen_crop = _match_detail(gen_crop, orig, box, patch_size[0] / (src[2] - src[0]))
+    if match_detail:
+        gen_crop = _match_detail(gen_crop, orig, box, patch_size[0] / (src[2] - src[0]))
 
     blended = _blend(gen_crop, orig.crop(box), mask.crop(box), feather_amount / scale_x)
     orig.paste(blended, box[:2])
@@ -888,6 +891,7 @@ def composite_with_soft_transition(
     mask_img_path: Optional[str],
     feather_amount: int,
     rescale_mode: RescaleMode = DEFAULT_RESCALE_MODE,
+    match_detail: bool = True,
 ) -> str:
     """
     Color-matches the generated image to the original where its colours
@@ -903,7 +907,8 @@ def composite_with_soft_transition(
 
     RescaleMode.EDIT: the result has the original's size and keeps all its
     pixels outside the blended region; the generated image is resampled into
-    that region, with the feather scaled to match.
+    that region, with the feather scaled to match. If the area had to be
+    enlarged, match_detail sharpens it and adds grain to fit the original.
     """
     if not mask_img_path:
         return gen_img_path
@@ -913,8 +918,10 @@ def composite_with_soft_transition(
         orig = orig_file.convert("RGB")
         mask = mask_file.getchannel('A') if mask_file.mode == 'RGBA' else mask_file.convert("L")
 
-    composite = _composite_at_original_size if rescale_mode == RescaleMode.EDIT else _composite_at_generated_size
-    result = composite(orig, gen, mask, feather_amount)
+    if rescale_mode == RescaleMode.EDIT:
+        result = _composite_at_original_size(orig, gen, mask, feather_amount, match_detail)
+    else:
+        result = _composite_at_generated_size(orig, gen, mask, feather_amount)
     if result is None:
         return gen_img_path
 
@@ -1182,6 +1189,7 @@ def run_generation(
     annotated_image_path: Optional[str] = None,
     rescale_mode: RescaleMode = DEFAULT_RESCALE_MODE,
     input_size: Optional[Tuple[int, int]] = None,
+    match_detail: bool = True,
 ) -> str:
     """
     Orchestrates the crop -> infer -> align -> composite/color-correct sequence
@@ -1198,7 +1206,7 @@ def run_generation(
     - If mask_path is set, the result is lined up with the model's input
       (align_to_input) and composited back into the untouched original via
       composite_with_soft_transition, feathered by feather_amount, as
-      rescale_mode selects.
+      rescale_mode selects, and sharpened and grained if match_detail.
     - Otherwise the raw result is returned as-is, or color-corrected as a
       whole if apply_color_correction_enabled is True and it shows the
       input's framing (with a mask that flag has no effect:
@@ -1223,7 +1231,9 @@ def run_generation(
     if mask_path:
         # Pasted back onto the original, so lined up with the model's input first.
         output_path = align_to_input(model_input_path, output_path, mask_path)
-        return composite_with_soft_transition(source_image_path, output_path, mask_path, feather_amount, rescale_mode)
+        return composite_with_soft_transition(
+            source_image_path, output_path, mask_path, feather_amount, rescale_mode, match_detail
+        )
     if apply_color_correction_enabled:
         # The output shows the input's framing when it has the input's size:
         # the source fitted to it, or a source already that size. Otherwise it

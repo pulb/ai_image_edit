@@ -580,6 +580,7 @@ class WorkflowModel:
             params.annotated_image_path,
             params.rescale_mode,
             input_size=size.input_size,
+            match_detail=params.match_detail_enabled,
         )
         return GenerationResult(before_path=params.source_image_path, after_path=final_output_path, actual_seed=seed)
 

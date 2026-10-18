@@ -50,6 +50,13 @@ COLOR_CORRECTION_INFO = (
     "With a mask, this switch has no effect: the edited area's colors are always matched to your photo."
 )
 
+MATCH_DETAIL_INFO = (
+    "Applies to edits with a mask, when the edited area is kept at your original's size and had to be "
+    "enlarged. The enlarged area looks softer and smoother than the rest of your photo; this sharpens it "
+    "a little and adds fine grain to match your photo's own. The more it was enlarged, the stronger the "
+    "effect. Turn it off to keep the area exactly as the model made it."
+)
+
 RESCALE_MODE_INFO_INTRO = "Applies to edits with a mask."
 # Per RescaleMode value; the heading is the option's label in RESCALE_MODE_OPTIONS.
 RESCALE_MODE_INFO = {
@@ -126,11 +133,13 @@ class AdvancedCard:
     scheduler: Optional[ui.select]
     rescale_mode: ui.select
     color_correction: ui.switch
+    match_detail: ui.switch
 
 
 def build_advanced_card(caps: ModelCapabilities) -> AdvancedCard:
     with ui.card().classes(CARD_CLASSES):
         with ui.expansion("Advanced settings").props("dense").classes("w-full"):
+            ui.label("Generation").classes("text-sm text-weight-bold").style(f"color: {PRIMARY_COLOR}")
             sr = caps.step_range
             ui.label("Inference steps").classes("text-xs text-gray-400")
             steps = create_value_slider(sr)
@@ -159,6 +168,8 @@ def build_advanced_card(caps: ModelCapabilities) -> AdvancedCard:
             if caps.scheduler_choices:
                 scheduler = ui.select(caps.scheduler_choices, value=default_choice(caps.default_scheduler, caps.scheduler_choices), label="Scheduler").props("outlined dark").classes("w-full")
 
+            ui.separator().classes("q-mt-md")
+            ui.label("Postprocessing").classes("text-sm text-weight-bold q-mt-sm").style(f"color: {PRIMARY_COLOR}")
             with ui.row().classes("w-full items-center no-wrap q-mt-sm"):
                 rescale_mode = ui.select(
                     RESCALE_MODE_OPTIONS, value=DEFAULT_RESCALE_MODE.value, label="Masked edits"
@@ -177,7 +188,15 @@ def build_advanced_card(caps: ModelCapabilities) -> AdvancedCard:
                 with ui.button(icon="info").props("flat round dense size=sm").classes("text-gray-400"):
                     with ui.menu():
                         ui.label(COLOR_CORRECTION_INFO).classes("text-xs q-pa-sm").style("max-width: 280px")
-    return AdvancedCard(steps, cfg, negative_prompt, denoise, sampler_name, scheduler, rescale_mode, color_correction)
+
+            with ui.row().classes("items-center no-wrap"):
+                match_detail = ui.switch("Match sharpness and grain", value=True)
+                with ui.button(icon="info").props("flat round dense size=sm").classes("text-gray-400"):
+                    with ui.menu():
+                        ui.label(MATCH_DETAIL_INFO).classes("text-xs q-pa-sm").style("max-width: 280px")
+    return AdvancedCard(
+        steps, cfg, negative_prompt, denoise, sampler_name, scheduler, rescale_mode, color_correction, match_detail
+    )
 
 
 @dataclass
@@ -444,6 +463,7 @@ def run(model: WorkflowModel) -> None:
                     apply_color_correction=advanced.color_correction.value,
                     feather_amount=editor_inputs.feather_amount,
                     rescale_mode=advanced.rescale_mode.value,
+                    match_detail=advanced.match_detail.value,
                 )
                 result = await nicegui_run.io_bound(model.generate, params)
                 # The input image (which may be an older result that was used as

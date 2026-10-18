@@ -159,6 +159,7 @@ class GenerationParams:
 
     apply_color_correction_enabled: bool = False
     feather_amount: int = int(FEATHER_RANGE.default)
+    match_detail_enabled: bool = True
 
     # Masked edits only.
     rescale_mode: RescaleMode = DEFAULT_RESCALE_MODE
