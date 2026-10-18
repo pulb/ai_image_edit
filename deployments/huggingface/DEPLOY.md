@@ -7,8 +7,8 @@ ComfyUI process, which needs a regular GPU. The UI is served on port `7860`.
 ## Space setup
 
 1. Create a Space with the **Docker** SDK and pick a GPU under
-   **Settings → Space hardware**: at least 48 GB of VRAM for `qwen_image21`,
-   at least 16 GB for `qwen_image21_gguf`.
+   **Settings → Space hardware**: at least 48 GB of VRAM for `qwen_image21` and `qwen_image21_turbo`,
+   at least 16 GB for the GGUF workflows.
 2. Copy the contents of [`space/`](space/) into the root of the Space repo: the
    `README.md` card (`sdk: docker`, `app_port: 7860`) and the `Dockerfile`, which
    is a symlink to [`../docker/Dockerfile`](../docker/Dockerfile). Copy the

@@ -48,8 +48,8 @@ Rules for any AI coding agent working in this repository.
   `workflows.py` (finding, reading and schema-checking workflow files),
   `sizes.py` (output-size policies), `version.py` (the version setuptools-scm derives from the git tags), `comfy/` (client, downloads, custom
   nodes, GPU arguments), `ui/` (the NiceGUI UI: `gui.py` is the page, built from one function per section, with `login.py`,
-  `components.py`, `mask_editor.py` and `compare_slider.py`; its CSS and JS are
-  in `ui/static/`) and `core/` (types, imaging, paths, result cache). It is started with `ai-image-edit`.
+  `components.py`, `helpers.py`, `assets.py`, `mask_editor.py` and `compare_slider.py`; its CSS and JS are
+  in `ui/static/`) and `core/` (types, errors, imaging, paths, result cache). It is started with `ai-image-edit`.
   Imports are absolute (`from ai_image_edit.core import …`). Dependencies
   live in `pyproject.toml`: everything the app needs (including NiceGUI and
   the ComfyUI client) is a regular dependency.
@@ -59,7 +59,7 @@ Rules for any AI coding agent working in this repository.
   argument — no shared mutable module state. The UI shows `model.display_name`.
 - **Model contract**: the UI uses a `WorkflowModel` (`workflow_model.py`):
   `capabilities`, `start()`, `generate()`, `setup_progress()`, `shutdown()`,
-  `list_loras()`, `model_name`, `model_version` and `display_name`.
+  `list_loras()`, `resolution_for_source()`, `model_name`, `model_version` and `display_name`.
   `get_model()` in the same module finds a workflow file by bundled name or
   by path.
 - **Qwen-licensed code**: no code under the Qwen Research License lives in
@@ -82,7 +82,9 @@ Rules for any AI coding agent working in this repository.
   is handled externally via `core/imaging.py`'s `run_generation()`,
   shared by every model that supports inpainting. It measures how far the
   model moved its input's content around the mask and undoes a plausible
-  shift and stretch before compositing (`align_to_input()`). A model does
+  shift and stretch before compositing (`align_to_input()`). An edited area
+  that had to be enlarged is sharpened and given the original's grain
+  (`_match_detail()`), which a switch in the UI turns off. A model does
   not need its own mask-blending logic; it only needs to accept a
   (possibly cropped) source path and hand back a result path.
 - **Working directory**: generated/uploaded/composited files live under

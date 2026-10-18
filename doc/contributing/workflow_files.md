@@ -53,8 +53,8 @@ itself (a wrong node class or input name): only running it in ComfyUI does.
 ## Downloads
 
 When the app starts a model, every file in `files` that is not in its folder yet is downloaded
-in the background; ComfyUI is launched when the last one is complete, and generating meanwhile
-fails with a message that says what is being downloaded. Custom nodes are installed after the downloads, before ComfyUI launches. A failed download or
+in the background; ComfyUI is launched when the last one is complete, and until then the Generate button
+stays off while the page says what is being downloaded. Custom nodes are installed after the downloads, before ComfyUI launches. A failed download or
 install is reported the same way and retried on the next start.
 
 - Files are fetched to `<name>.part` in 64 MB pieces, 8 at a time (`DOWNLOAD_CONNECTIONS`, at

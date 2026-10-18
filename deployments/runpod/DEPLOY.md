@@ -11,7 +11,9 @@ your own (see [Pod setup](#pod-setup)).
 | Model workflow (`MODEL_WORKFLOW`) | Weights |
 |---|---|
 | `qwen_image21` (default) | downloaded on first start |
+| `qwen_image21_turbo` | downloaded on first start |
 | `qwen_image21_gguf` | downloaded on first start |
+| `qwen_image21_turbo_gguf` | downloaded on first start |
 | `qwen_image_edit_2511_aio` | downloaded on first start |
 
 Environment variables, including the ComfyUI arguments for each GPU size, are
@@ -25,8 +27,8 @@ the image.
    `ghcr.io/pulb/ai_image_edit:latest`. The default is `qwen_image21`; select another with
    `MODEL_WORKFLOW`. Accept the weights' license with `ACCEPT_LICENSES=qwen-research` (for the
    Qwen-Image-2.1 models). Choose one of the GPUs the template recommends
-   that has enough memory: at least 48 GB of VRAM for `qwen_image21`, at least
-   16 GB for `qwen_image21_gguf`.
+   that has enough memory: at least 48 GB of VRAM for `qwen_image21` and `qwen_image21_turbo`, at least
+   16 GB for the GGUF workflows.
 2. Optional: attach a network volume (a Pod mounts it at `/workspace`) so the
    multi-GB weights download once instead of on every fresh container. Mount it at `/home/user/app/models` if the Pod lets you choose the
    mount path (otherwise the weights are stored on the Pod's disk).

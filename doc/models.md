@@ -15,6 +15,7 @@ Python; see [workflow files](contributing/workflow_files.md) for the format and
 |---|---|
 | `--workflow NAME_OR_FILE` / `MODEL_WORKFLOW` | The bundled workflow to run (default `qwen_image21`), or the path of a workflow file of your own. `--list-workflows` prints the bundled names. |
 | `--variant ID` / `MODEL_VARIANT` | One of the workflow's variants, e.g. another quantization. |
+| `--version` | Prints the app's version and exits. |
 | `ACCEPT_LICENSES` | Licenses you accept, comma-separated (`all` for every one). Files with a license are not downloaded without it. |
 
 The deployment guides ([Docker](../deployments/docker/DEPLOY.md),
@@ -36,7 +37,7 @@ the bf16 diffusion model, text encoder and VAE.
 - **Steps:** 8 to 60, 40 by default. The official pipeline uses 40 to 50 steps
   with the euler sampler; ComfyUI's own template defaults to 25.
 - **LoRA:** the official Turbo LoRA (listed as `8-Step Turbo`, from the same repository) is
-  downloaded with the model and can be applied from the reference images section
+  downloaded with the model and can be applied from the LoRAs section
   (strength 1 by default). It makes the model work like `qwen_image21_turbo`:
   set the steps to 8 and keep CFG at 1.
 - **License:** the weights are under the
@@ -103,6 +104,22 @@ the UI.
   supports a LoRA strength setting.
 - **License:** the weights and LoRAs come from third parties; check the licenses
   of the linked repositories before use.
+
+## Postprocessing
+
+The **Postprocessing** box in the page's Advanced settings controls what happens
+to a result after the model has produced it. It applies to every workflow.
+
+| Setting | Applies to | Meaning |
+|---|---|---|
+| Masked edits | Edits with a mask | **Rescale edited area to original size** (default): the result keeps your original's size and every pixel outside the edited area; only the edited area is taken from the generated image, scaled to fit. **Rescale original to generated size**: your original is scaled to the size the model generated at, and the result has that size. |
+| Match sharpness and grain | Edits with a mask, in the default mode | On by default. When the edited area had to be enlarged, it looks softer and smoother than the rest of the photo; this sharpens it a little and adds fine grain to match the photo's own. The more it was enlarged, the stronger the effect. Off keeps the area exactly as the model made it. |
+| Apply color corrections | Edits without a mask | Off by default. If the model shifts the colors of the whole picture, so the result looks duller, darker or tinted next to your photo, this evens the shift out, while what you asked to change keeps its new colors. Small shifts that don't show are left alone, a color change you asked for across the whole picture may be toned down, and when nearly all colors changed, nothing is corrected. It only works when the result keeps your photo's aspect ratio. |
+
+With a mask, the edited area's colors are always matched to your photo,
+whatever the color correction switch says. These settings act after inference,
+so changing them does not run the model again for a request it has already
+generated.
 
 ## Downloads and custom nodes
 
