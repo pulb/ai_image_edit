@@ -152,6 +152,20 @@
     display: none;
 }
 
+/* The generation's progress, centered over the result image. */
+.aie-progress-overlay {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 4;
+    width: 70% !important;
+    padding: 12px 16px;
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.7);
+    pointer-events: none;
+}
+
 .ais-range {
     position: absolute;
     left: 8px;

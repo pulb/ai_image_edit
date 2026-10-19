@@ -75,6 +75,10 @@ class StatusLine:
     def __init__(self, classes: str = "") -> None:
         with ui.column().classes(f"w-full gap-1 items-center {classes}") as self.box:
             self.label = ui.label().classes("text-xs w-full text-center text-gray-400")
+            # Two bars, one moving and one filling, rather than one switched
+            # between the two: Quasar draws a moving bar's fill at full width,
+            # so a switched bar would shrink back from there to its value.
+            self.moving_bar = ui.linear_progress(show_value=False, size="4px").props("rounded indeterminate").classes("w-full")
             self.bar = ui.linear_progress(value=0, show_value=False, size="4px").props("rounded").classes("w-full")
         self.box.set_visibility(False)
 
@@ -83,20 +87,21 @@ class StatusLine:
         self.box.set_visibility(True)
         self.label.set_text(text)
         self.label.classes(add="text-negative" if error else "text-gray-400", remove="text-gray-400" if error else "text-negative")
-        self.bar.set_visibility(bar)
-        if fraction is None:
-            if "indeterminate" not in self.bar.props:
-                # Emptied while it is hidden by the animation, so a bar that fills
-                # next starts from 0 instead of shrinking back from an old value.
-                self.bar.set_value(0)
-                self.bar.props("indeterminate")
-        else:
-            self.bar.set_value(fraction)  # before the switch, so the bar never shows an old value
-            if "indeterminate" in self.bar.props:
-                self.bar.props(remove="indeterminate")
+        self.moving_bar.set_visibility(bar and fraction is None)
+        self.bar.set_visibility(bar and fraction is not None)
+        # Emptied while hidden, so the next time it shows it fills from 0.
+        self.bar.set_value(0 if fraction is None else fraction)
 
     def hide(self) -> None:
         self.box.set_visibility(False)
+        self.bar.set_value(0)
+
+
+class GenerationProgressOverlay(StatusLine):
+    """The progress of a generation, on a dark panel centered over the result image (create it inside that frame)."""
+
+    def __init__(self) -> None:
+        super().__init__("aie-progress-overlay")
 
 
 GROUP_CLASSES = "w-full gap-3 bg-[#1f1f1f] rounded-lg"
@@ -246,7 +251,7 @@ class SliderPopup:
 
     def __init__(self, icon: str, label: str, spec: RangeSpec, *, js_on_value: str = "") -> None:
         value_id = f"aie_slider_value_{uuid.uuid4().hex}"
-        self.button = ui.button(icon=icon).props("flat dense no-caps size=md")
+        self.button = ui.button(icon=icon).props("flat dense no-caps no-wrap size=md")
         with self.button:
             ui.html(f'<span id="{value_id}" class="q-ml-xs">{spec.default:g}</span>', sanitize=False)
             with ui.menu().props("anchor='bottom middle' self='top middle'"):

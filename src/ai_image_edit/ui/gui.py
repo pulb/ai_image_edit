@@ -27,7 +27,7 @@ from ai_image_edit.core.types import (
 )
 from ai_image_edit.ui.assets import CLIENT_JS, WIDGET_CSS
 from ai_image_edit.ui.compare_slider import create_compare_slider
-from ai_image_edit.ui.components import GROUP_CLASSES, StatusLine, apply_dark_theme, create_simple_image_upload, create_value_slider
+from ai_image_edit.ui.components import GROUP_CLASSES, GenerationProgressOverlay, StatusLine, apply_dark_theme, create_simple_image_upload, create_value_slider
 from ai_image_edit.ui.helpers import (
     HOST,
     RESCALE_MODE_OPTIONS,
@@ -212,11 +212,14 @@ class ResultCard:
     compare_switch: ui.switch
     use_as_input_btn: ui.button
     download_btn: ui.button
+    progress: GenerationProgressOverlay
 
 
 async def build_result_card() -> ResultCard:
     with ui.card().classes(CARD_CLASSES):
-        set_result_images, set_compare, reset_result, get_result_after_path = await create_compare_slider()
+        set_result_images, set_compare, reset_result, get_result_after_path, frame = await create_compare_slider()
+        with frame:
+            progress = GenerationProgressOverlay()
 
         with ui.row().classes("w-full items-center no-wrap gap-0"):
             compare_switch = ui.switch("Compare input / output", value=False)
@@ -242,7 +245,7 @@ async def build_result_card() -> ResultCard:
         compare_switch.on_value_change(on_compare_change)
     return ResultCard(
         set_result_images, set_compare, reset_result, get_result_after_path,
-        compare_switch, use_as_input_btn, download_btn,
+        compare_switch, use_as_input_btn, download_btn, progress,
     )
 
 
@@ -421,7 +424,6 @@ def run(model: WorkflowModel) -> None:
             advanced = build_advanced_card(caps)
             result_card = await build_result_card()
 
-            generation_status = StatusLine()  # shown while a generation runs, above the button so it is in view
             generate_btn = ui.button("Generate").props("color=primary unelevated").classes("w-full")
 
         # The running generation's latest progress. generate() reports it on a
@@ -437,7 +439,7 @@ def run(model: WorkflowModel) -> None:
         def refresh_progress() -> None:
             progress = progress_state["progress"]
             cancelling = running["cancel"] is not None and running["cancel"].is_set()
-            generation_status.show(
+            result_card.progress.show(
                 describe_progress(progress, time.monotonic() - progress_state["started"], cancelling),
                 None if cancelling else progress_fraction(progress),
             )
@@ -521,7 +523,7 @@ def run(model: WorkflowModel) -> None:
             finally:
                 running["cancel"] = None
                 progress_timer.deactivate()
-                generation_status.hide()
+                result_card.progress.hide()
                 generate_btn.set_text("Generate")
                 generate_btn.props("color=primary")
                 setup = model.setup_progress()

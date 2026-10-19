@@ -14,6 +14,7 @@ async def create_compare_slider() -> Tuple[
     Callable[[bool], Awaitable[None]],
     Callable[[], Awaitable[None]],
     Callable[[], Awaitable[Optional[str]]],
+    ui.element,
 ]:
     """
     The result panel: a before/after image pair with a CSS clip-path
@@ -26,11 +27,12 @@ async def create_compare_slider() -> Tuple[
     result" — get_after_path() reads the browser's current after-image URL
     back and resolves it to its local WORK_DIR path.
 
-    Returns (set_images, set_compare, reset, get_after_path), all async.
+    Returns (set_images, set_compare, reset, get_after_path), all async, and
+    the image frame, for overlays.
     """
     slider_id = f"cmp_{uuid.uuid4().hex}"
 
-    with ui.element("div").classes("ais-container"):
+    with ui.element("div").classes("ais-container") as frame:
         ui.html(
             f'<div id="{slider_id}_zoomwrap" class="ais-zoomwrap">'
             f'<img id="{slider_id}_after" class="ais-after">'
@@ -78,4 +80,4 @@ async def create_compare_slider() -> Tuple[
         url = await call_js("AIS", "getAfterUrl", slider_id)
         return from_url(url) if url else None
 
-    return set_images, set_compare, reset, get_after_path
+    return set_images, set_compare, reset, get_after_path, frame

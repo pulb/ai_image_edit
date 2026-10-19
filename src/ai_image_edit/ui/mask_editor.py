@@ -149,7 +149,7 @@ async def create_mask_editor(
                         )
 
                     stroke_popup = SliderPopup(
-                        "line_weight", "Stroke width", RangeSpec(1, MAX_BRUSH_SIZE, ANNOTATION_STROKE),
+                        "brush", "Stroke width", RangeSpec(1, MAX_BRUSH_SIZE, ANNOTATION_STROKE),
                         js_on_value=f"AIE.setAnnotationStroke('{editor_id}', value); AIE.showBrushPreview('{editor_id}', value);",
                     )
                     stroke_popup.slider.on("change", js_handler=f"() => AIE.hideBrushPreview('{editor_id}')")
