@@ -105,7 +105,7 @@ async def create_mask_editor(
             zoom_radio = ui.element("q-radio").props('val=zoom model-value=zoom label="Pinch to zoom"')
 
             if supports_mask:
-                with ui.row().classes("w-full items-center gap-2 no-wrap"):
+                with ui.row().classes("w-full items-center gap-3 no-wrap"):
                     mask_radio = ui.element("q-radio").props('val=mask model-value=zoom label="Mask"')
 
                     # The brush size and feather are only used in the browser, so their
@@ -131,7 +131,7 @@ async def create_mask_editor(
 
             annotate_radio = None
             if num_annotation_colors > 0:
-                with ui.row().classes("w-full items-center gap-2 no-wrap"):
+                with ui.row().classes("w-full items-center gap-3 no-wrap"):
                     annotate_radio = ui.element("q-radio").props('val=annotate model-value=zoom label="Annotate"')
 
                     async def select_color(color: str) -> None:
