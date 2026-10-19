@@ -456,7 +456,6 @@ def run(model: WorkflowModel) -> None:
         async def do_generate() -> None:
             running["cancel"] = threading.Event()
             generate_btn.set_text("Cancel")
-            generate_btn.props("color=grey-8")
             result_card.compare_switch.disable()
             result_card.use_as_input_btn.disable()
             result_card.download_btn.disable()
@@ -525,7 +524,6 @@ def run(model: WorkflowModel) -> None:
                 progress_timer.deactivate()
                 result_card.progress.hide()
                 generate_btn.set_text("Generate")
-                generate_btn.props("color=primary")
                 setup = model.setup_progress()
                 generate_btn.set_enabled(setup.done and not setup.error)
 
