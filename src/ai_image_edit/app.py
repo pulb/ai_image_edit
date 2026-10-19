@@ -46,7 +46,7 @@ def describe_config(model: WorkflowModel, workflow: str, variant: Optional[str])
         ("model", model.display_name),
         ("work directory", f"{paths.WORK_DIR} (cap {paths.format_size(paths.WORK_MAX_BYTES)})"),
         ("ComfyUI directory", Path.cwd()),
-        ("generation timeout", f"{client.GENERATION_TIMEOUT_SECONDS} s"),
+        ("generation timeout", f"{client.STALL_TIMEOUT_SECONDS} s without progress, {client.MAX_GENERATION_SECONDS} s in all"),
         ("download connections", downloads.connections()),
         ("CUDA_VISIBLE_DEVICES", os.environ.get("CUDA_VISIBLE_DEVICES", "(not set)")),
         ("CUDA_DEVICE_ORDER", gpu.device_order()),

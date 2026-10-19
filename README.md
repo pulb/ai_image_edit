@@ -16,6 +16,7 @@ front of interchangeable image-generation models.
 | Inpainting | Advanced inpainting and mask functionality with seamless soft blending |
 | Annotations | Draw thin colored strokes directly on the image to point the model at what to change |
 | Incremental edits | Feed any result back in as the next input to refine an image step by step |
+| Progress | Shows each step while the model generates, with the elapsed time; a running generation can be cancelled |
 | Before/after comparison | Interactive slider to compare generated outputs with the source |
 | Aspect ratios | Presets for common, widely used aspect ratios |
 | LoRAs | Optional LoRA support, auto-detected from a local loras folder |

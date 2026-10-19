@@ -17,16 +17,18 @@ import time
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from PIL import Image
 
 from ai_image_edit.comfy import client as comfy_client
 from ai_image_edit.comfy import custom_nodes, downloads, gpu
 from ai_image_edit.core import imaging
-from ai_image_edit.core.errors import GenerationError
+from ai_image_edit.core.errors import GenerationCancelled, GenerationError
 from ai_image_edit.core.result_cache import cached_infer
-from ai_image_edit.core.types import GenerationParams, GenerationResult, ModelCapabilities, RangeSpec
+from ai_image_edit.core.types import (
+    GenerationParams, GenerationProgress, GenerationResult, ModelCapabilities, ProgressStage, RangeSpec,
+)
 from ai_image_edit.sizes import POLICIES, ResolvedSize, SizePolicy, dimensions_from_source
 from ai_image_edit.workflows import available_workflows, read_workflow_file
 
@@ -514,7 +516,12 @@ class WorkflowModel:
         seed = int(params.seed)
         return seed % (spec["max"] + 1) if spec.get("wrap") else seed
 
-    def generate(self, params: GenerationParams) -> GenerationResult:
+    def generate(
+        self,
+        params: GenerationParams,
+        on_progress: Optional[Callable[[GenerationProgress], None]] = None,
+        cancel: Optional[threading.Event] = None,
+    ) -> GenerationResult:
         """
         Resolves the target size, then hands off to imaging.run_generation
         for the crop -> infer -> composite sequence; _infer() builds and submits
@@ -524,7 +531,21 @@ class WorkflowModel:
         size for any masked request. Otherwise the images are passed as they
         are and the model scales them. The output size comes from the
         workflow, through the values the manifest binds (size.bind).
+
+        on_progress, if given, is called on this thread as the generation
+        moves on (see ProgressStage); the sampler's steps are those of the
+        node the steps are bound to. Setting cancel stops the generation
+        (GenerationCancelled); only this request's ComfyUI job is stopped, see
+        comfy_client.cancel_prompt().
         """
+        def report(stage: ProgressStage) -> None:
+            if on_progress is not None:
+                on_progress(GenerationProgress(stage))
+
+        def check_cancel() -> None:
+            if cancel is not None and cancel.is_set():
+                raise GenerationCancelled("Generation cancelled.")
+
         self._check_setup()
         prompt = (params.prompt or "").strip()
         if not prompt:
@@ -533,6 +554,7 @@ class WorkflowModel:
         if 1 + len(params.reference_images) > max_images:
             raise GenerationError(f"Up to {max_images} input images are supported.")
 
+        report(ProgressStage.PREPARING)
         seed = self._pick_seed(params)
         size: ResolvedSize = self._size.resolve(params)
         print(
@@ -543,6 +565,7 @@ class WorkflowModel:
         )
 
         def _infer(model_input_path: str) -> str:
+            check_cancel()
             self._check_nodes()
             reference_paths = params.reference_images
             if size.reference_resolution:
@@ -563,11 +586,18 @@ class WorkflowModel:
                 lora_files=params.lora_files, lora_strength=params.lora_strength, size_values=size.values,
             )
             t0 = time.time()
-            prompt_id = comfy_client.submit_workflow_and_wait(workflow, str(uuid.uuid4()))
+            sampler_node = _split(self._manifest["bind"]["steps"])[0]
+            prompt_id = comfy_client.submit_workflow_and_wait(workflow, str(uuid.uuid4()), sampler_node, on_progress, cancel)
             print(f"[{self.name}] ComfyUI generation took {time.time() - t0:.1f}s", flush=True)
             return comfy_client.fetch_generated_image(prompt_id)
 
-        infer = cached_infer(_infer, self.display_name, params, seed=seed, **size.cache_kwargs, width=size.width, height=size.height)
+        cached = cached_infer(_infer, self.display_name, params, seed=seed, **size.cache_kwargs, width=size.width, height=size.height)
+
+        def infer(model_input_path: str) -> str:
+            output_path = cached(model_input_path)
+            check_cancel()
+            report(ProgressStage.POSTPROCESSING)
+            return output_path
 
         final_output_path = imaging.run_generation(
             params.source_image_path,

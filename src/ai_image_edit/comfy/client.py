@@ -8,30 +8,38 @@ import json
 import os
 import subprocess
 import sys
+import threading
 import time
 import urllib.parse
-from typing import List, Optional
+from typing import Callable, List, Optional
 
 import requests
 import websocket
 
 from ai_image_edit.comfy import gpu
-from ai_image_edit.core.errors import GenerationError
+from ai_image_edit.core.errors import GenerationCancelled, GenerationError
 from ai_image_edit.core.paths import WORK_DIR
+from ai_image_edit.core.types import GenerationProgress, ProgressStage
 
 PORT = 8188
 SERVER_ADDRESS = f"127.0.0.1:{PORT}"
 
 # Seconds a single HTTP request to ComfyUI may take (the generation itself is
-# waited for separately, see GENERATION_TIMEOUT_SECONDS).
+# waited for separately, see STALL_TIMEOUT_SECONDS).
 REQUEST_TIMEOUT_SECONDS = 60
 
-# Safety net for submit_workflow_and_wait's websocket loop — without this, a
-# ComfyUI job that stalls, fails without emitting a proper execution_error
-# message, or a websocket connection that silently drops would leave the
-# app hanging forever with no feedback.
-# COMFY_GENERATION_TIMEOUT overrides the default (seconds); slower GPUs need more.
-GENERATION_TIMEOUT_SECONDS = int(os.environ.get("COMFY_GENERATION_TIMEOUT", "120"))
+# Safety nets for submit_workflow_and_wait's websocket loop, so a ComfyUI job
+# that stalls, fails without an execution_error message, or a websocket that
+# silently drops cannot leave the app waiting forever.
+# Seconds a running job may go without reporting anything (a node starting or
+# a sampler step). A single node that reports nothing, such as loading the
+# weights from a slow disk, must finish within it. COMFY_GENERATION_TIMEOUT.
+STALL_TIMEOUT_SECONDS = int(os.environ.get("COMFY_GENERATION_TIMEOUT", "300"))
+# Seconds a job may take in all, from submission, including the wait behind
+# other jobs in ComfyUI's queue. COMFY_GENERATION_MAX_TIME.
+MAX_GENERATION_SECONDS = int(os.environ.get("COMFY_GENERATION_MAX_TIME", "1800"))
+# How often submit_workflow_and_wait checks whether it was cancelled.
+CANCEL_POLL_SECONDS = 0.5
 
 
 def _unreachable(error: Exception) -> GenerationError:
@@ -40,9 +48,15 @@ def _unreachable(error: Exception) -> GenerationError:
     )
 
 
-def _timeout_error() -> GenerationError:
+def _stall_error() -> GenerationError:
     return GenerationError(
-        f"Generation timed out after {GENERATION_TIMEOUT_SECONDS}s waiting for ComfyUI — it may be stuck or stalled. Check the ComfyUI server logs."
+        f"ComfyUI reported no progress for {STALL_TIMEOUT_SECONDS}s — it may be stuck. Check the ComfyUI server logs."
+    )
+
+
+def _max_time_error() -> GenerationError:
+    return GenerationError(
+        f"The generation took longer than {MAX_GENERATION_SECONDS}s and was abandoned. Check the ComfyUI server logs."
     )
 
 
@@ -118,13 +132,57 @@ def _queue_prompt(workflow: dict, client_id: str) -> str:
     return body["prompt_id"]
 
 
-def submit_workflow_and_wait(workflow: dict, client_id: str) -> str:
+def cancel_prompt(prompt_id: str) -> None:
+    """
+    Stops one prompt: removes it from ComfyUI's queue if it still waits there,
+    and interrupts it if it is running.
+
+    Other users' and sessions' generations are not affected: the queue entry
+    is deleted by its prompt_id, and the interrupt names the prompt_id too, so
+    ComfyUI interrupts only if this prompt is the one running. ComfyUI's
+    interrupt itself is a single global flag, though, which the running job
+    picks up at its next check. If this prompt finishes in the instant between
+    ComfyUI's check and the flag being set, and another prompt starts at once,
+    that other prompt is interrupted instead. The window is very short, and the
+    flag is cleared whenever a prompt starts, so it never outlives that case.
+    Best effort: a ComfyUI that does not answer is ignored.
+    """
+    for path, body in (("queue", {"delete": [prompt_id]}), ("interrupt", {"prompt_id": prompt_id})):
+        try:
+            requests.post(f"http://{SERVER_ADDRESS}/{path}", json=body, timeout=REQUEST_TIMEOUT_SECONDS)
+        except requests.exceptions.RequestException as e:
+            print(f"[cancel] POST /{path} failed: {e}", flush=True)
+
+
+def submit_workflow_and_wait(
+    workflow: dict,
+    client_id: str,
+    sampler_node: Optional[str] = None,
+    on_progress: Optional[Callable[[GenerationProgress], None]] = None,
+    cancel: Optional[threading.Event] = None,
+) -> str:
     """
     Submits a workflow to ComfyUI and blocks (via websocket) until this
-    prompt finishes executing, up to GENERATION_TIMEOUT_SECONDS. Raises
-    GenerationError if submission fails, ComfyUI reports an execution error,
-    or the wait times out; returns the prompt_id on success.
+    prompt finishes executing; returns the prompt_id. Raises GenerationError
+    if submission fails, ComfyUI reports an error or an interruption, the
+    running job reports nothing for STALL_TIMEOUT_SECONDS, or the whole job
+    takes longer than MAX_GENERATION_SECONDS.
+
+    on_progress, if given, is called (on this thread) whenever the stage
+    changes and on every step of sampler_node; progress from other nodes is
+    not reported as sampling. Without a sampler_node, any node's steps are.
+
+    Setting cancel stops the prompt (see cancel_prompt()) within about
+    CANCEL_POLL_SECONDS and raises GenerationCancelled.
     """
+    last: List[Optional[GenerationProgress]] = [None]  # repeats are not reported
+
+    def report(stage: ProgressStage, step: Optional[int] = None, total: Optional[int] = None) -> None:
+        progress = GenerationProgress(stage, step, total)
+        if on_progress is not None and progress != last[0]:
+            last[0] = progress
+            on_progress(progress)
+
     ws = websocket.WebSocket()
     # Connected before the prompt is queued: a job that finishes at once (everything
     # cached) would otherwise report its end before anyone is listening.
@@ -135,40 +193,65 @@ def submit_workflow_and_wait(workflow: dict, client_id: str) -> str:
         raise _unreachable(e)
     try:
         prompt_id = _queue_prompt(workflow, client_id)
-        deadline = time.time() + GENERATION_TIMEOUT_SECONDS
+        give_up_at = time.time() + MAX_GENERATION_SECONDS
+        # None while the job waits in the queue: a wait behind another job is
+        # only limited by MAX_GENERATION_SECONDS.
+        stall_at: Optional[float] = None
+        sampled = False
+        report(ProgressStage.PREPARING)
 
         while True:
-            remaining = deadline - time.time()
-            if remaining <= 0:
-                raise _timeout_error()
-
-            # Re-armed every iteration to the time actually left, not the
-            # full budget — a fixed settimeout(GENERATION_TIMEOUT_SECONDS)
-            # here would let recv() block for a fresh full timeout on every message
-            # (e.g. a stream of ComfyUI "progress" events), so a job that
-            # keeps sending *something* without ever finishing could stall
-            # far past the documented timeout before the deadline check
-            # above ever caught it.
-            ws.settimeout(remaining)
+            if cancel is not None and cancel.is_set():
+                cancel_prompt(prompt_id)
+                raise GenerationCancelled("Generation cancelled.")
+            now = time.time()
+            if now >= give_up_at:
+                raise _max_time_error()
+            if stall_at is not None and now >= stall_at:
+                raise _stall_error()
+            # Re-armed every iteration to the time actually left, so a stream
+            # of unrelated messages cannot stretch the wait past either limit.
+            wait = min(give_up_at, stall_at or give_up_at) - now
+            ws.settimeout(min(wait, CANCEL_POLL_SECONDS) if cancel is not None else wait)
 
             try:
                 out = ws.recv()
             except websocket.WebSocketTimeoutException:
-                raise _timeout_error()
+                continue  # the checks at the top of the loop say which limit it was
 
-            if isinstance(out, str):
-                message = json.loads(out)
-                msg_type = message.get("type")
+            if not isinstance(out, str):
+                continue  # binary frames are previews
+            message = json.loads(out)
+            data = message.get("data")
+            if not isinstance(data, dict):
+                continue
+            if message.get("type") == "status" and stall_at is None:
+                # Broadcast whenever the queue changes; it counts the running job and
+                # the waiting ones, so more than this one means it waits its turn.
+                remaining = (data.get("status") or {}).get("exec_info", {}).get("queue_remaining")
+                if isinstance(remaining, int) and remaining > 1:
+                    report(ProgressStage.QUEUED)
+                continue
+            if data.get("prompt_id") != prompt_id:
+                continue
+            stall_at = time.time() + STALL_TIMEOUT_SECONDS
+            msg_type = message.get("type")
 
-                if msg_type == "executing":
-                    data = message["data"]
-                    if data["node"] is None and data["prompt_id"] == prompt_id:
-                        break
-
-                elif msg_type == "execution_error":
-                    data = message.get("data", {})
-                    if data.get("prompt_id") == prompt_id:
-                        raise GenerationError(f"ComfyUI Error: {data.get('exception_message', 'Unknown error')}")
+            if msg_type == "execution_start":
+                report(ProgressStage.PREPARING)
+            elif msg_type == "progress":
+                if sampler_node is None or str(data.get("node")) == sampler_node:
+                    sampled = True
+                    report(ProgressStage.SAMPLING, data.get("value"), data.get("max"))
+            elif msg_type == "executing":
+                if data.get("node") is None:
+                    break
+                if sampled and str(data["node"]) != sampler_node:
+                    report(ProgressStage.FINISHING)
+            elif msg_type == "execution_error":
+                raise GenerationError(f"ComfyUI Error: {data.get('exception_message', 'Unknown error')}")
+            elif msg_type == "execution_interrupted":
+                raise GenerationError("The generation was interrupted in ComfyUI.")
     except GenerationError:
         # A real execution failure or timeout — surface it, don't let the
         # narrower except below swallow it.

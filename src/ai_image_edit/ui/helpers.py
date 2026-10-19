@@ -5,7 +5,9 @@ import os
 from typing import List, Optional, Sequence
 
 from ai_image_edit.core.errors import GenerationError
-from ai_image_edit.core.types import DEFAULT_RESCALE_MODE, GenerationParams, ModelCapabilities, RescaleMode
+from ai_image_edit.core.types import (
+    DEFAULT_RESCALE_MODE, GenerationParams, GenerationProgress, ModelCapabilities, ProgressStage, RescaleMode,
+)
 
 # This app's one accent colour: the UI reads its purple from here.
 PRIMARY_COLOR = "#7c3aed"
@@ -49,6 +51,35 @@ def default_choice(default: Optional[str], choices: Optional[Sequence[str]]) -> 
     if not choices:
         return None
     return default if default in choices else choices[0]
+
+
+PROGRESS_TEXT = {
+    ProgressStage.PREPARING: "Preparing",
+    ProgressStage.QUEUED: "Waiting for another generation",
+    ProgressStage.SAMPLING: "Generating",
+    ProgressStage.FINISHING: "Finishing",
+    ProgressStage.POSTPROCESSING: "Postprocessing",
+}
+
+
+def describe_progress(progress: GenerationProgress, elapsed_seconds: float, cancelling: bool = False) -> str:
+    """The status line above the Generate button, e.g. "Generating: step 12 of 40 · 0:23"."""
+    text = "Cancelling" if cancelling else PROGRESS_TEXT[progress.stage]
+    if cancelling:
+        text += "…"
+    elif progress.stage is ProgressStage.SAMPLING and progress.step is not None and progress.total:
+        text += f": step {progress.step} of {progress.total}"
+    else:
+        text += "…"
+    minutes, seconds = divmod(int(elapsed_seconds), 60)
+    return f"{text} · {minutes}:{seconds:02d}"
+
+
+def progress_fraction(progress: GenerationProgress) -> Optional[float]:
+    """How full the bar is while sampling, 0 to 1; None (an indeterminate bar) otherwise."""
+    if progress.stage is ProgressStage.SAMPLING and progress.step is not None and progress.total:
+        return min(1.0, max(0.0, progress.step / progress.total))
+    return None
 
 
 def describe_error(exc: Exception) -> str:

@@ -3,7 +3,7 @@ import os
 import unittest
 from unittest import mock
 
-from ai_image_edit.core.types import ModelCapabilities, RescaleMode
+from ai_image_edit.core.types import GenerationProgress, ModelCapabilities, ProgressStage, RescaleMode
 from ai_image_edit.ui import helpers as common
 
 
@@ -90,6 +90,22 @@ class AssetsTest(unittest.TestCase):
             self.assertTrue(text.strip())
             self.assertEqual(re.findall(r"__[A-Z_]+__", text), [])
         self.assertIn(str(assets.DEFAULT_BRUSH_SIZE), assets.CLIENT_JS)
+
+
+class ProgressTextTest(unittest.TestCase):
+    def test_sampling_shows_the_step_and_the_time(self):
+        p = GenerationProgress(ProgressStage.SAMPLING, 12, 40)
+        self.assertEqual(common.describe_progress(p, 83.9), "Generating: step 12 of 40 · 1:23")
+        self.assertAlmostEqual(common.progress_fraction(p), 0.3)
+
+    def test_other_stages_have_an_indeterminate_bar(self):
+        p = GenerationProgress(ProgressStage.PREPARING)
+        self.assertEqual(common.describe_progress(p, 5), "Preparing… · 0:05")
+        self.assertIsNone(common.progress_fraction(p))
+
+    def test_cancelling_replaces_the_stage(self):
+        p = GenerationProgress(ProgressStage.SAMPLING, 3, 40)
+        self.assertEqual(common.describe_progress(p, 61, cancelling=True), "Cancelling… · 1:01")
 
 
 if __name__ == "__main__":

@@ -58,7 +58,9 @@ Rules for any AI coding agent working in this repository.
   calls (NiceGUI is imported only then). The model is passed as a plain
   argument — no shared mutable module state. The UI shows `model.display_name`.
 - **Model contract**: the UI uses a `WorkflowModel` (`workflow_model.py`):
-  `capabilities`, `start()`, `generate()`, `setup_progress()`, `shutdown()`,
+  `capabilities`, `start()`, `generate()` (with an optional progress callback, called on
+  the worker thread, which the UI shows through a timer, and an optional
+  cancel event, which stops only that request's ComfyUI job), `setup_progress()`, `shutdown()`,
   `list_loras()`, `resolution_for_source()`, `model_name`, `model_version` and `display_name`.
   `get_model()` in the same module finds a workflow file by bundled name or
   by path.

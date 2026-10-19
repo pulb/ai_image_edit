@@ -4,7 +4,7 @@ import base64
 import json
 import uuid
 from pathlib import Path
-from typing import Awaitable, Callable, Tuple
+from typing import Awaitable, Callable, Optional, Tuple
 
 from nicegui import ui
 from nicegui import run as nicegui_run
@@ -64,6 +64,39 @@ async def init_widget(ns: str, widget_id: str, label: str) -> None:
         await call_js(ns, "init", widget_id, timeout=10.0)
     except TimeoutError:
         print(f"[{label}] {ns}.init('{widget_id}') timed out — the widget may not respond until the page is reloaded.", flush=True)
+
+
+class StatusLine:
+    """
+    A small grey status text over a thin progress bar, the same wherever the
+    page reports progress. Hidden until show() is called.
+    """
+
+    def __init__(self, classes: str = "") -> None:
+        with ui.column().classes(f"w-full gap-1 items-center {classes}") as self.box:
+            self.label = ui.label().classes("text-xs w-full text-center text-gray-400")
+            self.bar = ui.linear_progress(value=0, show_value=False, size="4px").props("rounded").classes("w-full")
+        self.box.set_visibility(False)
+
+    def show(self, text: str, fraction: Optional[float] = None, *, bar: bool = True, error: bool = False) -> None:
+        """Show text, in red if error, over a bar that is fraction (0 to 1) full, or moving if None."""
+        self.box.set_visibility(True)
+        self.label.set_text(text)
+        self.label.classes(add="text-negative" if error else "text-gray-400", remove="text-gray-400" if error else "text-negative")
+        self.bar.set_visibility(bar)
+        if fraction is None:
+            if "indeterminate" not in self.bar.props:
+                # Emptied while it is hidden by the animation, so a bar that fills
+                # next starts from 0 instead of shrinking back from an old value.
+                self.bar.set_value(0)
+                self.bar.props("indeterminate")
+        else:
+            self.bar.set_value(fraction)  # before the switch, so the bar never shows an old value
+            if "indeterminate" in self.bar.props:
+                self.bar.props(remove="indeterminate")
+
+    def hide(self) -> None:
+        self.box.set_visibility(False)
 
 
 GROUP_CLASSES = "w-full gap-3 bg-[#1f1f1f] rounded-lg"

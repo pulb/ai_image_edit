@@ -59,8 +59,6 @@ RUN pip install --no-cache-dir torch==${TORCH_VERSION} torchvision==${TORCHVISIO
 # ComfyUI's own Python dependencies, from the git clone above.
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Generations on smaller GPUs can take minutes (weights are offloaded to RAM).
-ENV COMFY_GENERATION_TIMEOUT=600
 # COMFY_EXTRA_ARGS is deliberately not set here: unset means the app chooses the
 # ComfyUI arguments from the free GPU memory (deployments/docker/DEPLOY.md).
 

@@ -165,6 +165,25 @@ class GenerationParams:
     rescale_mode: RescaleMode = DEFAULT_RESCALE_MODE
 
 
+class ProgressStage(Enum):
+    """Where one generation is; see GenerationProgress."""
+
+    PREPARING = "preparing"  # before the sampler runs: uploads, loading models, encoding the prompt
+    QUEUED = "queued"  # waiting in ComfyUI's queue behind another generation
+    SAMPLING = "sampling"  # the sampler's steps
+    FINISHING = "finishing"  # after the sampler: decoding, saving
+    POSTPROCESSING = "postprocessing"  # compositing and color correction in the app
+
+
+@dataclass(frozen=True)
+class GenerationProgress:
+    """How far one generation is. step and total are set while sampling."""
+
+    stage: ProgressStage
+    step: Optional[int] = None
+    total: Optional[int] = None
+
+
 @dataclass
 class GenerationResult:
     """What a model's generate() hands back to the UI."""

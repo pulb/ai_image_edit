@@ -77,7 +77,11 @@ The model folders are below `/home/user/app/models`. **Mount a volume there**
 (as above), or the weights (about 15 GB for `qwen_image21_gguf`) are
 downloaded again by every new container. Any other location works the same
 way: it is just the volume you mount.
-`COMFY_GENERATION_TIMEOUT` (seconds, default 600) is for slow GPUs.
+A generation is abandoned if ComfyUI reports no progress (a node starting or a
+sampler step) for `COMFY_GENERATION_TIMEOUT` seconds (default 300; a single
+node such as loading the weights from a slow disk must finish within it), or
+if it takes more than `COMFY_GENERATION_MAX_TIME` seconds in all (default
+1800, including the wait behind other generations).
 
 The GPU needs at least 16 GB of VRAM for `qwen_image21_gguf`. `qwen_image21` with the bf16 weights needs far more; it was tested on an A100, and `MODEL_VARIANT=int8` uses less.
 

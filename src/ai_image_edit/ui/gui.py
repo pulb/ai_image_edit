@@ -12,17 +12,22 @@ are shown or hidden based on the active model's declared capabilities.
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
+import threading
+import time
 from typing import Callable, Dict, List, Optional
 
 from nicegui import app, ui
 from nicegui import run as nicegui_run
 
 from ai_image_edit.core import imaging
+from ai_image_edit.core.errors import GenerationCancelled
 from ai_image_edit.core.paths import WORK_DIR, to_url, trim_work_dir
-from ai_image_edit.core.types import DEFAULT_RESCALE_MODE, DEFAULT_SEED, ORIGINAL_ASPECT_RATIO, ModelCapabilities, RescaleMode
+from ai_image_edit.core.types import (
+    DEFAULT_RESCALE_MODE, DEFAULT_SEED, ORIGINAL_ASPECT_RATIO, GenerationProgress, ModelCapabilities, ProgressStage, RescaleMode,
+)
 from ai_image_edit.ui.assets import CLIENT_JS, WIDGET_CSS
 from ai_image_edit.ui.compare_slider import create_compare_slider
-from ai_image_edit.ui.components import GROUP_CLASSES, apply_dark_theme, create_simple_image_upload, create_value_slider
+from ai_image_edit.ui.components import GROUP_CLASSES, StatusLine, apply_dark_theme, create_simple_image_upload, create_value_slider
 from ai_image_edit.ui.helpers import (
     HOST,
     RESCALE_MODE_OPTIONS,
@@ -31,7 +36,9 @@ from ai_image_edit.ui.helpers import (
     RECENT_FILES_KEPT,
     default_choice,
     describe_error,
+    describe_progress,
     params_from_ui,
+    progress_fraction,
     resolution_label,
 )
 from ai_image_edit.ui.login import install_password_login
@@ -88,8 +95,7 @@ CARD_CLASSES = "w-full q-pa-none"
 
 @dataclass
 class Header:
-    setup_label: ui.label
-    setup_bar: ui.linear_progress
+    setup_status: StatusLine
 
 
 def build_header(model: WorkflowModel) -> Header:
@@ -99,11 +105,8 @@ def build_header(model: WorkflowModel) -> Header:
             ui.label(text).classes("text-sm w-full text-center").style(f"color: {PRIMARY_COLOR}")
         # The same width as the cards below (aie-page).
         with ui.column().classes("w-full gap-0 aie-page"):
-            setup_label = ui.label().classes("text-xs w-full text-center mt-3")
-            setup_label.set_visibility(False)
-            setup_bar = ui.linear_progress(value=0, show_value=False, size="4px").props("rounded").classes("w-full q-mt-xs")
-            setup_bar.set_visibility(False)
-    return Header(setup_label, setup_bar)
+            setup_status = StatusLine("mt-3")
+    return Header(setup_status)
 
 
 @dataclass
@@ -418,11 +421,40 @@ def run(model: WorkflowModel) -> None:
             advanced = build_advanced_card(caps)
             result_card = await build_result_card()
 
+            generation_status = StatusLine()  # shown while a generation runs, above the button so it is in view
             generate_btn = ui.button("Generate").props("color=primary unelevated").classes("w-full")
 
-        async def do_generate() -> None:
-            generate_btn.props("loading")
+        # The running generation's latest progress. generate() reports it on a
+        # worker thread, which only replaces the snapshot here; the timer below
+        # shows it, since NiceGUI elements must not be changed from that thread.
+        progress_state = {"progress": GenerationProgress(ProgressStage.PREPARING), "started": 0.0}
+        # Set while a generation runs; Generate is its Cancel button then.
+        running: Dict[str, Optional[threading.Event]] = {"cancel": None}
+
+        def set_progress(progress: GenerationProgress) -> None:
+            progress_state["progress"] = progress
+
+        def refresh_progress() -> None:
+            progress = progress_state["progress"]
+            cancelling = running["cancel"] is not None and running["cancel"].is_set()
+            generation_status.show(
+                describe_progress(progress, time.monotonic() - progress_state["started"], cancelling),
+                None if cancelling else progress_fraction(progress),
+            )
+
+        progress_timer = ui.timer(0.25, refresh_progress, active=False)
+
+        def cancel_generation() -> None:
+            # Stops only this page's generation; see comfy_client.cancel_prompt()
+            # for how far ComfyUI's interrupt reaches.
+            running["cancel"].set()
             generate_btn.disable()
+            refresh_progress()
+
+        async def do_generate() -> None:
+            running["cancel"] = threading.Event()
+            generate_btn.set_text("Cancel")
+            generate_btn.props("color=grey-8")
             result_card.compare_switch.disable()
             result_card.use_as_input_btn.disable()
             result_card.download_btn.disable()
@@ -466,7 +498,10 @@ def run(model: WorkflowModel) -> None:
                     rescale_mode=advanced.rescale_mode.value,
                     match_detail=advanced.match_detail.value,
                 )
-                result = await nicegui_run.io_bound(model.generate, params)
+                progress_state.update(progress=GenerationProgress(ProgressStage.PREPARING), started=time.monotonic())
+                refresh_progress()
+                progress_timer.activate()
+                result = await nicegui_run.io_bound(model.generate, params, set_progress, running["cancel"])
                 # The input image (which may be an older result that was used as
                 # the input), the references and the result on show must outlive
                 # the trim, however many files later generations add.
@@ -479,14 +514,26 @@ def run(model: WorkflowModel) -> None:
                 result_card.use_as_input_btn.enable()
                 result_card.download_btn.enable()
 
+            except GenerationCancelled:
+                pass  # the user asked for it, so there is nothing to report
             except Exception as e:  # noqa: BLE001 — surface unexpected errors instead of hanging silently
                 ui.notify(describe_error(e), type="negative")
             finally:
-                generate_btn.props(remove="loading")
+                running["cancel"] = None
+                progress_timer.deactivate()
+                generation_status.hide()
+                generate_btn.set_text("Generate")
+                generate_btn.props("color=primary")
                 setup = model.setup_progress()
                 generate_btn.set_enabled(setup.done and not setup.error)
 
-        generate_btn.on_click(do_generate)
+        async def on_generate_click() -> None:
+            if running["cancel"] is not None:
+                cancel_generation()
+            else:
+                await do_generate()
+
+        generate_btn.on_click(on_generate_click)
 
         async def use_as_input() -> None:
             after_path = await result_card.get_result_after_path()
@@ -516,20 +563,12 @@ def run(model: WorkflowModel) -> None:
         def refresh_setup() -> None:
             progress = model.setup_progress()
             text = progress.error or progress.message
-            header.setup_label.set_text(text)
-            header.setup_label.set_visibility(bool(text))
-            header.setup_label.classes(add="text-negative" if progress.error else "text-gray-400",
-                                remove="text-gray-400" if progress.error else "text-negative")
-            running = not progress.done
+            if text:
+                header.setup_status.show(text, progress.fraction, bar=not progress.done, error=bool(progress.error))
+            else:
+                header.setup_status.hide()
             # A generation needs the finished setup, so Generate waits for it (and stays off after an error).
             generate_btn.set_enabled(progress.done and not progress.error)
-            header.setup_bar.set_visibility(running)
-            if running:
-                if progress.fraction is None:
-                    header.setup_bar.props("indeterminate")
-                else:
-                    header.setup_bar.props(remove="indeterminate")
-                    header.setup_bar.set_value(progress.fraction)
             if references.lora_name is not None:
                 found = model.list_loras()
                 if found != references.available_loras:

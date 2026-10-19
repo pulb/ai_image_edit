@@ -17,8 +17,10 @@ import os
 import random
 import sys
 import tempfile
+import threading
 import types
 import unittest
+from unittest import mock
 from pathlib import Path
 
 try:
@@ -29,8 +31,8 @@ except ImportError:  # only the ComfyUI client needs it, and these tests never c
 from PIL import Image
 
 from ai_image_edit.core import imaging
-from ai_image_edit.core.errors import GenerationError
-from ai_image_edit.core.types import GenerationParams
+from ai_image_edit.core.errors import GenerationCancelled, GenerationError
+from ai_image_edit.core.types import GenerationParams, GenerationProgress, ProgressStage
 from ai_image_edit.workflows import available_workflows
 from ai_image_edit import workflows as workflow_files
 from ai_image_edit.comfy import client
@@ -218,6 +220,48 @@ class ManifestModelTests(unittest.TestCase):
             )).actual_seed
         finally:
             imaging.run_generation = real
+
+    def test_generate_reports_progress_with_the_sampler_node(self):
+        model = self.load(workflow_files.available_workflows()["qwen_image21"])
+        events, calls = [], []
+
+        def submit(workflow, client_id, sampler_node=None, on_progress=None, cancel=None):
+            calls.append(sampler_node)
+            on_progress(GenerationProgress(ProgressStage.SAMPLING, 1, 10))
+            return "p"
+
+        real = imaging.run_generation
+        imaging.run_generation = lambda source, mask, w, h, feather, cc, infer, *a, **k: infer(source)
+        try:
+            with mock.patch.object(model, "_check_nodes"), mock.patch.object(model, "_check_setup"), \
+                    mock.patch.object(client, "submit_workflow_and_wait", submit), \
+                    mock.patch.object(client, "fetch_generated_image", return_value="/out.png"):
+                model.generate(GenerationParams(
+                    prompt="a new hat", source_image_path=str(self.tmp / "source.png"), mask_path=None, steps=10, seed=987,
+                    randomize_seed=False,
+                ), events.append)
+        finally:
+            imaging.run_generation = real
+        self.assertEqual(calls, ["6"])
+        self.assertEqual([e.stage for e in events],
+                         [ProgressStage.PREPARING, ProgressStage.SAMPLING, ProgressStage.POSTPROCESSING])
+
+    def test_a_cancelled_generate_submits_nothing(self):
+        model = self.load(workflow_files.available_workflows()["qwen_image21"])
+        cancel = threading.Event()
+        cancel.set()
+        real = imaging.run_generation
+        imaging.run_generation = lambda source, mask, w, h, feather, cc, infer, *a, **k: infer(source)
+        try:
+            with mock.patch.object(model, "_check_nodes"), mock.patch.object(model, "_check_setup"), \
+                    mock.patch.object(client, "submit_workflow_and_wait") as submit:
+                with self.assertRaises(GenerationCancelled):
+                    model.generate(GenerationParams(
+                        prompt="a cancelled hat", source_image_path=str(self.tmp / "source.png"), mask_path=None, steps=10,
+                    ), cancel=cancel)
+        finally:
+            imaging.run_generation = real
+        submit.assert_not_called()
 
     def test_turbo_workflows_default_to_eight_steps_without_guidance(self):
         for name in ("qwen_image21_turbo", "qwen_image21_turbo_gguf"):
