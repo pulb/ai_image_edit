@@ -232,14 +232,45 @@ def create_simple_image_upload(label: str) -> dict:
     return holder
 
 
+class SliderPopup:
+    """
+    A compact slider: a small button with an icon and the current value, which
+    opens a menu with a labelled slider when tapped. For rows too tight for a
+    slider of their own.
+
+    The value shown in the button is updated in the browser while dragging, and
+    js_on_value (JavaScript statements that see the new value as `value`) runs
+    in the same handler, so a value the page only uses in the browser needs no
+    server round-trip. Further events can be added to .slider.
+    """
+
+    def __init__(self, icon: str, label: str, spec: RangeSpec, *, js_on_value: str = "") -> None:
+        value_id = f"aie_slider_value_{uuid.uuid4().hex}"
+        self.button = ui.button(icon=icon).props("flat dense no-caps size=md")
+        with self.button:
+            ui.html(f'<span id="{value_id}" class="q-ml-xs">{spec.default:g}</span>', sanitize=False)
+            with ui.menu().props("anchor='bottom middle' self='top middle'"):
+                with ui.column().classes("q-pa-md gap-1").style("min-width: 240px"):
+                    ui.label(label).classes("text-xs text-gray-400")
+                    self.slider = ui.slider(min=spec.min, max=spec.max, step=spec.step, value=spec.default).props("dense").classes("w-full")
+        self.slider.on(
+            "update:model-value",
+            js_handler=f"(value) => {{ document.getElementById('{value_id}').textContent = value; {js_on_value} }}",
+        )
+
+    def set_enabled(self, enabled: bool) -> None:
+        # The slider too, so it cannot change even if the menu was open.
+        self.button.set_enabled(enabled)
+        self.slider.set_enabled(enabled)
+
+
 def create_value_slider(spec: RangeSpec) -> ui.slider:
     """
-    A slider with its current value as text to its right. The value is kept
-    in sync with the server, which reads it at Generate time.
+    A slider with its current value in Quasar's bubble above the thumb. The
+    value is kept in sync with the server, which reads it at Generate time.
     """
-    with ui.row().classes("w-full items-center gap-1 no-wrap"):
-        slider = ui.slider(min=spec.min, max=spec.max, step=spec.step, value=spec.default).props("dense").classes("flex-1")
-        ui.label().classes("text-xs text-gray-400").style("min-width: 1.5em").bind_text_from(
-            slider, "value", backward=lambda v: f"{v:g}"
-        )
-    return slider
+    # The bubble is drawn above the slider without taking space of its own,
+    # so the margin keeps it clear of the label above.
+    return ui.slider(min=spec.min, max=spec.max, step=spec.step, value=spec.default).props("label-always").classes(
+        "w-full q-mt-lg"
+    )

@@ -6,9 +6,9 @@ from typing import Awaitable, Callable, Dict, NamedTuple, Optional, Tuple
 from nicegui import ui
 
 from ai_image_edit.core.paths import to_url
-from ai_image_edit.core.types import ANNOTATION_COLORS, FEATHER_RANGE
+from ai_image_edit.core.types import ANNOTATION_COLORS, FEATHER_RANGE, RangeSpec
 from ai_image_edit.ui.assets import DEFAULT_BRUSH_SIZE, DEFAULT_FEATHER_AMOUNT
-from ai_image_edit.ui.components import GROUP_CLASSES, PLACEHOLDER_TEXT, attach_file_picker, call_js, create_image_frame, init_widget, save_data_url
+from ai_image_edit.ui.components import GROUP_CLASSES, PLACEHOLDER_TEXT, SliderPopup, attach_file_picker, call_js, create_image_frame, init_widget, save_data_url
 
 
 class EditorInputs(NamedTuple):
@@ -96,7 +96,7 @@ async def create_mask_editor(
         await call_js("AIE", "clearAnnotations", editor_id)
 
     swatches: Dict[str, ui.button] = {}
-    mask_radio = brush_slider = feather_slider = None
+    mask_radio = brush_popup = feather_popup = None
 
     if supports_mask or num_annotation_colors > 0:
         with ui.column().classes(GROUP_CLASSES + " p-4"):
@@ -108,45 +108,25 @@ async def create_mask_editor(
                 with ui.row().classes("w-full items-center gap-3 no-wrap"):
                     mask_radio = ui.element("q-radio").props('val=mask model-value=zoom label="Mask"')
 
-                    with ui.column().classes("flex-1 gap-1"):
-                        ui.label("Brush size").classes("text-xs text-gray-400")
-                        with ui.row().classes("w-full items-center gap-1 no-wrap"):
-                            brush_slider = ui.slider(min=5, max=80, step=1, value=DEFAULT_BRUSH_SIZE).props("dense").classes("flex-1")
-                            # Updated by the slider's js_handler below, in the browser
-                            # (no server round-trip while dragging).
-                            ui.html(f'<span id="{editor_id}_brushvalue">{DEFAULT_BRUSH_SIZE}</span>', sanitize=False).classes(
-                                "text-xs text-gray-400"
-                            ).style("min-width: 1.5em")
-                        brush_slider.disable()
-                        # js_handler runs entirely in the browser, no server round-trip
-                        # (see the module docstring of assets.py for why that matters
-                        # for a dragged brush size) — 'update:model-value' fires continuously
-                        # while dragging; 'change' fires once on release.
-                        brush_slider.on(
-                            "update:model-value",
-                            js_handler=(
-                                f"(value) => {{ AIE.setBrush('{editor_id}', value); AIE.showBrushPreview('{editor_id}', value); "
-                                f"document.getElementById('{editor_id}_brushvalue').textContent = value; }}"
-                            ),
-                        )
-                        brush_slider.on("change", js_handler=f"() => AIE.hideBrushPreview('{editor_id}')")
+                    # The brush size and feather are only used in the browser, so their
+                    # js_on_value handlers pass them on there, without a server round-trip
+                    # (see the module docstring of assets.py for why that matters for a
+                    # dragged brush size). 'update:model-value' fires continuously while
+                    # dragging, 'change' once on release.
+                    brush_popup = SliderPopup(
+                        "brush", "Brush size", RangeSpec(5, 80, DEFAULT_BRUSH_SIZE),
+                        js_on_value=f"AIE.setBrush('{editor_id}', value); AIE.showBrushPreview('{editor_id}', value);",
+                    )
+                    brush_popup.slider.on("change", js_handler=f"() => AIE.hideBrushPreview('{editor_id}')")
+                    feather_popup = SliderPopup(
+                        "blur_circular", "Feather",
+                        RangeSpec(FEATHER_RANGE.min, FEATHER_RANGE.max, DEFAULT_FEATHER_AMOUNT, FEATHER_RANGE.step),
+                        js_on_value=f"AIE.setFeather('{editor_id}', value);",
+                    )
+                    for popup in (brush_popup, feather_popup):
+                        popup.set_enabled(False)
 
-                    with ui.column().classes("flex-1 gap-1"):
-                        ui.label("Feather").classes("text-xs text-gray-400")
-                        with ui.row().classes("w-full items-center gap-1 no-wrap"):
-                            feather_slider = ui.slider(min=FEATHER_RANGE.min, max=FEATHER_RANGE.max, step=FEATHER_RANGE.step, value=DEFAULT_FEATHER_AMOUNT).props("dense").classes("flex-1")
-                            ui.html(f'<span id="{editor_id}_feathervalue">{DEFAULT_FEATHER_AMOUNT}</span>', sanitize=False).classes(
-                                "text-xs text-gray-400"
-                            ).style("min-width: 1.5em")
-                        feather_slider.disable()
-                        feather_slider.on(
-                            "update:model-value",
-                            js_handler=(
-                                f"(value) => {{ AIE.setFeather('{editor_id}', value); "
-                                f"document.getElementById('{editor_id}_feathervalue').textContent = value; }}"
-                            ),
-                        )
-
+                    ui.space()
                     ui.button(icon="layers_clear", on_click=remove_mask).props("flat dense size=md").classes("text-xs").tooltip("Remove mask")
 
             annotate_radio = None
@@ -175,13 +155,9 @@ async def create_mask_editor(
                 for radio in (zoom_radio, mask_radio, annotate_radio):
                     if radio is not None:
                         radio.props(f"model-value={mode}")
-                for slider in (brush_slider, feather_slider):
-                    if slider is None:
-                        continue
-                    if mode == "mask":
-                        slider.enable()
-                    else:
-                        slider.disable()
+                for popup in (brush_popup, feather_popup):
+                    if popup is not None:
+                        popup.set_enabled(mode == "mask")
                 await call_js("AIE", "setMode", editor_id, mode)
 
             async def select_zoom() -> None:
