@@ -91,7 +91,7 @@ def msg(kind, prompt_id="p", **data):
 
 
 class WaitTest(unittest.TestCase):
-    def run_script(self, script, stall=600, max_time=1800, cancel=None):
+    def run_script(self, script, stall=600, max_time=1800, cancel=None, prompt_node=None):
         clock = [1000.0]
         events = []
         socket = FakeSocket(clock, script)
@@ -103,7 +103,9 @@ class WaitTest(unittest.TestCase):
                 mock.patch.object(client.time, "time", lambda: clock[0]), \
                 mock.patch.object(client, "STALL_TIMEOUT_SECONDS", stall), \
                 mock.patch.object(client, "MAX_GENERATION_SECONDS", max_time):
-            result = client.submit_workflow_and_wait({}, "c", sampler_node="6", on_progress=events.append, cancel=cancel)
+            result = client.submit_workflow_and_wait(
+                {}, "c", sampler_node="6", on_progress=events.append, cancel=cancel, prompt_node=prompt_node,
+            )
         return result, [(e.stage.value, e.step, e.total) for e in events]
 
     def test_reports_the_stages_of_this_prompt_only(self):
@@ -125,6 +127,30 @@ class WaitTest(unittest.TestCase):
         self.assertEqual(events, [
             ("preparing", None, None), ("sampling", 1, 2), ("sampling", 2, 2), ("finishing", None, None),
         ])
+
+    def test_the_prompt_enhancer_reports_its_tokens(self):
+        _, events = self.run_script([
+            (0, msg("execution_start")),
+            (0, msg("executing", node="41")),
+            (0, msg("progress", node="41", value=10, max=4096)),
+            (0, msg("progress", node="41", value=20, max=4096)),
+            (0, msg("executing", node="5")),
+            (0, msg("executing", node="6")),
+            (0, msg("progress", node="6", value=1, max=2)),
+            (0, msg("executing", node=None)),
+        ], prompt_node="41")
+        self.assertEqual(events, [
+            ("preparing", None, None), ("enhancing_prompt", None, None), ("enhancing_prompt", 10, None),
+            ("enhancing_prompt", 20, None), ("preparing", None, None), ("sampling", 1, 2),
+        ])
+
+    def test_the_output_text_is_read_from_the_history(self):
+        history = {"p": {"outputs": {"43": {"text": ["a better prompt"]}, "8": {"images": []}}}}
+        response = mock.Mock(**{"json.return_value": history})
+        with mock.patch.object(client.requests, "get", return_value=response):
+            self.assertEqual(client.fetch_output_text("p", "43"), "a better prompt")
+            self.assertIsNone(client.fetch_output_text("p", "8"))
+            self.assertIsNone(client.fetch_output_text("other", "43"))
 
     def test_a_job_behind_another_is_queued(self):
         _, events = self.run_script([

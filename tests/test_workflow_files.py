@@ -140,6 +140,9 @@ class ManifestModelTests(unittest.TestCase):
             "range without default": lambda d: d["manifest"]["capabilities"]["steps"].pop("default"),
             "references without loader ids": lambda d: d["manifest"]["images"]["references"].pop("loader_ids"),
             "loras without strength range": lambda d: d["manifest"]["capabilities"].pop("lora_strength"),
+            "prompt enhancer without output": lambda d: d["manifest"].update(prompt_enhancer={
+                "nodes": ["1"], "files": [], "prompt": "1.prompt", "seed": "1.seed", "images": "1.images.image{n}", "text_node": "1",
+            }),
         }
         for what, mutate in mistakes.items():
             with self.subTest(what):
@@ -225,7 +228,7 @@ class ManifestModelTests(unittest.TestCase):
         model = self.load(workflow_files.available_workflows()["qwen_image21"])
         events, calls = [], []
 
-        def submit(workflow, client_id, sampler_node=None, on_progress=None, cancel=None):
+        def submit(workflow, client_id, sampler_node=None, on_progress=None, cancel=None, prompt_node=None):
             calls.append(sampler_node)
             on_progress(GenerationProgress(ProgressStage.SAMPLING, 1, 10))
             return "p"
@@ -245,6 +248,147 @@ class ManifestModelTests(unittest.TestCase):
         self.assertEqual(calls, ["6"])
         self.assertEqual([e.stage for e in events],
                          [ProgressStage.PREPARING, ProgressStage.SAMPLING, ProgressStage.POSTPROCESSING])
+
+    def enhanced_models(self):
+        """The bundled workflows with a prompt enhancer, loaded with it on."""
+        for path in MANIFESTS:
+            model = self.load(path)
+            if model._manifest.get("prompt_enhancer"):
+                yield path, model
+
+    def test_the_prompt_enhancer_is_linked_in_only_when_asked_for(self):
+        found = False
+        for path, model in self.enhanced_models():
+            found = True
+            m = model._manifest
+            pe = m["prompt_enhancer"]
+            prompt_node, prompt_key = m["bind"]["prompt"].split(".", 1)
+            refs = m["images"]["references"]
+            for n in (0, refs["max"]):
+                with self.subTest(model=path.stem, references=n):
+                    size_values = {name: 1024 for name in m["size"]["bind"]}
+                    common = dict(
+                        prompt=" a hat ", source_path="/x/source.png", reference_paths=[f"/x/ref{i}.png" for i in range(n)],
+                        seed=77, steps=4, sampler="euler", scheduler="simple", size_values=size_values,
+                    )
+                    wf = model.build_workflow(**common, enhance_prompt=True)
+                    self.assertEqual(list(pe["output"]), wf[prompt_node]["inputs"][prompt_key])
+                    node, key = pe["prompt"].split(".", 1)
+                    self.assertEqual("a hat", wf[node]["inputs"][key])
+                    node, key = pe["seed"].split(".", 1)
+                    self.assertEqual(77, wf[node]["inputs"][key])
+                    for spec in pe["files"]:
+                        node, key = spec["set"].split(".", 1)
+                        self.assertEqual(spec["name"], wf[node]["inputs"][key])
+                    loaders = [m["images"]["source"].split(".")[0]] + [str(refs["loader_id_start"] + i) for i in range(n)]
+                    for i, loader in enumerate(loaders):
+                        node, key = pe["images"].format(n=i).split(".", 1)
+                        self.assertEqual([loader, 0], wf[node]["inputs"][key])
+                    for node_id, node_spec in wf.items():
+                        for name, value in node_spec["inputs"].items():
+                            if is_link(value):
+                                self.assertIn(value[0], wf, f"node {node_id} input {name!r} links to a missing node")
+
+                    wf = model.build_workflow(**common)
+                    self.assertEqual("a hat", wf[prompt_node]["inputs"][prompt_key])
+                    for node_id in pe["nodes"]:
+                        self.assertNotIn(node_id, wf)
+        self.assertTrue(found, "no bundled workflow has a prompt enhancer")
+
+    def test_a_turned_off_prompt_enhancer_is_neither_offered_nor_downloaded(self):
+        for path, model in self.enhanced_models():
+            with self.subTest(model=path.stem):
+                pe_files = {spec["name"] for spec in model._manifest["prompt_enhancer"]["files"]}
+                self.assertTrue(model.capabilities.supports_prompt_enhancer)
+                self.assertTrue(pe_files <= {item["dest"].name for item in model._pending_downloads()})
+
+                off = WorkflowModel.from_file(path, prompt_enhancer=False)
+                self.assertFalse(off.capabilities.supports_prompt_enhancer)
+                self.assertFalse(pe_files & {item["dest"].name for item in off._pending_downloads()})
+                size_values = {name: 1024 for name in off._manifest["size"]["bind"]}
+                wf = off.build_workflow(
+                    prompt="p", source_path="/x/s.png", reference_paths=[], seed=1, steps=4, sampler="euler",
+                    scheduler="simple", size_values=size_values, enhance_prompt=True,
+                )
+                for node_id in off._manifest["prompt_enhancer"]["nodes"]:
+                    self.assertNotIn(node_id, wf)
+
+    def test_workflows_without_a_prompt_enhancer_do_not_offer_it(self):
+        for path in MANIFESTS:
+            model = self.load(path)
+            if not model._manifest.get("prompt_enhancer"):
+                with self.subTest(model=path.stem):
+                    self.assertFalse(model.capabilities.supports_prompt_enhancer)
+
+    def test_lora_downloads_can_be_turned_off(self):
+        for path in MANIFESTS:
+            lora_files = {spec["name"] for spec in WorkflowModel.from_file(path)._manifest.get("loras", {}).get("files", [])}
+            if not lora_files:
+                continue
+            with self.subTest(model=path.stem):
+                self.assertTrue(lora_files <= {i["dest"].name for i in WorkflowModel.from_file(path)._pending_downloads()})
+                off = WorkflowModel.from_file(path, lora_downloads=False)
+                self.assertFalse(lora_files & {i["dest"].name for i in off._pending_downloads()})
+                self.assertTrue(off.capabilities.supports_loras)
+
+    def test_nothing_else_may_depend_on_the_prompt_enhancer(self):
+        path, model = next(self.enhanced_models())
+        manifest, workflow = workflow_files.read_workflow_file(path)
+        output = manifest["prompt_enhancer"]["output"]
+        node, key = manifest["bind"]["prompt"].split(".", 1)
+        workflow[node]["inputs"][key] = list(output)
+        with self.assertRaisesRegex(ValueError, "linked to the prompt enhancer's node"):
+            WorkflowModel("x", manifest, workflow)
+
+    def test_enhancer_nodes_must_be_in_the_workflow(self):
+        path, _ = next(self.enhanced_models())
+        manifest, workflow = workflow_files.read_workflow_file(path)
+        manifest["prompt_enhancer"]["text_node"] = "999"
+        with self.assertRaisesRegex(ValueError, "prompt_enhancer.text_node refers to node '999'"):
+            WorkflowModel("x", manifest, workflow)
+
+    def test_generate_with_the_enhancer_returns_its_prompt_and_keeps_it_for_cached_results(self):
+        path, model = next(self.enhanced_models())
+        pe = model._manifest["prompt_enhancer"]
+        calls, texts = [], []
+
+        def submit(workflow, client_id, sampler_node=None, on_progress=None, cancel=None, prompt_node=None):
+            calls.append(prompt_node)
+            if on_progress is not None:
+                on_progress(GenerationProgress(ProgressStage.ENHANCING_PROMPT, 12))
+            return "p"
+
+        def fetch_text(prompt_id, node_id):
+            texts.append(node_id)
+            return "a detailed red hat"
+
+        events = []
+        real = imaging.run_generation
+        imaging.run_generation = lambda source, mask, w, h, feather, cc, infer, *a, **k: infer(source)
+        try:
+            with mock.patch.object(model, "_check_nodes"), mock.patch.object(model, "_check_setup"), \
+                    mock.patch.object(client, "submit_workflow_and_wait", submit), \
+                    mock.patch.object(client, "fetch_generated_image", return_value=str(self.tmp / "enhanced_out.png")), \
+                    mock.patch.object(client, "fetch_output_text", fetch_text):
+                (self.tmp / "enhanced_out.png").touch()
+                params = GenerationParams(
+                    prompt="a red hat", source_image_path=str(self.tmp / "source.png"), mask_path=None, steps=10, seed=5,
+                    randomize_seed=False, enhance_prompt=True,
+                )
+                first = model.generate(params, events.append)
+                again = model.generate(params)  # the same request again: the cached result
+                plain = model.generate(GenerationParams(
+                    prompt="a red hat", source_image_path=str(self.tmp / "source.png"), mask_path=None, steps=10, seed=5,
+                    randomize_seed=False,
+                ))
+        finally:
+            imaging.run_generation = real
+        self.assertEqual(calls, [pe["prompt"].split(".")[0], None])
+        self.assertEqual(texts, [pe["text_node"]])
+        self.assertEqual(first.enhanced_prompt, "a detailed red hat")
+        self.assertEqual(again.enhanced_prompt, "a detailed red hat")
+        self.assertIsNone(plain.enhanced_prompt)
+        self.assertIn(ProgressStage.ENHANCING_PROMPT, [e.stage for e in events])
 
     def test_a_cancelled_generate_submits_nothing(self):
         model = self.load(workflow_files.available_workflows()["qwen_image21"])

@@ -28,7 +28,8 @@ the image.
    `MODEL_WORKFLOW`. Accept the weights' license with `ACCEPT_LICENSES=qwen-research` (for the
    Qwen-Image-2.1 models). Choose one of the GPUs the template recommends
    that has enough memory: at least 48 GB of VRAM for `qwen_image21` and `qwen_image21_turbo`, at least
-   16 GB for the GGUF workflows.
+   16 GB for the GGUF workflows. `qwen_image21` also downloads its prompt enhancer (about 9 GB more);
+   `DOWNLOAD_PROMPT_ENHANCER=0` leaves it out, `DOWNLOAD_LORAS=0` the Turbo LoRA.
 2. Optional: attach a network volume (a Pod mounts it at `/workspace`) so the
    multi-GB weights download once instead of on every fresh container. Mount it at `/home/user/app/models` if the Pod lets you choose the
    mount path (otherwise the weights are stored on the Pod's disk).

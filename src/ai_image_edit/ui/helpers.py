@@ -55,6 +55,7 @@ def default_choice(default: Optional[str], choices: Optional[Sequence[str]]) -> 
 
 PROGRESS_TEXT = {
     ProgressStage.PREPARING: "Preparing",
+    ProgressStage.ENHANCING_PROMPT: "Improving prompt",
     ProgressStage.QUEUED: "Waiting for another generation",
     ProgressStage.SAMPLING: "Generating",
     ProgressStage.FINISHING: "Finishing",
@@ -69,6 +70,9 @@ def describe_progress(progress: GenerationProgress, elapsed_seconds: float, canc
         text += "…"
     elif progress.stage is ProgressStage.SAMPLING and progress.step is not None and progress.total:
         text += f": step {progress.step} of {progress.total}"
+    elif progress.stage is ProgressStage.ENHANCING_PROMPT and progress.step:
+        # Only the tokens so far: the enhancer stops when it is done, mostly long before its limit.
+        text += f": {progress.step} tokens"
     else:
         text += "…"
     minutes, seconds = divmod(int(elapsed_seconds), 60)
@@ -111,6 +115,7 @@ def params_from_ui(
     feather_amount: Optional[int] = None,
     rescale_mode: Optional[str] = None,
     match_detail: bool = True,
+    enhance_prompt: bool = False,
 ) -> GenerationParams:
     """
     Builds the GenerationParams for one generation. A control the model
@@ -141,6 +146,7 @@ def params_from_ui(
         lora_strength=lora_strength if caps.supports_loras and lora_strength is not None else caps.lora_strength_range.default,
         apply_color_correction_enabled=bool(apply_color_correction),
         match_detail_enabled=bool(match_detail),
+        enhance_prompt=bool(enhance_prompt) and caps.supports_prompt_enhancer,
         feather_amount=int(feather_amount) if caps.supports_inpainting and feather_amount is not None else 0,
         rescale_mode=RescaleMode(rescale_mode) if caps.supports_inpainting and rescale_mode is not None else DEFAULT_RESCALE_MODE,
     )

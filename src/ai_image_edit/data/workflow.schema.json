@@ -261,6 +261,38 @@
             "strength_inputs": {"type": "array", "items": {"type": "string"}, "minItems": 1}
           }
         },
+        "prompt_enhancer": {
+          "description": "A language model that rewrites the prompt before the generation, run when the user asks for it. Its nodes are in the workflow but only linked in (bind.prompt gets 'output') when it runs; otherwise they are removed.",
+          "type": "object",
+          "required": ["nodes", "files", "prompt", "seed", "images", "output", "text_node"],
+          "additionalProperties": false,
+          "properties": {
+            "nodes": {"description": "The ids of the enhancer's nodes.", "type": "array", "items": {"type": "string"}, "minItems": 1},
+            "files": {
+              "description": "The enhancer's weight files, like the manifest's files; downloaded unless the enhancer is turned off.",
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["name", "url", "folder", "set"],
+                "additionalProperties": false,
+                "properties": {
+                  "name": {"type": "string", "minLength": 1},
+                  "url": {"type": "string", "pattern": "^https://"},
+                  "sha256": {"type": "string", "pattern": "^[0-9a-fA-F]{64}$"},
+                  "size": {"type": "integer", "minimum": 1},
+                  "license": {"type": "string"},
+                  "folder": {"type": "string"},
+                  "set": {"$ref": "#/$defs/target"}
+                }
+              }
+            },
+            "prompt": {"description": "Where the user's prompt goes.", "$ref": "#/$defs/target"},
+            "seed": {"description": "Where the generation's seed goes.", "$ref": "#/$defs/target"},
+            "images": {"description": "The image inputs the source and reference images are linked to; {n} counts from 0.", "type": "string", "pattern": "^[^.\\s]+\\..*\\{n\\}.*$"},
+            "output": {"description": "The output with the rewritten prompt.", "$ref": "#/$defs/link"},
+            "text_node": {"description": "A PreviewAny node showing the rewritten prompt, which the app reads back.", "type": "string"}
+          }
+        },
         "capabilities": {
           "type": "object",
           "required": ["supports_inpainting", "sampler", "scheduler", "steps"],

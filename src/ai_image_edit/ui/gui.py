@@ -57,6 +57,12 @@ COLOR_CORRECTION_INFO = (
     "With a mask, this switch has no effect: the edited area's colors are always matched to your photo."
 )
 
+ENHANCE_PROMPT_INFO = (
+    "Before generating, a language model rewrites your prompt into a more detailed, precise one, looking "
+    "at your image (and the reference images). This often gives better results, but takes longer: the "
+    "rewrite can take a minute or more. The rewritten prompt is shown below the prompt afterwards."
+)
+
 MATCH_DETAIL_INFO = (
     "Applies to edits with a mask, when the edited area is kept at your original's size and had to be "
     "enlarged. The enlarged area looks softer and smoother than the rest of your photo; this sharpens it "
@@ -114,16 +120,47 @@ class PromptCard:
     prompt: ui.textarea
     seed_input: ui.number
     randomize_seed: ui.switch
+    enhance_prompt: Optional[ui.switch]
+    show_enhanced_prompt: Callable[[Optional[str]], None]
 
 
-def build_prompt_card() -> PromptCard:
+def build_prompt_card(caps: ModelCapabilities) -> PromptCard:
     with ui.card().classes(CARD_CLASSES):
         prompt = ui.textarea(label="Prompt").props("rows=6 outlined dark").classes("w-full")
+
+        enhance_prompt = None
+        if caps.supports_prompt_enhancer:
+            with ui.row().classes("items-center no-wrap"):
+                enhance_prompt = ui.switch("Improve prompt", value=False)
+                with ui.button(icon="info").props("flat round dense size=sm").classes("text-gray-400"):
+                    with ui.menu():
+                        ui.label(ENHANCE_PROMPT_INFO).classes("text-xs q-pa-sm").style("max-width: 280px")
+
+        # The prompt the enhancer wrote for the last generation, if it ran.
+        with ui.column().classes(GROUP_CLASSES + " p-4 gap-1") as enhanced_box:
+            ui.label("Improved prompt").classes("text-xs text-gray-400")
+            enhanced_text = ui.label().classes("text-sm").style("white-space: pre-wrap")
+            with ui.row().classes("w-full justify-end"):
+                use_enhanced = ui.button("Use as prompt", icon="arrow_upward").props("flat dense no-caps size=sm")
+        enhanced_box.set_visibility(False)
+
+        def show_enhanced_prompt(text: Optional[str]) -> None:
+            enhanced_text.set_text(text or "")
+            enhanced_box.set_visibility(bool(text))
+
+        def use_enhanced_prompt() -> None:
+            # Already improved: rewriting it again would only drift further from what was asked.
+            prompt.value = enhanced_text.text
+            if enhance_prompt is not None:
+                enhance_prompt.value = False
+            show_enhanced_prompt(None)
+
+        use_enhanced.on_click(use_enhanced_prompt)
 
         with ui.row().classes("w-full items-center gap-4"):
             seed_input = ui.number(label="Seed", value=DEFAULT_SEED, format="%d").props("outlined dark").classes("flex-1")
             randomize_seed = ui.switch("Randomize seed", value=True)
-    return PromptCard(prompt, seed_input, randomize_seed)
+    return PromptCard(prompt, seed_input, randomize_seed, enhance_prompt, show_enhanced_prompt)
 
 
 @dataclass
@@ -415,7 +452,7 @@ def run(model: WorkflowModel) -> None:
         header = build_header(model)
 
         with ui.column().classes("w-full gap-3 aie-page"):
-            prompt_card = build_prompt_card()
+            prompt_card = build_prompt_card(caps)
 
             editor = await build_editor_card(model, caps)
 
@@ -462,6 +499,7 @@ def run(model: WorkflowModel) -> None:
             result_card.download_btn.disable()
             await result_card.reset_result()
             await result_card.set_compare(result_card.compare_switch.value)
+            prompt_card.show_enhanced_prompt(None)
             try:
                 if not editor.editor_holder["path"]:
                     ui.notify("Please upload an image to edit!", type="negative")
@@ -499,6 +537,7 @@ def run(model: WorkflowModel) -> None:
                     feather_amount=editor_inputs.feather_amount,
                     rescale_mode=advanced.rescale_mode.value,
                     match_detail=advanced.match_detail.value,
+                    enhance_prompt=prompt_card.enhance_prompt.value if prompt_card.enhance_prompt is not None else False,
                 )
                 progress_state.update(progress=GenerationProgress(ProgressStage.PREPARING), started=time.monotonic())
                 refresh_progress()
@@ -511,6 +550,7 @@ def run(model: WorkflowModel) -> None:
                 await nicegui_run.io_bound(trim_work_dir, RECENT_FILES_KEPT, in_use)
 
                 prompt_card.seed_input.value = result.actual_seed
+                prompt_card.show_enhanced_prompt(result.enhanced_prompt)
                 await result_card.set_result_images(result.before_path, result.after_path)
                 result_card.compare_switch.enable()
                 result_card.use_as_input_btn.enable()

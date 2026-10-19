@@ -46,9 +46,9 @@ class ResolutionTest(unittest.TestCase):
 
 
 class RescaleModeParamTest(unittest.TestCase):
-    def params(self, *, inpainting=True, **overrides):
+    def params(self, *, inpainting=True, enhancer=False, **overrides):
         caps = ModelCapabilities(
-            max_reference_images=1, supports_loras=False, supports_inpainting=inpainting,
+            max_reference_images=1, supports_loras=False, supports_inpainting=inpainting, supports_prompt_enhancer=enhancer,
             supported_aspect_ratios=["Original"], default_aspect_ratio="Original",
             supported_resolutions=[1024], default_resolution=1024,
         )
@@ -73,6 +73,11 @@ class RescaleModeParamTest(unittest.TestCase):
     def test_detail_matching_is_on_unless_switched_off(self):
         self.assertTrue(self.params().match_detail_enabled)
         self.assertFalse(self.params(match_detail=False).match_detail_enabled)
+
+    def test_the_prompt_is_enhanced_only_if_the_model_can(self):
+        self.assertFalse(self.params().enhance_prompt)
+        self.assertTrue(self.params(enhancer=True, enhance_prompt=True).enhance_prompt)
+        self.assertFalse(self.params(enhancer=False, enhance_prompt=True).enhance_prompt)
 
     def test_ignored_without_inpainting(self):
         self.assertIs(self.params(inpainting=False, rescale_mode="original").rescale_mode, RescaleMode.EDIT)
@@ -101,6 +106,12 @@ class ProgressTextTest(unittest.TestCase):
     def test_other_stages_have_an_indeterminate_bar(self):
         p = GenerationProgress(ProgressStage.PREPARING)
         self.assertEqual(common.describe_progress(p, 5), "Preparing… · 0:05")
+        self.assertIsNone(common.progress_fraction(p))
+
+    def test_the_prompt_enhancer_shows_its_tokens(self):
+        p = GenerationProgress(ProgressStage.ENHANCING_PROMPT, 250)
+        self.assertEqual(common.describe_progress(p, 12), "Improving prompt: 250 tokens · 0:12")
+        self.assertEqual(common.describe_progress(GenerationProgress(ProgressStage.ENHANCING_PROMPT), 1), "Improving prompt… · 0:01")
         self.assertIsNone(common.progress_fraction(p))
 
     def test_cancelling_replaces_the_stage(self):

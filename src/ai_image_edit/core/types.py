@@ -109,6 +109,10 @@ class ModelCapabilities:
     # the picture.
     num_annotation_colors: int = 0
 
+    # Whether the model can rewrite the prompt with a language model before
+    # generating (GenerationParams.enhance_prompt).
+    supports_prompt_enhancer: bool = False
+
     step_range: RangeSpec = field(default_factory=lambda: RangeSpec(1, 50, 20, step=1))
     cfg_range: RangeSpec = field(default_factory=lambda: RangeSpec(0.1, 10.0, 1.0, step=0.1))
     denoise_range: RangeSpec = field(default_factory=lambda: RangeSpec(0.0, 1.0, 1.0, step=0.01))
@@ -157,6 +161,10 @@ class GenerationParams:
     lora_files: List[str] = field(default_factory=list)
     lora_strength: float = 0.7
 
+    # Rewrite the prompt with the model's prompt enhancer first
+    # (capabilities.supports_prompt_enhancer).
+    enhance_prompt: bool = False
+
     apply_color_correction_enabled: bool = False
     feather_amount: int = int(FEATHER_RANGE.default)
     match_detail_enabled: bool = True
@@ -169,6 +177,7 @@ class ProgressStage(Enum):
     """Where one generation is; see GenerationProgress."""
 
     PREPARING = "preparing"  # before the sampler runs: uploads, loading models, encoding the prompt
+    ENHANCING_PROMPT = "enhancing_prompt"  # the prompt enhancer writing; step counts the tokens so far
     QUEUED = "queued"  # waiting in ComfyUI's queue behind another generation
     SAMPLING = "sampling"  # the sampler's steps
     FINISHING = "finishing"  # after the sampler: decoding, saving
@@ -177,7 +186,7 @@ class ProgressStage(Enum):
 
 @dataclass(frozen=True)
 class GenerationProgress:
-    """How far one generation is. step and total are set while sampling."""
+    """How far one generation is. step and total are set while sampling, step alone while enhancing the prompt."""
 
     stage: ProgressStage
     step: Optional[int] = None
@@ -191,3 +200,4 @@ class GenerationResult:
     before_path: str
     after_path: str
     actual_seed: int
+    enhanced_prompt: Optional[str] = None  # the prompt the enhancer wrote, if it ran

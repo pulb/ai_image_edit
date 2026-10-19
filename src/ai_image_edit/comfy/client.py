@@ -160,6 +160,7 @@ def submit_workflow_and_wait(
     sampler_node: Optional[str] = None,
     on_progress: Optional[Callable[[GenerationProgress], None]] = None,
     cancel: Optional[threading.Event] = None,
+    prompt_node: Optional[str] = None,
 ) -> str:
     """
     Submits a workflow to ComfyUI and blocks (via websocket) until this
@@ -171,6 +172,8 @@ def submit_workflow_and_wait(
     on_progress, if given, is called (on this thread) whenever the stage
     changes and on every step of sampler_node; progress from other nodes is
     not reported as sampling. Without a sampler_node, any node's steps are.
+    While prompt_node (a prompt enhancer) runs, the stage is ENHANCING_PROMPT
+    with the tokens written so far as the step.
 
     Setting cancel stops the prompt (see cancel_prompt()) within about
     CANCEL_POLL_SECONDS and raises GenerationCancelled.
@@ -240,14 +243,20 @@ def submit_workflow_and_wait(
             if msg_type == "execution_start":
                 report(ProgressStage.PREPARING)
             elif msg_type == "progress":
-                if sampler_node is None or str(data.get("node")) == sampler_node:
+                if prompt_node is not None and str(data.get("node")) == prompt_node:
+                    report(ProgressStage.ENHANCING_PROMPT, data.get("value"))
+                elif sampler_node is None or str(data.get("node")) == sampler_node:
                     sampled = True
                     report(ProgressStage.SAMPLING, data.get("value"), data.get("max"))
             elif msg_type == "executing":
                 if data.get("node") is None:
                     break
-                if sampled and str(data["node"]) != sampler_node:
+                if prompt_node is not None and str(data["node"]) == prompt_node:
+                    report(ProgressStage.ENHANCING_PROMPT)
+                elif sampled and str(data["node"]) != sampler_node:
                     report(ProgressStage.FINISHING)
+                elif last[0] is not None and last[0].stage is ProgressStage.ENHANCING_PROMPT:
+                    report(ProgressStage.PREPARING)
             elif msg_type == "execution_error":
                 raise GenerationError(f"ComfyUI Error: {data.get('exception_message', 'Unknown error')}")
             elif msg_type == "execution_interrupted":
@@ -294,3 +303,18 @@ def fetch_generated_image(prompt_id: str) -> str:
         raise GenerationError(f"Error retrieving generated image: {e}")
 
     raise GenerationError("ComfyUI finished but produced no output image.")
+
+
+def fetch_output_text(prompt_id: str, node_id: str) -> Optional[str]:
+    """
+    The text a node of a completed prompt showed (a PreviewAny node's "text"
+    output), or None if there is none or it cannot be fetched: it is only
+    shown to the user, so it never fails a generation.
+    """
+    try:
+        history = requests.get(f"http://{SERVER_ADDRESS}/history/{prompt_id}", timeout=REQUEST_TIMEOUT_SECONDS).json()
+        text = history[prompt_id]["outputs"][node_id]["text"]
+        return str(text[0]) if isinstance(text, list) and text else None
+    except (requests.RequestException, ValueError, LookupError, TypeError) as e:
+        print(f"Could not read the output text of node {node_id}: {e}", flush=True)
+        return None

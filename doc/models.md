@@ -15,6 +15,8 @@ Python; see [workflow files](contributing/workflow_files.md) for the format and
 |---|---|
 | `--workflow NAME_OR_FILE` / `MODEL_WORKFLOW` | The bundled workflow to run (default `qwen_image21`), or the path of a workflow file of your own. `--list-workflows` prints the bundled names. |
 | `--variant ID` / `MODEL_VARIANT` | One of the workflow's variants, e.g. another quantization. |
+| `--no-prompt-enhancer` / `DOWNLOAD_PROMPT_ENHANCER=0` | Leaves out the workflow's prompt enhancer, if it has one: its weights are not downloaded and the **Improve prompt** switch is not shown. On by default. |
+| `--no-lora-downloads` / `DOWNLOAD_LORAS=0` | Skips downloading the LoRAs the workflow brings along. LoRAs already in the folder are still offered. On by default. |
 | `--version` | Prints the app's version and exits. |
 | `ACCEPT_LICENSES` | Licenses you accept, comma-separated (`all` for every one). Files with a license are not downloaded without it. |
 
@@ -40,6 +42,14 @@ the bf16 diffusion model, text encoder and VAE.
   downloaded with the model and can be applied from the LoRAs section
   (strength 1 by default). It makes the model work like `qwen_image21_turbo`:
   set the steps to 8 and keep CFG at 1.
+- **Prompt enhancer:** the official edit prompt enhancer (a fine-tuned Qwen3.5 9B,
+  about 9 GB, from the same repository) is downloaded with the model. The
+  **Improve prompt** switch under the prompt has it rewrite the instruction
+  into a more detailed one, looking at the source and reference images, before
+  the model sees it; the rewritten prompt is shown afterwards and can be taken
+  over as the prompt. It follows ComfyUI's own template: it thinks before it
+  answers, limited to 4096 tokens, which can take a minute or more. Leave it
+  out with `DOWNLOAD_PROMPT_ENHANCER=0`.
 - **License:** the weights are under the
   [Qwen RESEARCH LICENSE AGREEMENT](https://huggingface.co/Qwen/Qwen-Image-2.1/raw/main/LICENSE)
   (accept it with `ACCEPT_LICENSES=qwen-research`).
@@ -123,7 +133,7 @@ generated.
 
 ## Downloads and custom nodes
 
-When a model starts, the app lists the weight files, LoRAs and custom nodes its
+When a model starts, the app lists the weight files, LoRAs, prompt enhancer and custom nodes its
 workflow needs and fetches only what is missing, with parallel ranged downloads,
 resume support and a checksum check. Until the last file is there and ComfyUI
 has started, the Generate button stays off and the page shows the progress

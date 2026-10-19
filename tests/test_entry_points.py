@@ -37,7 +37,7 @@ class SelectionTests(unittest.TestCase):
         env = mock.patch.dict(os.environ)
         env.start()
         self.addCleanup(env.stop)
-        for name in ("MODEL_WORKFLOW", "MODEL_VARIANT", "REQUIRE_PASSWORD"):
+        for name in ("MODEL_WORKFLOW", "MODEL_VARIANT", "REQUIRE_PASSWORD", "DOWNLOAD_PROMPT_ENHANCER", "DOWNLOAD_LORAS"):
             os.environ.pop(name, None)
         self.model = mock.Mock()
         self.run = mock.patch.object(app.ui, "run").start()
@@ -46,20 +46,36 @@ class SelectionTests(unittest.TestCase):
 
     def test_default_workflow(self):
         app.main([])
-        self.get.assert_called_once_with("qwen_image21", None)
+        self.get.assert_called_once_with("qwen_image21", None, prompt_enhancer=True, lora_downloads=True)
         self.model.start.assert_called_once()
         self.run.assert_called_once_with(self.model)
 
     def test_environment_is_the_fallback(self):
         os.environ.update(MODEL_WORKFLOW="x", MODEL_VARIANT="Q8_0")
         app.main([])
-        self.get.assert_called_once_with("x", "Q8_0")
+        self.get.assert_called_once_with("x", "Q8_0", prompt_enhancer=True, lora_downloads=True)
         self.run.assert_called_once_with(self.model)
 
     def test_command_line_beats_environment(self):
         os.environ.update(MODEL_WORKFLOW="x", MODEL_VARIANT="a")
         app.main(["--workflow", "y", "--variant", "b"])
-        self.get.assert_called_once_with("y", "b")
+        self.get.assert_called_once_with("y", "b", prompt_enhancer=True, lora_downloads=True)
+
+    def test_downloads_can_be_turned_off(self):
+        os.environ.update(DOWNLOAD_PROMPT_ENHANCER="0", DOWNLOAD_LORAS="false")
+        app.main([])
+        self.get.assert_called_once_with("qwen_image21", None, prompt_enhancer=False, lora_downloads=False)
+
+    def test_download_switches_on_the_command_line_beat_the_environment(self):
+        os.environ.update(DOWNLOAD_PROMPT_ENHANCER="0", DOWNLOAD_LORAS="1")
+        app.main(["--prompt-enhancer", "--no-lora-downloads"])
+        self.get.assert_called_once_with("qwen_image21", None, prompt_enhancer=True, lora_downloads=False)
+
+    def test_a_download_switch_must_be_a_switch(self):
+        os.environ["DOWNLOAD_LORAS"] = "maybe"
+        with self.assertRaisesRegex(SystemExit, "DOWNLOAD_LORAS='maybe' is not a switch"):
+            app.main([])
+        self.get.assert_not_called()
 
     def test_startup_prints_the_configuration_without_secrets(self):
         os.environ.update(
@@ -128,8 +144,8 @@ class GetModelTests(unittest.TestCase):
         from ai_image_edit.workflow_model import get_model
 
         with mock.patch.object(WorkflowModel, "from_file") as from_file:
-            get_model("qwen_image21_gguf", "Q8_0")
-            from_file.assert_called_with(available_workflows()["qwen_image21_gguf"], "Q8_0")
+            get_model("qwen_image21_gguf", "Q8_0", prompt_enhancer=False)
+            from_file.assert_called_with(available_workflows()["qwen_image21_gguf"], "Q8_0", prompt_enhancer=False)
             get_model(str(GGUF))
             from_file.assert_called_with(GGUF, None)
 

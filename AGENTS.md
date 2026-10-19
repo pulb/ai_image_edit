@@ -63,7 +63,9 @@ Rules for any AI coding agent working in this repository.
   cancel event, which stops only that request's ComfyUI job), `setup_progress()`, `shutdown()`,
   `list_loras()`, `resolution_for_source()`, `model_name`, `model_version` and `display_name`.
   `get_model()` in the same module finds a workflow file by bundled name or
-  by path.
+  by path; its `prompt_enhancer` and `lora_downloads` options (from
+  `DOWNLOAD_PROMPT_ENHANCER` / `DOWNLOAD_LORAS`, read in `app.py`) leave out
+  the workflow's prompt enhancer and its LoRA downloads.
 - **Qwen-licensed code**: no code under the Qwen Research License lives in
   this repo; the Qwen-Image-2.1 weights are only downloaded, under their own
   license. Never copy Qwen-licensed code into this repo.

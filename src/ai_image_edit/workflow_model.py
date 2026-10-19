@@ -62,6 +62,9 @@ class SetupProgress:
 # Seconds between the checks whether a freshly launched ComfyUI answers yet.
 COMFY_POLL_SECONDS = 0.5
 
+# How many of the prompt enhancer's latest prompts are kept for cached results.
+ENHANCED_PROMPTS_KEPT = 16
+
 _NAMED_CHOICES = {"comfy_samplers": SAMPLER_CHOICES, "comfy_schedulers": SCHEDULER_CHOICES}
 _BINDABLE = {"prompt", "negative_prompt", "seed", "steps", "cfg", "sampler", "scheduler", "denoise"}
 
@@ -90,12 +93,25 @@ class WorkflowModel:
     downloads and the start of ComfyUI that start() continues in the
     background), and how to run one generation (generate()), plus a name
     and version to show.
+
+    prompt_enhancer=False leaves out the workflow's prompt enhancer (its
+    weights are not downloaded and its nodes are removed);
+    lora_downloads=False skips downloading the workflow's own LoRA files
+    (LoRAs already in the folder are still offered).
     """
 
-    def __init__(self, name: str, manifest: dict, workflow: dict, variant: Optional[str] = None) -> None:
+    def __init__(
+        self, name: str, manifest: dict, workflow: dict, variant: Optional[str] = None,
+        *, prompt_enhancer: bool = True, lora_downloads: bool = True,
+    ) -> None:
         self.name = name
         self._manifest = self._with_variant(name, manifest, variant)
         self._workflow = workflow
+        self._use_enhancer = prompt_enhancer
+        self._lora_downloads = lora_downloads
+        # The prompts the enhancer wrote, by raw output path, so a result the
+        # cache reuses still comes with its prompt. Only the latest few are kept.
+        self._enhanced_prompts: Dict[str, str] = {}
         self._process: Optional[subprocess.Popen] = None
         self._nodes_checked = False
         self._download_status: Optional[downloads.DownloadStatus] = None
@@ -111,11 +127,11 @@ class WorkflowModel:
         self._validate()
 
     @classmethod
-    def from_file(cls, path: Path, variant: Optional[str] = None) -> "WorkflowModel":
-        """The model described by a workflow file; its name is the file name without .json."""
+    def from_file(cls, path: Path, variant: Optional[str] = None, **options: bool) -> "WorkflowModel":
+        """The model described by a workflow file; its name is the file name without .json. options are __init__'s."""
         path = Path(path)
         manifest, workflow = read_workflow_file(path)
-        return cls(path.stem, manifest, workflow, variant)
+        return cls(path.stem, manifest, workflow, variant, **options)
 
     @staticmethod
     def _with_variant(name: str, manifest: dict, variant: Optional[str]) -> dict:
@@ -207,6 +223,42 @@ class WorkflowModel:
             for targets in loras["feeds"].values():
                 for target in targets:
                     need_node(target, "loras.feeds")
+        enhancer = m.get("prompt_enhancer")
+        if enhancer:
+            self._validate_enhancer(enhancer, need_node)
+
+    def _validate_enhancer(self, enhancer: dict, need_node: Callable[[str, str], None]) -> None:
+        m, wf = self._manifest, self._workflow
+        nodes = set(enhancer["nodes"])
+        missing = sorted(nodes - set(wf))
+        if missing:
+            raise ValueError(f"{self.name}: prompt_enhancer.nodes {missing} are not in the workflow")
+        for key in ("prompt", "seed"):
+            need_node(enhancer[key], f"prompt_enhancer.{key}")
+        for spec in enhancer["files"]:
+            need_node(spec["set"], "prompt_enhancer.files")
+            if spec.get("license") and spec["license"] not in m.get("licenses", {}):
+                raise ValueError(f"{self.name}: prompt_enhancer.files {spec['name']!r}: unknown license {spec['license']!r}")
+        image_node, _ = _split(enhancer["images"].format(n=0))
+        targets = [
+            ("prompt", _split(enhancer["prompt"])[0]), ("seed", _split(enhancer["seed"])[0]),
+            ("output", enhancer["output"][0]), ("text_node", enhancer["text_node"]), ("images", image_node),
+        ] + [("files", _split(spec["set"])[0]) for spec in enhancer["files"]]
+        for key, node in targets:
+            if node not in nodes:
+                raise ValueError(f"{self.name}: prompt_enhancer.{key} refers to node {node!r}, which is not in prompt_enhancer.nodes")
+        if _split(m["bind"]["prompt"])[0] in nodes:
+            raise ValueError(f"{self.name}: bind.prompt must not be a node of the prompt enhancer")
+        # The enhancer's nodes are removed when it is off, so nothing else may depend on them.
+        for node_id, node in wf.items():
+            if node_id in nodes:
+                continue
+            for key, value in node.get("inputs", {}).items():
+                if isinstance(value, list) and value and value[0] in nodes:
+                    raise ValueError(
+                        f"{self.name}: node {node_id!r} input {key!r} is linked to the prompt enhancer's node {value[0]!r}; "
+                        "the app links it (bind.prompt) when the enhancer runs"
+                    )
 
     # ------------------------------------------------------------ identity
 
@@ -223,6 +275,11 @@ class WorkflowModel:
     def display_name(self) -> str:
         """model_name followed by model_version, if any."""
         return f"{self.model_name} {self.model_version}" if self.model_version else self.model_name
+
+    @property
+    def _enhancer(self) -> Optional[dict]:
+        """The manifest's prompt_enhancer section, or None if there is none or it is turned off."""
+        return self._manifest.get("prompt_enhancer") if self._use_enhancer else None
 
     @property
     def _max_references(self) -> int:
@@ -249,6 +306,7 @@ class WorkflowModel:
             supports_denoise="denoise" in bind,
             supports_negative_prompt="negative_prompt" in bind,
             num_annotation_colors=caps.get("num_annotation_colors", 0),
+            supports_prompt_enhancer=self._enhancer is not None,
             step_range=_range(caps["steps"]),
         )
         for field, key in (("cfg_range", "cfg"), ("denoise_range", "denoise"), ("lora_strength_range", "lora_strength")):
@@ -258,11 +316,16 @@ class WorkflowModel:
 
     # ------------------------------------------------------------ lifecycle
 
+    def _weight_files(self) -> List[dict]:
+        """The model's weight files, the prompt enhancer's included when it is on."""
+        return self._manifest.get("files", []) + (self._enhancer["files"] if self._enhancer else [])
+
     def _pending_downloads(self) -> List[dict]:
-        wanted = [(spec, Path(spec["folder"]) / spec["name"]) for spec in self._manifest.get("files", [])]
+        wanted = [(spec, Path(spec["folder"]) / spec["name"]) for spec in self._weight_files()]
         # LoRA files: each goes into its own subfolder of loras.dir (the subfolder is the display name).
         loras = self._manifest.get("loras", {})
-        wanted += [(spec, Path(loras["dir"]) / spec["dir"] / spec["name"]) for spec in loras.get("files", [])]
+        if self._lora_downloads:
+            wanted += [(spec, Path(loras["dir"]) / spec["dir"] / spec["name"]) for spec in loras.get("files", [])]
         return [
             {"url": spec["url"], "dest": dest, "sha256": spec.get("sha256"), "size": spec.get("size"), "license": spec.get("license")}
             for spec, dest in wanted if not dest.is_file()
@@ -283,7 +346,7 @@ class WorkflowModel:
     def _weights_bytes(self) -> int:
         """Total size of the model files (not the LoRAs), which ComfyUI loads for a generation."""
         total = 0
-        for spec in self._manifest.get("files", []):
+        for spec in self._weight_files():
             path = Path(spec["folder"]) / spec["name"]
             if path.is_file():
                 total += path.stat().st_size
@@ -429,10 +492,17 @@ class WorkflowModel:
         self, *, prompt: str, negative_prompt: str = "", source_path: str, reference_paths: List[str],
         seed: int, steps: int, cfg: float = 1.0, denoise: float = 1.0, sampler: str, scheduler: str,
         lora_files: Optional[List[str]] = None, lora_strength: float = 0.7, size_values: Dict[str, Any],
+        enhance_prompt: bool = False,
     ) -> dict:
-        """The workflow template with the fields for one generation filled in."""
+        """
+        The workflow template with the fields for one generation filled in.
+        With enhance_prompt (and the enhancer on), the prompt goes to the
+        prompt enhancer, whose output becomes the prompt; otherwise its nodes
+        are removed.
+        """
         m = self._manifest
         wf = copy.deepcopy(self._workflow)
+        enhancer = self._enhancer if enhance_prompt else None
 
         def put(target: str, value: Any) -> None:
             node, key = _split(target)
@@ -444,7 +514,7 @@ class WorkflowModel:
             put(target, value)
 
         put(m["images"]["source"], comfy_client.upload_image(source_path))
-        self._place_references(wf, reference_paths)
+        reference_loaders = self._place_references(wf, reference_paths)
 
         values = {
             "prompt": prompt.strip(), "negative_prompt": negative_prompt or "", "seed": seed, "steps": int(steps),
@@ -455,19 +525,34 @@ class WorkflowModel:
         for name, target in m["size"].get("bind", {}).items():
             put(target, size_values[name])
 
+        if enhancer:
+            for spec in enhancer["files"]:
+                put(spec["set"], spec["name"])
+            put(enhancer["prompt"], values["prompt"])
+            put(enhancer["seed"], seed)
+            put(m["bind"]["prompt"], list(enhancer["output"]))
+            # The enhancer sees the same images as the model: the source first, then the references.
+            loaders = [_split(m["images"]["source"])[0]] + reference_loaders
+            for n, loader in enumerate(loaders):
+                put(enhancer["images"].format(n=n), [loader, 0])
+        else:
+            for node in m.get("prompt_enhancer", {}).get("nodes", []):
+                wf.pop(node, None)
+
         if lora_files:
             self._splice_loras(wf, lora_files, lora_strength)
         return wf
 
-    def _place_references(self, wf: dict, reference_paths: List[str]) -> None:
+    def _place_references(self, wf: dict, reference_paths: List[str]) -> List[str]:
         """
         Each reference image is a LoadImage node wired to the next free image
         input of the encode node. Slots the request does not use are removed,
-        in case the template ships them.
+        in case the template ships them. Returns the ids of the loader nodes used.
         """
         refs = self._manifest["images"].get("references")
         if not refs:
-            return
+            return []
+        used: List[str] = []
         first_n = refs.get("first_n", 2)
         for i in range(refs["max"]):
             loader_id = refs["loader_ids"][i] if "loader_ids" in refs else str(refs["loader_id_start"] + i)
@@ -479,9 +564,11 @@ class WorkflowModel:
                 else:
                     wf[loader_id] = {"class_type": "LoadImage", "inputs": {"image": uploaded, "upload": "image"}}
                 wf[node]["inputs"][key] = [loader_id, 0]
+                used.append(loader_id)
             else:
                 wf.pop(loader_id, None)
                 wf[node]["inputs"].pop(key, None)
+        return used
 
     def _splice_loras(self, wf: dict, lora_files: List[str], strength: float) -> None:
         """
@@ -534,7 +621,8 @@ class WorkflowModel:
 
         on_progress, if given, is called on this thread as the generation
         moves on (see ProgressStage); the sampler's steps are those of the
-        node the steps are bound to. Setting cancel stops the generation
+        node the steps are bound to, and the prompt enhancer's tokens are
+        reported while it writes. Setting cancel stops the generation
         (GenerationCancelled); only this request's ComfyUI job is stopped, see
         comfy_client.cancel_prompt().
         """
@@ -554,13 +642,15 @@ class WorkflowModel:
         if 1 + len(params.reference_images) > max_images:
             raise GenerationError(f"Up to {max_images} input images are supported.")
 
+        enhancer = self._enhancer if params.enhance_prompt else None
+        enhance = enhancer is not None
         report(ProgressStage.PREPARING)
         seed = self._pick_seed(params)
         size: ResolvedSize = self._size.resolve(params)
         print(
             f"[{self.name}] mask={'yes' if params.mask_path else 'no'} images={1 + len(params.reference_images)} "
             f"gen_dims={size.width}x{size.height} {size.description} steps={params.steps} cfg={params.cfg} "
-            f"sampler={params.sampler_name} scheduler={params.scheduler}",
+            f"sampler={params.sampler_name} scheduler={params.scheduler} enhance_prompt={'yes' if enhance else 'no'}",
             flush=True,
         )
 
@@ -584,17 +674,31 @@ class WorkflowModel:
                 reference_paths=reference_paths, seed=seed, steps=params.steps, cfg=params.cfg,
                 denoise=params.denoise, sampler=params.sampler_name, scheduler=params.scheduler,
                 lora_files=params.lora_files, lora_strength=params.lora_strength, size_values=size.values,
+                enhance_prompt=enhance,
             )
             t0 = time.time()
             sampler_node = _split(self._manifest["bind"]["steps"])[0]
-            prompt_id = comfy_client.submit_workflow_and_wait(workflow, str(uuid.uuid4()), sampler_node, on_progress, cancel)
+            prompt_id = comfy_client.submit_workflow_and_wait(
+                workflow, str(uuid.uuid4()), sampler_node, on_progress, cancel,
+                prompt_node=_split(enhancer["prompt"])[0] if enhancer else None,
+            )
             print(f"[{self.name}] ComfyUI generation took {time.time() - t0:.1f}s", flush=True)
-            return comfy_client.fetch_generated_image(prompt_id)
+            output_path = comfy_client.fetch_generated_image(prompt_id)
+            if enhancer:
+                text = comfy_client.fetch_output_text(prompt_id, enhancer["text_node"])
+                if text:
+                    self._remember_enhanced_prompt(output_path, text)
+            return output_path
 
-        cached = cached_infer(_infer, self.display_name, params, seed=seed, **size.cache_kwargs, width=size.width, height=size.height)
+        # The enhancer's own setting is keyed too: params.enhance_prompt does nothing without it.
+        cached = cached_infer(
+            _infer, self.display_name, params, seed=seed, enhance=enhance, **size.cache_kwargs, width=size.width, height=size.height,
+        )
+        raw_output: List[str] = []
 
         def infer(model_input_path: str) -> str:
             output_path = cached(model_input_path)
+            raw_output.append(output_path)
             check_cancel()
             report(ProgressStage.POSTPROCESSING)
             return output_path
@@ -612,13 +716,22 @@ class WorkflowModel:
             input_size=size.input_size,
             match_detail=params.match_detail_enabled,
         )
-        return GenerationResult(before_path=params.source_image_path, after_path=final_output_path, actual_seed=seed)
+        enhanced = self._enhanced_prompts.get(raw_output[-1]) if enhance and raw_output else None
+        return GenerationResult(
+            before_path=params.source_image_path, after_path=final_output_path, actual_seed=seed, enhanced_prompt=enhanced,
+        )
+
+    def _remember_enhanced_prompt(self, output_path: str, text: str) -> None:
+        self._enhanced_prompts[output_path] = text
+        while len(self._enhanced_prompts) > ENHANCED_PROMPTS_KEPT:
+            self._enhanced_prompts.pop(next(iter(self._enhanced_prompts)))
 
 
-def get_model(workflow: str, variant: Optional[str] = None) -> WorkflowModel:
+def get_model(workflow: str, variant: Optional[str] = None, **options: bool) -> WorkflowModel:
     """
     The model of a bundled workflow (by name) or of a workflow file (by path).
-    `variant` selects one of the workflow's variants.
+    `variant` selects one of the workflow's variants; options are
+    WorkflowModel's (prompt_enhancer, lora_downloads).
     """
     bundled = available_workflows()
     if workflow in bundled:
@@ -630,4 +743,4 @@ def get_model(workflow: str, variant: Optional[str] = None) -> WorkflowModel:
             f"Unknown workflow '{workflow}'. Available: {', '.join(sorted(bundled))}; "
             "or give the path of a workflow file."
         )
-    return WorkflowModel.from_file(path, variant)
+    return WorkflowModel.from_file(path, variant, **options)
