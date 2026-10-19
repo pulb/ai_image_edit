@@ -248,9 +248,6 @@ AIE.showPlaceholder = function (id, visible) {
 };
 
 AIE.setMode = function (id, mode) {
-    // Brush/Feather sliders are NiceGUI ui.slider widgets, so their enabled
-    // state is toggled from Python (see set_mode in create_mask_editor)
-    // rather than by reaching into the DOM here.
     const state = AIE[id];
     if (!state) return;
     state.mode = mode;

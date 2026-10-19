@@ -123,8 +123,6 @@ async def create_mask_editor(
                         RangeSpec(FEATHER_RANGE.min, FEATHER_RANGE.max, DEFAULT_FEATHER_AMOUNT, FEATHER_RANGE.step),
                         js_on_value=f"AIE.setFeather('{editor_id}', value);",
                     )
-                    for popup in (brush_popup, feather_popup):
-                        popup.set_enabled(False)
 
                     ui.space()
                     ui.button(icon="layers_clear", on_click=remove_mask).props("flat dense size=md").classes("text-xs").tooltip("Remove mask")
@@ -153,20 +151,16 @@ async def create_mask_editor(
                         js_on_value=f"AIE.setAnnotationStroke('{editor_id}', value); AIE.showBrushPreview('{editor_id}', value);",
                     )
                     stroke_popup.slider.on("change", js_handler=f"() => AIE.hideBrushPreview('{editor_id}')")
-                    stroke_popup.set_enabled(False)
 
                     ui.space()
-                    ui.button(icon="layers_clear", on_click=remove_annotations).props("flat dense size=md").classes("text-xs").tooltip("Remove annotations")
+                    ui.button(icon="layers_clear", on_click=remove_annotations).props("flat dense size=md").classes("text-xs").tooltip(
+                        "Remove annotations"
+                    )
 
             async def set_mode(mode: str) -> None:
                 for radio in (zoom_radio, mask_radio, annotate_radio):
                     if radio is not None:
                         radio.props(f"model-value={mode}")
-                for popup in (brush_popup, feather_popup):
-                    if popup is not None:
-                        popup.set_enabled(mode == "mask")
-                if stroke_popup is not None:
-                    stroke_popup.set_enabled(mode == "annotate")
                 await call_js("AIE", "setMode", editor_id, mode)
 
             async def select_zoom() -> None:
@@ -183,6 +177,14 @@ async def create_mask_editor(
                 mask_radio.on("update:model-value", select_mask)
             if annotate_radio is not None:
                 annotate_radio.on("update:model-value", select_annotate)
+
+            # Like the swatches, every control of a row selects that row's mode.
+            if mask_radio is not None:
+                for element in (brush_popup.button, feather_popup.button):
+                    element.on("click", select_mask)
+            if annotate_radio is not None:
+                for element in (stroke_popup.button,):
+                    element.on("click", select_annotate)
 
     await init_widget("AIE", editor_id, "create_mask_editor")
 

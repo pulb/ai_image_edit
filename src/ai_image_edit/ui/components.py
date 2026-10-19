@@ -263,11 +263,6 @@ class SliderPopup:
             js_handler=f"(value) => {{ document.getElementById('{value_id}').textContent = value; {js_on_value} }}",
         )
 
-    def set_enabled(self, enabled: bool) -> None:
-        # The slider too, so it cannot change even if the menu was open.
-        self.button.set_enabled(enabled)
-        self.slider.set_enabled(enabled)
-
 
 def create_value_slider(spec: RangeSpec) -> ui.slider:
     """
