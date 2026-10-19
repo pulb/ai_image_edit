@@ -414,5 +414,9 @@ AIS.reset = function (id) {
     if (after) { after.removeAttribute('src'); after.style.display = 'none'; }
     if (before) { before.removeAttribute('src'); before.style.display = 'none'; }
     if (state) AIU.resetPanZoom(state.wrap, state);
-    AIS.setCompare(id, false);
+    // The compare setting stays; setImages applies it again with the next result.
+    for (const part of ['_handle', '_range']) {
+        const el = document.getElementById(id + part);
+        if (el) el.style.display = 'none';
+    }
 };

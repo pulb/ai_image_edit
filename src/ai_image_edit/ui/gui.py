@@ -463,7 +463,6 @@ def run(model: WorkflowModel) -> None:
             result_card.use_as_input_btn.disable()
             result_card.download_btn.disable()
             await result_card.reset_result()
-            await result_card.set_compare(result_card.compare_switch.value)
             try:
                 if not editor.editor_holder["path"]:
                     ui.notify("Please upload an image to edit!", type="negative")
@@ -547,13 +546,9 @@ def run(model: WorkflowModel) -> None:
 
             # The previous before/after pair no longer corresponds to the input
             # that's now in place, so clear it and re-disable the controls that
-            # depend on a fresh result. The Compare toggle's own checked/
-            # unchecked state is left alone (not the visual divider, which
-            # reset() unconditionally hides) — reapplying it right after
-            # restores the divider immediately if it was checked, matching the
-            # same reset-then-reapply approach as do_generate.
+            # depend on a fresh result. The Compare toggle keeps its state;
+            # the next result shows the divider again if it is on.
             await result_card.reset_result()
-            await result_card.set_compare(result_card.compare_switch.value)
             result_card.compare_switch.disable()
             result_card.use_as_input_btn.disable()
             result_card.download_btn.disable()
