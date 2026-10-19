@@ -316,8 +316,9 @@ def build_reference_card(model: WorkflowModel, caps: ModelCapabilities) -> Refer
                 with ui.expansion("LoRAs").props("dense").classes("w-full"):
                     card.available_loras.update(model.list_loras())
                     card.lora_name = ui.select(["None"] + list(card.available_loras), value="None", label="Name").props("outlined dark").classes("w-full")
-                    ui.label("Strength").classes("text-xs text-gray-400 q-mt-sm")
-                    card.lora_strength = create_value_slider(caps.lora_strength_range)
+                    with ui.column().classes("w-full gap-0 q-mt-sm"):
+                        ui.label("Strength").classes("text-xs text-gray-400")
+                        card.lora_strength = create_value_slider(caps.lora_strength_range)
     return card
 
 
