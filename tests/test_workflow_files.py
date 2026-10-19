@@ -246,6 +246,20 @@ class ManifestModelTests(unittest.TestCase):
         self.assertEqual([e.stage for e in events],
                          [ProgressStage.PREPARING, ProgressStage.SAMPLING, ProgressStage.POSTPROCESSING])
 
+    def test_lora_downloads_can_be_turned_off(self):
+        found = False
+        for path in MANIFESTS:
+            lora_files = {spec["name"] for spec in WorkflowModel.from_file(path)._manifest.get("loras", {}).get("files", [])}
+            if not lora_files:
+                continue
+            found = True
+            with self.subTest(model=path.stem):
+                self.assertTrue(lora_files <= {i["dest"].name for i in WorkflowModel.from_file(path)._pending_downloads()})
+                off = WorkflowModel.from_file(path, lora_downloads=False)
+                self.assertFalse(lora_files & {i["dest"].name for i in off._pending_downloads()})
+                self.assertTrue(off.capabilities.supports_loras)
+        self.assertTrue(found, "no bundled workflow downloads LoRAs")
+
     def test_a_cancelled_generate_submits_nothing(self):
         model = self.load(workflow_files.available_workflows()["qwen_image21"])
         cancel = threading.Event()

@@ -90,12 +90,18 @@ class WorkflowModel:
     downloads and the start of ComfyUI that start() continues in the
     background), and how to run one generation (generate()), plus a name
     and version to show.
+
+    lora_downloads=False skips downloading the workflow's own LoRA files
+    (LoRAs already in the folder are still offered).
     """
 
-    def __init__(self, name: str, manifest: dict, workflow: dict, variant: Optional[str] = None) -> None:
+    def __init__(
+        self, name: str, manifest: dict, workflow: dict, variant: Optional[str] = None, *, lora_downloads: bool = True,
+    ) -> None:
         self.name = name
         self._manifest = self._with_variant(name, manifest, variant)
         self._workflow = workflow
+        self._lora_downloads = lora_downloads
         self._process: Optional[subprocess.Popen] = None
         self._nodes_checked = False
         self._download_status: Optional[downloads.DownloadStatus] = None
@@ -111,11 +117,11 @@ class WorkflowModel:
         self._validate()
 
     @classmethod
-    def from_file(cls, path: Path, variant: Optional[str] = None) -> "WorkflowModel":
-        """The model described by a workflow file; its name is the file name without .json."""
+    def from_file(cls, path: Path, variant: Optional[str] = None, **options: bool) -> "WorkflowModel":
+        """The model described by a workflow file; its name is the file name without .json. options are __init__'s."""
         path = Path(path)
         manifest, workflow = read_workflow_file(path)
-        return cls(path.stem, manifest, workflow, variant)
+        return cls(path.stem, manifest, workflow, variant, **options)
 
     @staticmethod
     def _with_variant(name: str, manifest: dict, variant: Optional[str]) -> dict:
@@ -262,7 +268,8 @@ class WorkflowModel:
         wanted = [(spec, Path(spec["folder"]) / spec["name"]) for spec in self._manifest.get("files", [])]
         # LoRA files: each goes into its own subfolder of loras.dir (the subfolder is the display name).
         loras = self._manifest.get("loras", {})
-        wanted += [(spec, Path(loras["dir"]) / spec["dir"] / spec["name"]) for spec in loras.get("files", [])]
+        if self._lora_downloads:
+            wanted += [(spec, Path(loras["dir"]) / spec["dir"] / spec["name"]) for spec in loras.get("files", [])]
         return [
             {"url": spec["url"], "dest": dest, "sha256": spec.get("sha256"), "size": spec.get("size"), "license": spec.get("license")}
             for spec, dest in wanted if not dest.is_file()
@@ -615,10 +622,11 @@ class WorkflowModel:
         return GenerationResult(before_path=params.source_image_path, after_path=final_output_path, actual_seed=seed)
 
 
-def get_model(workflow: str, variant: Optional[str] = None) -> WorkflowModel:
+def get_model(workflow: str, variant: Optional[str] = None, **options: bool) -> WorkflowModel:
     """
     The model of a bundled workflow (by name) or of a workflow file (by path).
-    `variant` selects one of the workflow's variants.
+    `variant` selects one of the workflow's variants; options are
+    WorkflowModel's (lora_downloads).
     """
     bundled = available_workflows()
     if workflow in bundled:
@@ -630,4 +638,4 @@ def get_model(workflow: str, variant: Optional[str] = None) -> WorkflowModel:
             f"Unknown workflow '{workflow}'. Available: {', '.join(sorted(bundled))}; "
             "or give the path of a workflow file."
         )
-    return WorkflowModel.from_file(path, variant)
+    return WorkflowModel.from_file(path, variant, **options)

@@ -15,6 +15,7 @@ Python; see [workflow files](contributing/workflow_files.md) for the format and
 |---|---|
 | `--workflow NAME_OR_FILE` / `MODEL_WORKFLOW` | The bundled workflow to run (default `qwen_image21`), or the path of a workflow file of your own. `--list-workflows` prints the bundled names. |
 | `--variant ID` / `MODEL_VARIANT` | One of the workflow's variants, e.g. another quantization. |
+| `--no-lora-downloads` / `DOWNLOAD_LORAS=0` | Skips downloading the LoRAs the workflow brings along. LoRAs already in the folder are still offered. On by default. |
 | `--version` | Prints the app's version and exits. |
 | `ACCEPT_LICENSES` | Licenses you accept, comma-separated (`all` for every one). Files with a license are not downloaded without it. |
 
