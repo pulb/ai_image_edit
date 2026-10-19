@@ -278,8 +278,8 @@ def build_reference_card(model: WorkflowModel, caps: ModelCapabilities) -> Refer
                         holder["container"].set_visibility(False)
 
                     with ui.row().classes("w-full items-center gap-2"):
-                        ref_remove_btn = ui.button(icon="remove").props("flat dense round size=sm")
-                        ref_add_btn = ui.button(icon="add").props("flat dense round size=sm")
+                        ref_remove_btn = ui.button(icon="remove").props("flat dense round size=md")
+                        ref_add_btn = ui.button(icon="add").props("flat dense round size=md")
                         ref_count_label = ui.label().classes("text-xs text-gray-400")
 
                     def update_reference_slots() -> None:
