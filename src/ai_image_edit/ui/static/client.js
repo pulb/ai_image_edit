@@ -122,8 +122,8 @@ AIE.init = function (id) {
     // mode is 'zoom' (the default), 'mask' or 'annotate'; the radio group
     // in create_mask_editor switches it. They are mutually exclusive, so a
     // single finger can safely mean "pan" in zoom mode, since drawing is
-    // only ever active in the other two. Annotations keep a fixed thin
-    // stroke (annotStroke, CSS pixels) in the selected colour.
+    // only ever active in the other two. Annotations use their own
+    // stroke width (annotStroke, CSS pixels) in the selected colour.
     const state = AIU.newPanZoomState({
         canvas: canvas, ctx: canvas.getContext('2d'),
         maskCanvas: maskCanvas, overlayCanvas: overlayCanvas, annotCanvas: annotCanvas,
@@ -305,6 +305,10 @@ AIE.clearImage = function (id) {
 
 AIE.setBrush = function (id, size) {
     if (AIE[id]) AIE[id].brush = Number(size);
+};
+
+AIE.setAnnotationStroke = function (id, size) {
+    if (AIE[id]) AIE[id].annotStroke = Number(size);
 };
 
 AIE.setAnnotationColor = function (id, color) {

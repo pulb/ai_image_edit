@@ -58,18 +58,18 @@ from ai_image_edit.ui.helpers import PRIMARY_COLOR
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 
-# Brush min/max stay hardcoded on the slider itself (5-80) since nothing
-# else in the app references them — only the *default* needs a shared
-# constant, since it's duplicated into the JS-side initial state
+# The brush default is duplicated into the JS-side initial state
 # (__DEFAULT_BRUSH_SIZE__ in client.js) as well as the Python-side ui.slider.
+# The maximum is shared by the mask brush and the annotation stroke.
 DEFAULT_BRUSH_SIZE = 48
+MAX_BRUSH_SIZE = 80
 
 # Same idea for feather: the default is duplicated into the JS initial state
 # (__DEFAULT_FEATHER_AMOUNT__) and the slider.
 DEFAULT_FEATHER_AMOUNT = int(FEATHER_RANGE.default)
 
 # Annotation stroke width in on-screen CSS pixels (converted to image pixels
-# at draw time, like the brush). Thin and fixed: there is no slider.
+# at draw time, like the brush). This is the default of the stroke slider.
 ANNOTATION_STROKE = 3
 
 WIDGET_CSS = (STATIC_DIR / "widgets.css").read_text(encoding="utf-8").replace("__PRIMARY_COLOR__", PRIMARY_COLOR)

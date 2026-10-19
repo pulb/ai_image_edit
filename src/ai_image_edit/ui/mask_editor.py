@@ -7,7 +7,7 @@ from nicegui import ui
 
 from ai_image_edit.core.paths import to_url
 from ai_image_edit.core.types import ANNOTATION_COLORS, FEATHER_RANGE, RangeSpec
-from ai_image_edit.ui.assets import DEFAULT_BRUSH_SIZE, DEFAULT_FEATHER_AMOUNT
+from ai_image_edit.ui.assets import ANNOTATION_STROKE, DEFAULT_BRUSH_SIZE, DEFAULT_FEATHER_AMOUNT, MAX_BRUSH_SIZE
 from ai_image_edit.ui.components import GROUP_CLASSES, PLACEHOLDER_TEXT, SliderPopup, attach_file_picker, call_js, create_image_frame, init_widget, save_data_url
 
 
@@ -96,7 +96,7 @@ async def create_mask_editor(
         await call_js("AIE", "clearAnnotations", editor_id)
 
     swatches: Dict[str, ui.button] = {}
-    mask_radio = brush_popup = feather_popup = None
+    mask_radio = brush_popup = feather_popup = stroke_popup = None
 
     if supports_mask or num_annotation_colors > 0:
         with ui.column().classes(GROUP_CLASSES + " p-4"):
@@ -114,7 +114,7 @@ async def create_mask_editor(
                     # dragged brush size). 'update:model-value' fires continuously while
                     # dragging, 'change' once on release.
                     brush_popup = SliderPopup(
-                        "brush", "Brush size", RangeSpec(5, 80, DEFAULT_BRUSH_SIZE),
+                        "brush", "Brush size", RangeSpec(5, MAX_BRUSH_SIZE, DEFAULT_BRUSH_SIZE),
                         js_on_value=f"AIE.setBrush('{editor_id}', value); AIE.showBrushPreview('{editor_id}', value);",
                     )
                     brush_popup.slider.on("change", js_handler=f"() => AIE.hideBrushPreview('{editor_id}')")
@@ -148,6 +148,13 @@ async def create_mask_editor(
                             .style(f"background: {color} !important")
                         )
 
+                    stroke_popup = SliderPopup(
+                        "line_weight", "Stroke width", RangeSpec(1, MAX_BRUSH_SIZE, ANNOTATION_STROKE),
+                        js_on_value=f"AIE.setAnnotationStroke('{editor_id}', value); AIE.showBrushPreview('{editor_id}', value);",
+                    )
+                    stroke_popup.slider.on("change", js_handler=f"() => AIE.hideBrushPreview('{editor_id}')")
+                    stroke_popup.set_enabled(False)
+
                     ui.space()
                     ui.button(icon="layers_clear", on_click=remove_annotations).props("flat dense size=md").classes("text-xs").tooltip("Remove annotations")
 
@@ -158,6 +165,8 @@ async def create_mask_editor(
                 for popup in (brush_popup, feather_popup):
                     if popup is not None:
                         popup.set_enabled(mode == "mask")
+                if stroke_popup is not None:
+                    stroke_popup.set_enabled(mode == "annotate")
                 await call_js("AIE", "setMode", editor_id, mode)
 
             async def select_zoom() -> None:
