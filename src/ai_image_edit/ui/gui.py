@@ -187,14 +187,16 @@ def build_advanced_card(caps: ModelCapabilities) -> AdvancedCard:
                                         ui.label(RESCALE_MODE_OPTIONS[mode]).classes("text-xs text-weight-bold")
                                         ui.label(description).classes("text-xs")
 
-                with ui.row().classes("items-center no-wrap"):
+                with ui.row().classes("w-full items-center no-wrap"):
                     match_detail = ui.switch("Match sharpness and grain", value=True)
+                    ui.space()
                     with ui.button(icon="info").props("flat round dense size=sm").classes("text-gray-400"):
                         with ui.menu():
                             ui.label(MATCH_DETAIL_INFO).classes("text-xs q-pa-sm").style("max-width: 280px")
 
-                with ui.row().classes("items-center no-wrap"):
+                with ui.row().classes("w-full items-center no-wrap"):
                     color_correction = ui.switch("Apply color corrections", value=False)
+                    ui.space()
                     with ui.button(icon="info").props("flat round dense size=sm").classes("text-gray-400"):
                         with ui.menu():
                             ui.label(COLOR_CORRECTION_INFO).classes("text-xs q-pa-sm").style("max-width: 280px")
