@@ -27,7 +27,7 @@ from ai_image_edit.core.types import (
 )
 from ai_image_edit.ui.assets import CLIENT_JS, WIDGET_CSS
 from ai_image_edit.ui.compare_slider import create_compare_slider
-from ai_image_edit.ui.components import GROUP_CLASSES, GenerationProgressOverlay, StatusLine, apply_dark_theme, create_simple_image_upload, create_value_slider
+from ai_image_edit.ui.components import GROUP_BG, GROUP_CLASSES, GenerationProgressOverlay, StatusLine, apply_dark_theme, create_simple_image_upload, create_value_slider
 from ai_image_edit.ui.helpers import (
     HOST,
     RESCALE_MODE_OPTIONS,
@@ -205,6 +205,9 @@ def build_advanced_card(caps: ModelCapabilities) -> AdvancedCard:
     )
 
 
+FORMAT_LABELS = {"png": "PNG", "jpeg": "JPEG"}
+
+
 @dataclass
 class ResultCard:
     set_result_images: Callable
@@ -213,7 +216,7 @@ class ResultCard:
     get_result_after_path: Callable
     compare_switch: ui.switch
     use_as_input_btn: ui.button
-    download_btn: ui.button
+    download_btn: ui.dropdown_button
     progress: GenerationProgressOverlay
 
 
@@ -224,22 +227,59 @@ async def build_result_card() -> ResultCard:
             progress = GenerationProgressOverlay()
 
         with ui.row().classes("w-full items-center no-wrap gap-0"):
-            compare_switch = ui.switch("Compare input / output", value=False)
+            compare_switch = ui.switch("Compare", value=False).tooltip("Compare input / output")
             compare_switch.disable()
 
             ui.space()
 
             use_as_input_btn = (
-                ui.button(icon="move_up").props('flat dense size=md aria-label="Use as input"')
-                .classes("text-xs").tooltip("Use as input")
+                ui.button(icon="move_up", color=GROUP_BG)
+                .props('unelevated dense size=md text-color=primary aria-label="Use as input"')
+                .classes("text-xs q-px-xs").tooltip("Use as input")
             )
             use_as_input_btn.disable()
 
+            # Split: the icon downloads in the chosen format, the arrow opens the choice.
+            download_format = {"value": "png"}
             download_btn = (
-                ui.button(icon="download").props('flat dense size=md aria-label="Download result"')
-                .classes("text-xs").tooltip("Download result")
+                ui.dropdown_button("PNG", icon="download", color=GROUP_BG, split=True, auto_close=True)
+                # A title, not a tooltip: the dropdown's children make up its menu.
+                .props('unelevated dense no-caps size=md text-color=primary aria-label="Download result" '
+                       'toggle-aria-label="Choose the download format" title="Download result"')
+                .classes("text-xs q-ml-sm aie-download")
             )
+            with download_btn, ui.list().props("dense").style("min-width: 150px"):
+                format_items = {}
+                for fmt, icon, label in (("png", "image", "PNG (lossless)"), ("jpeg", "photo", "JPEG")):
+                    with ui.item(on_click=lambda fmt=fmt: select_format(fmt)) as item:
+                        with ui.item_section().props("avatar").style("min-width: 32px"):
+                            ui.icon(icon)
+                        ui.item_section(label)
+                    format_items[fmt] = item
             download_btn.disable()
+
+        def select_format(choice: str) -> None:
+            download_format["value"] = choice
+            download_btn.set_text(FORMAT_LABELS[choice])
+            for fmt, item in format_items.items():
+                if fmt == download_format["value"]:
+                    item.props("active")
+                else:
+                    item.props(remove="active")
+
+        async def download() -> None:
+            after_path = await get_result_after_path()
+            if not after_path:
+                ui.notify("No generated image to download yet.", type="negative")
+                return
+            if download_format["value"] == "jpeg":
+                after_path = await nicegui_run.io_bound(imaging.save_as_jpeg, after_path)
+            # The file's regular address, not a single-use link: phone browsers
+            # may fetch a download twice, and the second fetch of such a link fails.
+            ui.download.from_url(to_url(after_path), filename=Path(after_path).name)
+
+        select_format(download_format["value"])
+        download_btn.on_click(download)
 
         async def on_compare_change(e) -> None:
             await set_compare(e.value)
@@ -580,17 +620,6 @@ def run(model: WorkflowModel) -> None:
 
         setup_timer = ui.timer(1.0, refresh_setup)  # stops itself once the setup is done
         refresh_setup()
-
-        async def download_result() -> None:
-            after_path = await result_card.get_result_after_path()
-            if not after_path:
-                ui.notify("No generated image to download yet.", type="negative")
-                return
-            # The file's regular address, not a single-use link: phone browsers
-            # may fetch a download twice, and the second fetch of such a link fails.
-            ui.download.from_url(to_url(after_path), filename=Path(after_path).name)
-
-        result_card.download_btn.on_click(download_result)
 
     # Serve everything under WORK_DIR at /files/<n> so <img>/<canvas> loads in
     # the browser can reference uploaded/generated files directly by URL.

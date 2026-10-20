@@ -617,6 +617,31 @@ def prepare_upload(image_path: str) -> str:
     return str(png_path)
 
 
+JPEG_QUALITY = 95
+
+
+def save_as_jpeg(image_path: str) -> str:
+    """
+    A JPEG copy of the image next to it (`<stem>.jpg`), made once and reused.
+    Full-resolution colour (no chroma subsampling), as that would blur small
+    edited areas; transparency is flattened onto white.
+    """
+    jpeg_path = Path(image_path).with_suffix(".jpg")
+    if jpeg_path.exists():
+        return str(jpeg_path)
+    with Image.open(image_path) as img:
+        if "A" in img.getbands() or img.mode == "P":
+            rgba = img.convert("RGBA")
+            rgb = Image.new("RGB", rgba.size, (255, 255, 255))
+            rgb.paste(rgba, mask=rgba.getchannel("A"))
+        else:
+            rgb = img.convert("RGB")
+    partial = jpeg_path.with_name(jpeg_path.name + ".part")
+    rgb.save(partial, format="JPEG", quality=JPEG_QUALITY, subsampling=0)
+    partial.replace(jpeg_path)
+    return str(jpeg_path)
+
+
 def compose_annotations(source_image_path: str, layer_path: str) -> str:
     """
     Draws the transparent annotation layer onto the source image and saves

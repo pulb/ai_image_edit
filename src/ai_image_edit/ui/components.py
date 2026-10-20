@@ -104,7 +104,10 @@ class GenerationProgressOverlay(StatusLine):
         super().__init__("aie-progress-overlay")
 
 
-GROUP_CLASSES = "w-full gap-3 bg-[#1f1f1f] rounded-lg"
+GROUP_BG = "#1f1f1f"
+"""The background of grouped controls (GROUP_CLASSES) and of filled buttons on a card, a little brighter than the card."""
+
+GROUP_CLASSES = f"w-full gap-3 bg-[{GROUP_BG}] rounded-lg"
 """A box that groups controls on a card, a little brighter than the card. Padding is added by the user: p-4 around controls that have inner padding of their own (radios), p-6 around plain fields."""
 
 

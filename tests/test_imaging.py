@@ -853,6 +853,31 @@ def _wide_gamut_profile() -> bytes:
     return header + struct.pack(">I", len(tags)) + table + data
 
 
+class SaveAsJpegTest(unittest.TestCase):
+    def test_writes_a_full_colour_jpeg_next_to_the_image_once(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            png = Path(tmp) / "result.png"
+            Image.new("RGB", (64, 32), (200, 40, 40)).save(png)
+            jpeg = imaging.save_as_jpeg(str(png))
+            self.assertEqual(jpeg, str(Path(tmp) / "result.jpg"))
+            with Image.open(jpeg) as img:
+                self.assertEqual((img.format, img.size), ("JPEG", (64, 32)))
+                self.assertEqual([(h, v) for _, h, v, _ in img.layer], [(1, 1)] * 3)  # no chroma subsampling (4:4:4)
+                self.assertLess(max(abs(a - b) for a, b in zip(img.getpixel((10, 10)), (200, 40, 40))), 4)
+            mtime = Path(jpeg).stat().st_mtime_ns
+            self.assertEqual(imaging.save_as_jpeg(str(png)), jpeg)
+            self.assertEqual(Path(jpeg).stat().st_mtime_ns, mtime)
+            self.assertEqual(sorted(p.name for p in Path(tmp).iterdir()), ["result.jpg", "result.png"])
+
+    def test_transparency_becomes_white(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            png = Path(tmp) / "clear.png"
+            Image.new("RGBA", (16, 16), (0, 0, 0, 0)).save(png)
+            with Image.open(imaging.save_as_jpeg(str(png))) as img:
+                self.assertEqual(img.mode, "RGB")
+                self.assertGreater(min(img.getpixel((8, 8))), 250)
+
+
 class PrepareUploadTest(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()

@@ -179,3 +179,8 @@
     max-width: 720px;
     margin: 0 auto;
 }
+
+/* The format label of the split download button: room before the divider. */
+.aie-download > .q-btn:first-child {
+    padding-right: 0.75em;
+}
