@@ -43,6 +43,22 @@ mistyped node id or input name fails when the model loads.
 | `loras` | Omit if the model has none. Chains one `loader_class` node per selected file from `first_id`; `from` are the links it starts from, `outputs` the names of its outputs, `feeds` the targets that receive the final links, `strength_inputs` the inputs that get the strength. `dir` is searched for LoRA files. `files` (`[{dir, name, url, sha256, size, license}]`) are LoRA files downloaded like `files` above if missing: `dir` is the subfolder of the LoRA (its display name; one LoRA can have several files), `name` the file. A LoRA downloaded in the background is added to the UI list as soon as its files are there. `DOWNLOAD_LORAS=0` skips these downloads. |
 | `capabilities` | What the UI offers: `supports_inpainting`, `num_annotation_colors`, `sampler`/`scheduler` (`default`, optional `choices`), and ranges (`min`, `max`, `default`, `step`) for `steps`, `cfg`, `denoise`, `lora_strength`. |
 
+## Converting a workflow from the editor
+
+The `workflow` section is the API format ("Save (API Format)"). A workflow saved with plain "Save"
+can be converted with `tools/convert_workflow.py`, which needs the node definitions of a ComfyUI that
+has the workflow's nodes installed (its URL, or its `/object_info` saved to a file):
+
+```
+python tools/convert_workflow.py my_workflow.json --object-info http://127.0.0.1:8188 -o model.json
+```
+
+It writes a workflow file whose manifest binds the first sampler, the prompts its conditioning comes
+from, the first `LoadImage` and an empty latent image (as a `fixed_area` size), and lists the files
+the model loaders name, with an empty `url` (`https://`). That is a starting point: the notes it prints
+say what is left (download URLs and licenses, custom nodes, reference images, LoRAs). `--api-only`
+writes just the graph. Subgraphs are not supported.
+
 ## Tests
 
 `PYTHONPATH=src python -m unittest discover -s tests` checks every file in

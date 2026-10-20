@@ -116,3 +116,6 @@ Rules for any AI coding agent working in this repository.
   node installation, the entry points, the GPU argument choice, the ComfyUI client, image compositing and the session secret. Run them
   after any change; for code they don't reach (the UI, the ComfyUI client),
   also read the affected code paths end to end.
+- `tools/` holds scripts for working on the app, not part of it
+  (`convert_workflow.py`, tested in `tests/test_convert_workflow.py`). When
+  the workflow file format changes, update the converter with it.
