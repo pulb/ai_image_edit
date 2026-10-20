@@ -271,21 +271,9 @@ class WorkflowModel:
         if self._lora_downloads:
             wanted += [(spec, Path(loras["dir"]) / spec["dir"] / spec["name"]) for spec in loras.get("files", [])]
         return [
-            {"url": spec["url"], "dest": dest, "sha256": spec.get("sha256"), "size": spec.get("size"), "license": spec.get("license")}
+            {"url": spec["url"], "dest": dest, "sha256": spec.get("sha256"), "size": spec.get("size")}
             for spec, dest in wanted if not dest.is_file()
         ]
-
-    def _check_licenses(self, pending: List[dict]) -> None:
-        """Downloading a file whose license needs accepting requires ACCEPT_LICENSES to name it."""
-        accepted = {part.strip() for part in os.environ.get("ACCEPT_LICENSES", "").split(",")}
-        for item in pending:
-            lic = item["license"]
-            if lic and lic not in accepted and "all" not in accepted:
-                info = self._manifest["licenses"][lic]
-                raise RuntimeError(
-                    f"{self.name} needs {item['dest'].name}, which is under the {info['name']} ({info['url']}). "
-                    f"Read it and, if you accept it, set ACCEPT_LICENSES={lic} to let the app download the file."
-                )
 
     def _weights_bytes(self) -> int:
         """Total size of the model files (not the LoRAs), which ComfyUI loads for a generation."""
@@ -321,7 +309,6 @@ class WorkflowModel:
         if not pending and not nodes:
             self._launch_comfy()
             return
-        self._check_licenses(pending)
         status = self._download_status = downloads.DownloadStatus()
 
         def prepare_and_launch() -> None:

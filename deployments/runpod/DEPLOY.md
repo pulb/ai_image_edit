@@ -25,8 +25,8 @@ the image.
 
 1. Create a Pod from the image, exposing HTTP port `7860`, e.g.
    `ghcr.io/pulb/ai_image_edit:latest`. The default is `qwen_image21`; select another with
-   `MODEL_WORKFLOW`. Accept the weights' license with `ACCEPT_LICENSES=qwen-research` (for the
-   Qwen-Image-2.1 models). Choose one of the GPUs the template recommends
+   `MODEL_WORKFLOW`. The Qwen-Image-2.1 weights are for non-commercial use only
+   ([license](https://huggingface.co/Qwen/Qwen-Image-2.1/raw/main/LICENSE)). Choose one of the GPUs the template recommends
    that has enough memory: at least 48 GB of VRAM for `qwen_image21` and `qwen_image21_turbo`, at least
    16 GB for the GGUF workflows.
 2. Optional: attach a network volume (a Pod mounts it at `/workspace`) so the

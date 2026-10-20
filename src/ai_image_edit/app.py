@@ -72,7 +72,6 @@ def describe_config(model: WorkflowModel, workflow: str, variant: Optional[str],
         ("download connections", downloads.connections()),
         ("CUDA_VISIBLE_DEVICES", os.environ.get("CUDA_VISIBLE_DEVICES", "(not set)")),
         ("CUDA_DEVICE_ORDER", gpu.device_order()),
-        ("accepted licenses", os.environ.get("ACCEPT_LICENSES", "").strip() or "(none)"),
         ("password login", "on" if os.environ.get("APP_PASSWORD") else "off"),
         ("HF_TOKEN", flag("HF_TOKEN")),
     ]

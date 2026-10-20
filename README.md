@@ -38,6 +38,9 @@ starts. These are included:
 - **`qwen_image_edit_2511_aio`**: Qwen-Image-Edit 2511 with a set of LoRAs, for
   fast edits in just a few steps.
 
+**The Qwen-Image-2.1 workflows are for non-commercial use only**, see
+[License](#license).
+
 The [deployments](#deployments) are already preconfigured. More details about
 each workflow, its variants and licenses are in [doc/models.md](doc/models.md).
 
@@ -87,9 +90,11 @@ not under the GPL. They are downloaded from their publishers when a model
 starts, and each has its own license. Check the licenses of the linked
 repositories before use.
 
-A model whose files carry a license that must be accepted is not downloaded
-until you accept it with `ACCEPT_LICENSES`; the error names the license and its
-URL. Custom nodes installed for a workflow keep their own licenses.
+The Qwen-Image-2.1 weights used by the `qwen_image21*` workflows are under the
+[Qwen Research License](https://huggingface.co/Qwen/Qwen-Image-2.1/raw/main/LICENSE).
+**They may be used for non-commercial purposes only (research or evaluation).**
+By using them you accept that license. Custom nodes installed for a workflow
+keep their own licenses.
 
 Copyright (C) 2026 AI Image Edit authors
 

@@ -64,8 +64,7 @@ install is reported the same way and retried on the next start.
 - Folders are relative to the directory the app runs in (the ComfyUI root). To keep the weights
   elsewhere, mount a volume at `<ComfyUI root>/models`.
 - `HF_TOKEN` is sent as a bearer token to huggingface.co only.
-- A file with a `license` is only downloaded if `ACCEPT_LICENSES` (comma-separated ids, or `all`)
-  lists it; otherwise starting the model fails with the license's name and URL. Read the license
-  and set the variable only if you accept it.
+- A file's `license` names an entry of `licenses`; it is documentation, the download does not
+  depend on it. Say in the workflow's documentation when a license limits its use.
 - `sha256` and `size` are optional; use them for files you have checked, so a corrupt or replaced
   file is rejected.

@@ -59,14 +59,13 @@ image is small and, as it contains no weights, can be public.
 docker build -f deployments/docker/Dockerfile -t ai-image-edit deployments/docker
 docker run -p 7860:7860 --gpus all --shm-size=640m \
     -v ai-image-edit-models:/home/user/app/models \
-    -e APP_PASSWORD=... -e ACCEPT_LICENSES=qwen-research ai-image-edit
+    -e APP_PASSWORD=... ai-image-edit
 ```
 
 | Variable | Meaning |
 |---|---|
 | `MODEL_WORKFLOW` | Model workflow: `qwen_image21` (default; the official bf16 weights, or the smaller `int8` ones with `MODEL_VARIANT=int8`; needs a large GPU), `qwen_image21_gguf` (quantized, for smaller GPUs), `qwen_image21_turbo` / `qwen_image21_turbo_gguf` (the 8-step Turbo version, full precision or quantized) or `qwen_image_edit_2511_aio`. A path to a workflow file in the container (mount it) runs that file instead. |
 | `MODEL_VARIANT` | Variant of the model, e.g. `Q8_0` for `qwen_image21_gguf` (`Q4_0`, `Q4_K_M` (default), `Q5_K_M`, `Q6_K`, `Q8_0`, `BF16`: the uncensored third-party version; `standard-Q4_0` to `standard-Q8_0`: the unmodified model; `qwen_image21_turbo_gguf` has `Q2_K` to `F16`, default `Q4_K_M`). Larger is better and needs more memory. |
-| `ACCEPT_LICENSES` | Licenses you accept, comma-separated (`all` for every one). A model whose files have a license is not downloaded without it; the error names the license and its URL. Every `qwen_image21*` workflow needs `qwen-research`. |
 | `DOWNLOAD_LORAS` | `0` skips the LoRAs a workflow brings along (the Turbo LoRA of `qwen_image21`). LoRAs already in the folder are still offered. On by default. |
 | `DOWNLOAD_CONNECTIONS` | Parts of a file downloaded at once (default 8, at most 32). |
 | `HF_TOKEN` | Hugging Face token, if a file needs a login. Sent to Hugging Face only. |
@@ -87,9 +86,10 @@ if it takes more than `COMFY_GENERATION_MAX_TIME` seconds in all (default
 
 The GPU needs at least 16 GB of VRAM for `qwen_image21_gguf`. `qwen_image21` with the bf16 weights needs far more; it was tested on an A100, and `MODEL_VARIANT=int8` uses less.
 
-The Qwen-Image-2.1 weights are under the Qwen RESEARCH LICENSE AGREEMENT
-(non-commercial use only), which is why they are not in the image and why you
-accept it with `ACCEPT_LICENSES` when you run it.
+The Qwen-Image-2.1 weights are under the
+[Qwen RESEARCH LICENSE AGREEMENT](https://huggingface.co/Qwen/Qwen-Image-2.1/raw/main/LICENSE):
+**non-commercial use only.** They are not in the image but downloaded when the
+model starts, and using them means accepting that license.
 
 Build arguments: `APP_REPO` and `APP_REF` (where the app is installed from:
 `pulb/ai_image_edit` at `main` by default; the image is not built from the

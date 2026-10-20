@@ -79,14 +79,14 @@ class SelectionTests(unittest.TestCase):
 
     def test_startup_prints_the_configuration_without_secrets(self):
         os.environ.update(
-            MODEL_VARIANT="Q8_0", APP_PASSWORD="hunter2", HF_TOKEN="hf_secret", ACCEPT_LICENSES="qwen-research",
+            MODEL_VARIANT="Q8_0", APP_PASSWORD="hunter2", HF_TOKEN="hf_secret",
             CUDA_VISIBLE_DEVICES="1",
         )
         self.model.display_name = "Some Model"
         with mock.patch("builtins.print") as out:
             app.main([])
         printed = "\n".join(str(call.args[0]) for call in out.call_args_list if call.args)
-        for expected in ("Q8_0", "Some Model", "work directory", "CUDA_VISIBLE_DEVICES:", "qwen-research", "password login", "on"):
+        for expected in ("Q8_0", "Some Model", "work directory", "CUDA_VISIBLE_DEVICES:", "password login", "on"):
             self.assertIn(expected, printed)
         self.assertNotIn("hunter2", printed)
         self.assertNotIn("hf_secret", printed)
@@ -117,7 +117,7 @@ class SelectionTests(unittest.TestCase):
             app.main(["--workflow", "z"])
 
     def test_start_failure_is_a_clean_exit(self):
-        for error in (RuntimeError("license not accepted"), FileNotFoundError("main.py")):
+        for error in (RuntimeError("setup failed"), FileNotFoundError("main.py")):
             self.model.start.side_effect = error
             with self.assertRaisesRegex(SystemExit, str(error)):
                 app.main([])

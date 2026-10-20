@@ -118,7 +118,7 @@
         "required_nodes": {"type": "array", "items": {"type": "string"}},
         "missing_nodes_hint": {"type": "string"},
         "licenses": {
-          "description": "Licenses a file can refer to. Downloading a file with a license requires the user to accept it (ACCEPT_LICENSES=<id>).",
+          "description": "Licenses a file can refer to, by id: the name and where to read it.",
           "type": "object",
           "additionalProperties": {
             "type": "object",

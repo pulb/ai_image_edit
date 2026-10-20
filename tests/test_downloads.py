@@ -208,7 +208,6 @@ class ModelStartTests(ServerCase):
         env = mock.patch.dict(os.environ)
         env.start()
         self.addCleanup(env.stop)
-        os.environ.pop("ACCEPT_LICENSES", None)
         self.process = mock.Mock(**{"poll.return_value": None})
         launch = mock.patch.object(client, "launch_comfy_process", return_value=self.process)
         self.launch = launch.start()
@@ -290,15 +289,12 @@ class ModelStartTests(ServerCase):
         self.assertEqual(Handler.hits, [])
         self.launch.assert_called_once()
 
-    def test_license_must_be_accepted(self):
+    def test_a_file_with_a_license_is_downloaded_without_further_ado(self):
         model = self.model(license="lic")
-        with self.assertRaisesRegex(RuntimeError, r"ACCEPT_LICENSES=lic.*example.org/lic|example.org/lic.*ACCEPT_LICENSES=lic"):
-            model.start()
-        self.assertEqual(Handler.hits, [])
-        os.environ["ACCEPT_LICENSES"] = "other, lic"
         model.start()
         self.assertTrue(model._download_status.finished.wait(10))
         self.assertIsNone(model._download_status.error)
+        self.assertTrue(Handler.hits)
 
     def test_failed_download_is_reported(self):
         model = self.model()
