@@ -303,7 +303,7 @@ class WorkflowModel:
             time.sleep(COMFY_POLL_SECONDS)
 
     def start(self) -> None:
-        # Checked before anything starts, so a missing setting or file fails fast.
+        # Missing files and custom nodes are fetched in the background, then ComfyUI is launched.
         pending = self._pending_downloads()
         nodes = custom_nodes.missing(self._manifest.get("custom_nodes", []))
         if not pending and not nodes:

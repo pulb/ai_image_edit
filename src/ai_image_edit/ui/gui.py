@@ -211,7 +211,6 @@ FORMAT_LABELS = {"png": "PNG", "jpeg": "JPEG"}
 @dataclass
 class ResultCard:
     set_result_images: Callable
-    set_compare: Callable
     reset_result: Callable
     get_result_after_path: Callable
     compare_switch: ui.switch
@@ -286,7 +285,7 @@ async def build_result_card() -> ResultCard:
 
         compare_switch.on_value_change(on_compare_change)
     return ResultCard(
-        set_result_images, set_compare, reset_result, get_result_after_path,
+        set_result_images, reset_result, get_result_after_path,
         compare_switch, use_as_input_btn, download_btn, progress,
     )
 

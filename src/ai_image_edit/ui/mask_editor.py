@@ -33,8 +33,8 @@ async def create_mask_editor(
     drawing an optional inpainting mask, with a resizable brush. A radio
     group switches between pinch-to-zoom (default), mask drawing and,
     when num_annotation_colors > 0, annotating in one of that many colours
-    (ANNOTATION_COLORS, thin fixed stroke). Drawing a stroke in mask mode
-    makes this an Inpaint Edit, "Remove mask" reverts to a plain Image Edit;
+    (ANNOTATION_COLORS, with an adjustable stroke width). Drawing a stroke in
+    mask mode makes this an Inpaint Edit, "Remove mask" reverts to a plain Image Edit;
     without supports_mask there is no mask mode. The Feather slider
     (FEATHER_RANGE) is the Gaussian blur radius composite_with_soft_transition()
     applies to the mask edges; 0 falls back to a hard cutout.
@@ -183,8 +183,7 @@ async def create_mask_editor(
                 for element in (brush_popup.button, feather_popup.button):
                     element.on("click", select_mask)
             if annotate_radio is not None:
-                for element in (stroke_popup.button,):
-                    element.on("click", select_annotate)
+                stroke_popup.button.on("click", select_annotate)
 
     await init_widget("AIE", editor_id, "create_mask_editor")
 
