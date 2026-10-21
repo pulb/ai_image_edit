@@ -58,8 +58,8 @@ ComfyUI, PyTorch and the app, without model weights. Which model runs is
 chosen when the container starts, and its weights, LoRAs and custom nodes
 are fetched on first start as its workflow file lists them (see
 [Downloads](../../doc/contributing/workflow_files.md#downloads)). While that
-runs the app is already up and says what is being downloaded when you try to
-generate; ComfyUI starts when everything is there. Nothing is baked in, so the
+runs the app is already up: the page shows the progress, and Generate stays off
+until everything is there and ComfyUI has started. Nothing is baked in, so the
 image is small and, as it contains no weights, can be public.
 
 ```bash
@@ -77,14 +77,15 @@ docker run -p 7860:7860 --gpus all --shm-size=640m \
 | `DOWNLOAD_CONNECTIONS` | Parts of a file downloaded at once (default 8, at most 32). |
 | `HF_TOKEN` | Hugging Face token, if a file needs a login. Sent to Hugging Face only. |
 
-The same can be given as arguments: `docker run ... ai-image-edit python -m
-ai-image-edit --workflow qwen_image21_gguf --variant Q8_0` (`--no-lora-downloads` for
-`DOWNLOAD_LORAS=0`).
+The same can be given as arguments to the image's command, `ai-image-edit`:
+`docker run ... ai-image-edit ai-image-edit --workflow qwen_image21_gguf --variant Q8_0`
+(`--no-lora-downloads` for `DOWNLOAD_LORAS=0`).
 
 The model folders are below `/home/user/app/models`. **Mount a volume there**
 (as above), or the weights (about 15 GB for `qwen_image21_gguf`) are
 downloaded again by every new container. Any other location works the same
 way: it is just the volume you mount.
+
 A generation is abandoned if ComfyUI reports no progress (a node starting or a
 sampler step) for `COMFY_GENERATION_TIMEOUT` seconds (default 300; a single
 node such as loading the weights from a slow disk must finish within it), or

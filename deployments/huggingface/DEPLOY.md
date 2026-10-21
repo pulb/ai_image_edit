@@ -13,8 +13,9 @@ ComfyUI process, which needs a regular GPU. The UI is served on port `7860`.
    `README.md` card (`sdk: docker`, `app_port: 7860`) and the `Dockerfile`, which
    is a symlink to [`../docker/Dockerfile`](../docker/Dockerfile). Copy the
    symlink's target, not the link itself (`cp -L`).
-3. Optional: under **Settings → Variables and secrets** set `MODEL_WORKFLOW` to change the model from
-   the default `qwen_image21`, plus any other optional variable from [Docker](../docker/DEPLOY.md). The
+3. Under **Settings → Variables and secrets** add the secret `APP_PASSWORD`, the password for the
+   app (see below). Optionally set `MODEL_WORKFLOW` to change the model from the default
+   `qwen_image21`, plus any other optional variable from [Docker](../docker/DEPLOY.md). The
    weights download on first start. The Qwen-Image-2.1 weights are for non-commercial use only
    ([license](https://huggingface.co/Qwen/Qwen-Image-2.1/raw/main/LICENSE)).
 
