@@ -497,6 +497,9 @@ def run(model: WorkflowModel) -> None:
             refresh_progress()
 
         async def do_generate() -> None:
+            if not editor.editor_holder["path"]:
+                ui.notify("Please upload an image to edit!", type="negative")
+                return
             running["cancel"] = threading.Event()
             generate_btn.set_text("Cancel")
             result_card.compare_switch.disable()
@@ -504,10 +507,6 @@ def run(model: WorkflowModel) -> None:
             result_card.download_btn.disable()
             await result_card.reset_result()
             try:
-                if not editor.editor_holder["path"]:
-                    ui.notify("Please upload an image to edit!", type="negative")
-                    return
-
                 source_image_path = editor.editor_holder["path"]
                 editor_inputs = await editor.get_editor_inputs()
                 annotated_image_path = None
