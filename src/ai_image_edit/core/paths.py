@@ -20,7 +20,7 @@ from urllib.parse import quote, unquote
 # persistent storage) and falls back to ./app_work where /dev/shm is not
 # usable. AI_IMAGE_EDIT_WORK_DIR overrides it. AI_IMAGE_EDIT_WORK_MAX_SIZE is
 # the cap trim_work_dir() enforces, itself limited by the size of the
-# filesystem (e.g. docker run --shm-size).
+# filesystem (e.g. docker run --shm-size); read_settings() applies it.
 _SHM = Path("/dev/shm")
 
 
@@ -33,6 +33,7 @@ def _default_work_dir() -> Path:
 WORK_DIR = Path(os.environ.get("AI_IMAGE_EDIT_WORK_DIR") or _default_work_dir())
 WORK_DIR.mkdir(parents=True, exist_ok=True)
 
+DEFAULT_WORK_MAX_SIZE = "512m"
 _UNITS = {"k": 1024, "m": 1024**2, "g": 1024**3, "t": 1024**4}
 
 
@@ -61,7 +62,11 @@ def _effective_max_bytes() -> int:
     writes fail before any cap is reached. 0 means "as much as the
     filesystem allows". Prints a warning when the setting had to be lowered.
     """
-    configured = parse_size(os.environ.get("AI_IMAGE_EDIT_WORK_MAX_SIZE", "512m") or "0")
+    raw = os.environ.get("AI_IMAGE_EDIT_WORK_MAX_SIZE", DEFAULT_WORK_MAX_SIZE)
+    try:
+        configured = parse_size(raw or "0")
+    except ValueError:
+        raise ValueError(f"AI_IMAGE_EDIT_WORK_MAX_SIZE={raw!r} is not a size such as 512m or 2g.") from None
     limit = int(shutil.disk_usage(WORK_DIR).total * 0.9)
     if configured <= 0:
         return limit
@@ -75,7 +80,13 @@ def _effective_max_bytes() -> int:
     return min(configured, limit)
 
 
-WORK_MAX_BYTES = _effective_max_bytes()
+WORK_MAX_BYTES = parse_size(DEFAULT_WORK_MAX_SIZE)
+
+
+def read_settings() -> None:
+    """Applies AI_IMAGE_EDIT_WORK_MAX_SIZE (see _effective_max_bytes()); raises ValueError for an invalid value."""
+    global WORK_MAX_BYTES
+    WORK_MAX_BYTES = _effective_max_bytes()
 
 
 def trim_work_dir(keep: int = 0, protect: Iterable[str] = ()) -> None:

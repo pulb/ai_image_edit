@@ -26,6 +26,7 @@ except ImportError:
 
 from ai_image_edit import app
 from ai_image_edit.comfy import client, custom_nodes
+from ai_image_edit.core import paths
 from ai_image_edit.workflows import available_workflows, read_workflow_file
 from ai_image_edit.workflow_model import WorkflowModel
 
@@ -37,8 +38,12 @@ class SelectionTests(unittest.TestCase):
         env = mock.patch.dict(os.environ)
         env.start()
         self.addCleanup(env.stop)
-        for name in ("MODEL_WORKFLOW", "MODEL_VARIANT", "REQUIRE_PASSWORD", "DOWNLOAD_LORAS"):
+        for name in ("MODEL_WORKFLOW", "MODEL_VARIANT", "REQUIRE_PASSWORD", "DOWNLOAD_LORAS",
+                     "COMFY_GENERATION_TIMEOUT", "COMFY_GENERATION_MAX_TIME", "AI_IMAGE_EDIT_WORK_MAX_SIZE"):
             os.environ.pop(name, None)
+        # main() applies these settings; each test gets the values back afterwards.
+        for module, name in ((client, "STALL_TIMEOUT_SECONDS"), (client, "MAX_GENERATION_SECONDS"), (paths, "WORK_MAX_BYTES")):
+            mock.patch.object(module, name, getattr(module, name)).start()
         self.model = mock.Mock()
         self.run = mock.patch.object(app.ui, "run").start()
         self.error_page = mock.patch.object(app.ui, "run_error_page").start()
@@ -90,6 +95,19 @@ class SelectionTests(unittest.TestCase):
         os.environ["DOWNLOAD_LORAS"] = "maybe"
         self.assertEqual(self.assert_error_page("Configuration", "DOWNLOAD_LORAS='maybe' is not a switch"), "")
         self.get.assert_not_called()
+
+    def test_invalid_numeric_settings_show_the_error_page(self):
+        for name, value in (("COMFY_GENERATION_TIMEOUT", "5min"), ("COMFY_GENERATION_MAX_TIME", "0"),
+                            ("AI_IMAGE_EDIT_WORK_MAX_SIZE", "lots")):
+            with self.subTest(name=name), mock.patch.dict(os.environ, {name: value}):
+                self.error_page.reset_mock()
+                self.assertEqual(self.assert_error_page("Configuration", f"{name}={value!r}"), "")
+        self.get.assert_not_called()
+
+    def test_the_timeouts_are_applied(self):
+        os.environ.update(COMFY_GENERATION_TIMEOUT="120", COMFY_GENERATION_MAX_TIME="600")
+        app.main([])
+        self.assertEqual((client.STALL_TIMEOUT_SECONDS, client.MAX_GENERATION_SECONDS), (120, 600))
 
     def test_a_required_password_must_be_set(self):
         os.environ.pop("APP_PASSWORD", None)

@@ -25,8 +25,21 @@ class UrlTest(unittest.TestCase):
         self.assertEqual(from_url("/files/..%2F..%2Fetc%2Fpasswd"), str(WORK_DIR / "passwd"))
 
 
-if __name__ == "__main__":
-    unittest.main()
+class WorkMaxSizeTest(unittest.TestCase):
+    def setUp(self):
+        patcher = mock.patch.object(paths, "WORK_MAX_BYTES", paths.WORK_MAX_BYTES)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def test_the_setting_is_applied(self):
+        with mock.patch.dict(os.environ, {"AI_IMAGE_EDIT_WORK_MAX_SIZE": "1k"}):
+            paths.read_settings()
+        self.assertEqual(paths.WORK_MAX_BYTES, 1024)
+
+    def test_an_invalid_setting_is_an_error(self):
+        with mock.patch.dict(os.environ, {"AI_IMAGE_EDIT_WORK_MAX_SIZE": "lots"}):
+            with self.assertRaisesRegex(ValueError, "AI_IMAGE_EDIT_WORK_MAX_SIZE='lots' is not a size"):
+                paths.read_settings()
 
 
 class TrimWorkDirTest(unittest.TestCase):
@@ -66,3 +79,7 @@ class TrimWorkDirTest(unittest.TestCase):
     def test_a_protected_path_that_is_not_there_is_ignored(self):
         trim_work_dir(protect=[str(self.dir / "gone.png")])
         self.assertEqual(self.remaining(), ["f4", "f5", "f6", "f7"])
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -85,6 +85,11 @@ def describe_config(model: WorkflowModel, workflow: str, variant: Optional[str],
 
 def start_model(args: argparse.Namespace) -> WorkflowModel:
     """Builds and starts the model the arguments and environment select; raises StartupError."""
+    try:
+        client.read_settings()
+        paths.read_settings()
+    except ValueError as exc:
+        raise StartupError("Configuration", str(exc)) from exc
     variant = args.variant or os.environ.get("MODEL_VARIANT") or None
     lora_downloads = option_flag(args.lora_downloads, "DOWNLOAD_LORAS")
 
