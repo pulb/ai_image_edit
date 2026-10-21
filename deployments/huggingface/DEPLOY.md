@@ -18,7 +18,8 @@ ComfyUI process, which needs a regular GPU. The UI is served on port `7860`.
    weights download on first start. The Qwen-Image-2.1 weights are for non-commercial use only
    ([license](https://huggingface.co/Qwen/Qwen-Image-2.1/raw/main/LICENSE)).
 
-The image refuses to start without a password (`REQUIRE_PASSWORD=1`). Either set
+The image needs a password (`REQUIRE_PASSWORD=1`); without one, the Space shows a page
+saying that `APP_PASSWORD` is not set. Either set
 `APP_PASSWORD`, or set `REQUIRE_PASSWORD` to an empty value and restrict access
 by setting the Space's visibility to private in Hugging Face.
 

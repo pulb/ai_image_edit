@@ -41,8 +41,23 @@ class SelectionTests(unittest.TestCase):
             os.environ.pop(name, None)
         self.model = mock.Mock()
         self.run = mock.patch.object(app.ui, "run").start()
+        self.error_page = mock.patch.object(app.ui, "run_error_page").start()
         self.get = mock.patch.object(app, "get_model", return_value=self.model).start()
         self.addCleanup(mock.patch.stopall)
+
+    def assert_error_page(self, area, logged, argv=()):
+        """main() logs the message, serves the error page for `area`, then exits with 1; returns the page's detail."""
+        log = io.StringIO()
+        with contextlib.redirect_stderr(log), self.assertRaises(SystemExit) as raised:
+            app.main(list(argv))
+        self.assertEqual(raised.exception.code, 1)
+        self.assertIn(logged, log.getvalue())
+        self.error_page.assert_called_once()
+        shown_area, detail = self.error_page.call_args.args
+        self.assertEqual(shown_area, area)
+        self.assertNotIn(logged, detail)  # the message itself never reaches the public page
+        self.run.assert_not_called()
+        return detail
 
     def test_default_workflow(self):
         app.main([])
@@ -73,9 +88,21 @@ class SelectionTests(unittest.TestCase):
 
     def test_a_download_switch_must_be_a_switch(self):
         os.environ["DOWNLOAD_LORAS"] = "maybe"
-        with self.assertRaisesRegex(SystemExit, "DOWNLOAD_LORAS='maybe' is not a switch"):
-            app.main([])
+        self.assertEqual(self.assert_error_page("Configuration", "DOWNLOAD_LORAS='maybe' is not a switch"), "")
         self.get.assert_not_called()
+
+    def test_a_required_password_must_be_set(self):
+        os.environ.pop("APP_PASSWORD", None)
+        os.environ["REQUIRE_PASSWORD"] = "1"
+        detail = self.assert_error_page("Password", "REQUIRE_PASSWORD is set but APP_PASSWORD is empty")
+        self.assertIn("`APP_PASSWORD` is not set", detail)
+        self.get.assert_not_called()
+
+    def test_a_required_password_that_is_set_starts_the_app(self):
+        os.environ.update(REQUIRE_PASSWORD="1", APP_PASSWORD="hunter2")
+        app.main([])
+        self.run.assert_called_once_with(self.model)
+        self.error_page.assert_not_called()
 
     def test_startup_prints_the_configuration_without_secrets(self):
         os.environ.update(
@@ -110,18 +137,35 @@ class SelectionTests(unittest.TestCase):
             app.main(["--list-workflows"])
         self.assertEqual(out.call_args[0][0].split("\n"), sorted(available_workflows()))
         self.get.assert_not_called()
+        self.error_page.assert_not_called()
 
-    def test_bad_workflow_is_a_clean_exit(self):
+    def test_version_and_command_line_errors_exit_without_the_error_page(self):
+        for argv, code in ((["--version"], 0), (["--no-such-option"], 2)):
+            with self.subTest(argv=argv), contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                with self.assertRaises(SystemExit) as raised:
+                    app.main(argv)
+                self.assertEqual(raised.exception.code, code)
+        self.error_page.assert_not_called()
+
+    def test_bad_workflow_shows_the_error_page(self):
         self.get.side_effect = ValueError("Unknown workflow 'z'")
-        with self.assertRaisesRegex(SystemExit, "Unknown workflow"):
-            app.main(["--workflow", "z"])
+        self.assertEqual(self.assert_error_page("Workflow", "Unknown workflow 'z'", ["--workflow", "z"]), "")
 
-    def test_start_failure_is_a_clean_exit(self):
+    def test_start_failure_shows_the_error_page(self):
         for error in (RuntimeError("setup failed"), FileNotFoundError("main.py")):
-            self.model.start.side_effect = error
-            with self.assertRaisesRegex(SystemExit, str(error)):
-                app.main([])
-        self.run.assert_not_called()
+            with self.subTest(error=error):
+                self.error_page.reset_mock()
+                self.model.start.side_effect = error
+                self.assertEqual(self.assert_error_page("Model setup", str(error)), "")
+
+    def test_unexpected_failure_shows_the_error_page_and_logs_the_traceback(self):
+        self.get.side_effect = KeyError("surprise")
+        log = io.StringIO()
+        with contextlib.redirect_stderr(log), self.assertRaises(SystemExit):
+            app.main([])
+        self.error_page.assert_called_once_with("Startup", "")
+        self.assertIn("Traceback", log.getvalue())
+        self.assertIn("surprise", log.getvalue())
 
 
 class VersionTests(unittest.TestCase):

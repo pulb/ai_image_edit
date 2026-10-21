@@ -629,8 +629,9 @@ def run(model: WorkflowModel) -> None:
     # gets torn down on shutdown instead of leaking.
     app.on_shutdown(model.shutdown)
 
-    # APP_PASSWORD turns the login on; without it the app is open. app.py
-    # refuses to start when REQUIRE_PASSWORD is set but APP_PASSWORD is not.
+    # APP_PASSWORD turns the login on; without it the app is open. When
+    # REQUIRE_PASSWORD is set but APP_PASSWORD is not, app.py serves the error
+    # page instead of this one.
     password = os.environ.get("APP_PASSWORD", "")
     storage_secret = install_password_login(password) if password else None
 

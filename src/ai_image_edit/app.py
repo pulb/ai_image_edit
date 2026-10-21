@@ -11,16 +11,21 @@ images are configured: MODEL_WORKFLOW (a bundled name or a workflow file;
 default qwen_image21), MODEL_VARIANT and DOWNLOAD_LORAS (on unless set to 0).
 APP_PASSWORD adds a password login
 to the UI. The UI code lives in ui/, the model in workflow_model.py; the built
-model is passed straight to the UI's run(model).
+model is passed straight to the UI's run(model). If the app cannot start, the
+reason goes to the log and an error page saying which part failed is served
+instead (ui.run_error_page).
 """
 import argparse
 import os
+import sys
+import traceback
 from pathlib import Path
-from typing import List, Optional
+from typing import List, NoReturn, Optional
 
 from ai_image_edit import ui
 from ai_image_edit.comfy import client, downloads, gpu
 from ai_image_edit.core import paths
+from ai_image_edit.core.errors import StartupError
 from ai_image_edit.version import VERSION
 from ai_image_edit.workflow_model import WorkflowModel, get_model
 from ai_image_edit.workflows import available_workflows
@@ -51,7 +56,7 @@ def option_flag(value: Optional[bool], env_name: str, default: bool = True) -> b
     if not raw:
         return default
     if raw not in _ON | _OFF:
-        raise SystemExit(f"{env_name}={os.environ[env_name]!r} is not a switch: use 1 or 0.")
+        raise StartupError("Configuration", f"{env_name}={os.environ[env_name]!r} is not a switch: use 1 or 0.")
     return raw in _ON
 
 
@@ -78,30 +83,51 @@ def describe_config(model: WorkflowModel, workflow: str, variant: Optional[str],
     return "Configuration:\n" + "\n".join(f"  {name + ':':<22}{value}" for name, value in rows)
 
 
-def main(argv: Optional[List[str]] = None) -> None:
-    args = parse_args(argv)
-    if args.list_workflows:
-        print("\n".join(sorted(available_workflows())))
-        return
-
+def start_model(args: argparse.Namespace) -> WorkflowModel:
+    """Builds and starts the model the arguments and environment select; raises StartupError."""
     variant = args.variant or os.environ.get("MODEL_VARIANT") or None
     lora_downloads = option_flag(args.lora_downloads, "DOWNLOAD_LORAS")
 
     # Checked before the model starts, which can take minutes.
-    password = os.environ.get("APP_PASSWORD", "")
-    if os.environ.get("REQUIRE_PASSWORD") and not password:
-        raise SystemExit("REQUIRE_PASSWORD is set but APP_PASSWORD is empty: set APP_PASSWORD to start the app.")
+    if os.environ.get("REQUIRE_PASSWORD") and not os.environ.get("APP_PASSWORD"):
+        raise StartupError(
+            "Password",
+            "REQUIRE_PASSWORD is set but APP_PASSWORD is empty: set APP_PASSWORD to start the app.",
+            "This deployment requires a password, but `APP_PASSWORD` is not set.",
+        )
 
     workflow = args.workflow or os.environ.get("MODEL_WORKFLOW") or "qwen_image21"
     try:
         model = get_model(workflow, variant, lora_downloads=lora_downloads)
     except (ValueError, OSError) as exc:
-        raise SystemExit(str(exc))
+        raise StartupError("Workflow", str(exc)) from exc
     print(describe_config(model, workflow, variant, lora_downloads), flush=True)
     print(f"Starting model '{workflow}' in the background...", flush=True)
     try:
         model.start()
     except (RuntimeError, OSError) as exc:  # a missing file, ComfyUI not launchable: a message is enough
-        raise SystemExit(str(exc))
+        raise StartupError("Model setup", str(exc)) from exc
+    return model
 
+
+def fail(error: StartupError) -> NoReturn:
+    """Logs why the app could not start and serves the error page until the app is stopped."""
+    print(f"error: {error}", file=sys.stderr, flush=True)
+    print("The app could not start; serving an error page instead.", file=sys.stderr, flush=True)
+    ui.run_error_page(error.area, error.detail)
+    raise SystemExit(1)
+
+
+def main(argv: Optional[List[str]] = None) -> None:
+    args = parse_args(argv)
+    if args.list_workflows:
+        print("\n".join(sorted(available_workflows())))
+        return
+    try:
+        model = start_model(args)
+    except StartupError as exc:
+        fail(exc)
+    except Exception as exc:  # noqa: BLE001 — unexpected: the traceback goes to the log, the page only says that startup failed
+        traceback.print_exc()
+        fail(StartupError("Startup", f"Unexpected error: {exc}"))
     ui.run(model)

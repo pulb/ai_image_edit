@@ -46,8 +46,8 @@ prints a warning at startup). Check it with `df -h /dev/shm` in the Pod.
 
 RunPod's HTTP proxy is public and has no login of its own, so anyone with
 the Pod URL can use the app. Set the Pod environment variable `APP_PASSWORD`
-to put the whole app behind a password login page; the image refuses to start
-without it. Details: [Docker](../docker/DEPLOY.md#password-login).
+to put the whole app behind a password login page; without it the app does not
+start, and its page says that `APP_PASSWORD` is not set. Details: [Docker](../docker/DEPLOY.md#password-login).
 
 ## Updating
 

@@ -48,7 +48,7 @@ Rules for any AI coding agent working in this repository.
   `workflows.py` (finding, reading and schema-checking workflow files),
   `sizes.py` (output-size policies), `version.py` (the version setuptools-scm derives from the git tags), `comfy/` (client, downloads, custom
   nodes, GPU arguments), `ui/` (the NiceGUI UI: `gui.py` is the page, built from one function per section, with `login.py`,
-  `components.py`, `helpers.py`, `assets.py`, `mask_editor.py` and `compare_slider.py`; its CSS and JS are
+  `components.py`, `helpers.py`, `assets.py`, `mask_editor.py`, `compare_slider.py` and `error_page.py`; its CSS and JS are
   in `ui/static/`) and `core/` (types, errors, imaging, paths, result cache). It is started with `ai-image-edit`.
   Imports are absolute (`from ai_image_edit.core import …`). Dependencies
   live in `pyproject.toml`: everything the app needs (including NiceGUI and
@@ -57,6 +57,10 @@ Rules for any AI coding agent working in this repository.
   `run(model: WorkflowModel) -> None`, which `ui/__init__.py`'s `run()`
   calls (NiceGUI is imported only then). The model is passed as a plain
   argument — no shared mutable module state. The UI shows `model.display_name`.
+  When the app cannot start, `app.py` raises a `StartupError` (`core/errors.py`)
+  and serves `ui.run_error_page(area, detail)` instead. That page is public, so
+  it shows only fixed texts (setting names at most, never values or exception
+  messages); the message goes to the log.
 - **Model contract**: the UI uses a `WorkflowModel` (`workflow_model.py`):
   `capabilities`, `start()`, `generate()` (with an optional progress callback, called on
   the worker thread, which the UI shows through a timer, and an optional
