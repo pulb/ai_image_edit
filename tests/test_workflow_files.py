@@ -38,7 +38,7 @@ from ai_image_edit import workflows as workflow_files
 from ai_image_edit.comfy import client
 from ai_image_edit import sizes
 from ai_image_edit.sizes import POLICIES
-from ai_image_edit.workflow_model import WorkflowModel
+from ai_image_edit.workflow_model import REQUIRED_BINDINGS, WorkflowModel
 
 import jsonschema
 
@@ -137,7 +137,7 @@ class ManifestModelTests(unittest.TestCase):
             return data
 
         mistakes = {
-            "unknown format version": lambda d: d.update(format_version=2),
+            "unknown format version": lambda d: d.update(format_version=3),
             "no workflow": lambda d: d.pop("workflow"),
             "unknown manifest key": lambda d: d["manifest"].update(modle_name="x"),
             "no name": lambda d: d["manifest"].pop("model_name"),
@@ -150,6 +150,12 @@ class ManifestModelTests(unittest.TestCase):
             "range without default": lambda d: d["manifest"]["capabilities"]["steps"].pop("default"),
             "references without loader ids": lambda d: d["manifest"]["images"]["references"].pop("loader_ids"),
             "loras without strength range": lambda d: d["manifest"]["capabilities"].pop("lora_strength"),
+            "optional input in bind": lambda d: d["manifest"]["bind"].update(cfg="2.cfg"),
+            "cfg range in capabilities": lambda d: d["manifest"]["capabilities"].update(cfg=d["manifest"]["inputs"]["cfg"]["range"]),
+            "input without target": lambda d: d["manifest"]["inputs"]["cfg"].pop("target"),
+            "input with an unknown key": lambda d: d["manifest"]["inputs"]["cfg"].update(kind="slider"),
+            "input name that is not lower case": lambda d: d["manifest"]["inputs"].update(CFG=d["manifest"]["inputs"].pop("cfg")),
+            "empty input label": lambda d: d["manifest"]["inputs"]["cfg"].update(label=""),
         }
         for what, mutate in mistakes.items():
             with self.subTest(what):
@@ -160,6 +166,67 @@ class ManifestModelTests(unittest.TestCase):
         path.write_text(json.dumps({"format_version": 99, "manifest": {}, "workflow": {}}), encoding="utf-8")
         with self.assertRaisesRegex(ValueError, "unsupported format_version 99"):
             workflow_files.read_workflow_file(path)
+
+    def test_the_required_bindings_are_the_schemas(self):
+        schema = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
+        bind = schema["$defs"]["manifest"]["properties"]["bind"]
+        self.assertEqual(set(REQUIRED_BINDINGS), set(bind["required"]))
+        self.assertEqual(set(REQUIRED_BINDINGS), set(bind["properties"]))
+
+    def test_a_version_1_file_says_what_to_change(self):
+        path = self.tmp / "version_1.json"
+        path.write_text(json.dumps({"format_version": 1, "manifest": {}, "workflow": {}}), encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "format_version 1.*move negative_prompt, cfg and denoise .* into inputs"):
+            workflow_files.read_workflow_file(path)
+
+    # The optional inputs every bundled workflow offers: (name, label, slider?, default), in order.
+    EXPECTED_OPTIONS = {
+        "qwen_image21": [("cfg", "CFG scale", True, 1.0), ("negative_prompt", "Negative prompt", False, "")],
+        "qwen_image21_gguf": [("cfg", "CFG scale", True, 1.0), ("negative_prompt", "Negative prompt", False, "")],
+        "qwen_image21_turbo": [("cfg", "CFG scale", True, 1.0), ("negative_prompt", "Negative prompt", False, "")],
+        "qwen_image21_turbo_gguf": [("cfg", "CFG scale", True, 1.0), ("negative_prompt", "Negative prompt", False, "")],
+        "qwen_image_edit_2511_aio": [("cfg", "CFG scale", True, 1.0), ("denoise", "Denoise", True, 1.0)],
+    }
+
+    def test_optional_inputs_become_controls(self):
+        self.assertEqual(set(self.EXPECTED_OPTIONS), {p.stem for p in MANIFESTS})
+        for path in MANIFESTS:
+            with self.subTest(model=path.stem):
+                options = self.load(path).capabilities.options
+                self.assertEqual(
+                    [(o.name, o.label, o.range is not None, o.default) for o in options], self.EXPECTED_OPTIONS[path.stem]
+                )
+                for option in options:
+                    self.assertFalse(option.integer, option.name)  # CFG and denoise are fractional
+                    self.assertIsInstance(option.convert(1), float if option.range else str)
+
+    def edited(self, change) -> tuple:
+        manifest, workflow = workflow_files.read_workflow_file(available_workflows()["qwen_image21"])
+        change(manifest, workflow)
+        return manifest, workflow
+
+    def test_an_input_must_match_its_workflow_placeholder(self):
+        cases = {
+            "has a range, but its workflow input holds": lambda m, w: m["inputs"]["negative_prompt"].update(
+                range={"min": 0, "max": 1, "default": 0}
+            ),
+            "needs a range": lambda m, w: m["inputs"]["cfg"].pop("range"),
+            "a binding every workflow has": lambda m, w: m["inputs"].update(seed={"target": "6.seed", "range": {"min": 0, "max": 9, "default": 0}}),
+            "has no input 'nope'": lambda m, w: m["inputs"].update(extra={"target": "6.nope"}),
+        }
+        for message, change in cases.items():
+            with self.subTest(message):
+                with self.assertRaisesRegex(ValueError, message):
+                    WorkflowModel("x", *self.edited(change))
+
+    def test_labels_and_whole_numbers_are_inferred(self):
+        def add(m, w):
+            w["6"]["inputs"]["extra_steps"] = 2
+            m["inputs"]["extra_steps"] = {"target": "6.extra_steps", "range": {"min": 1, "max": 8, "default": 2, "step": 1}}
+        spec = next(o for o in WorkflowModel("x", *self.edited(add)).capabilities.options if o.name == "extra_steps")
+        self.assertEqual((spec.label, spec.integer, spec.default), ("Extra steps", True, 2))
+        self.assertEqual(spec.convert(3.0), 3)
+        self.assertIsInstance(spec.convert(3.0), int)
 
     def test_workflows_are_well_formed_for_every_number_of_references(self):
         for path in MANIFESTS:
@@ -285,7 +352,8 @@ class ManifestModelTests(unittest.TestCase):
             with self.subTest(workflow=name):
                 model = self.load(workflow_files.available_workflows()[name])
                 self.assertEqual(8, model.capabilities.step_range.default)
-                self.assertEqual(1.0, model.capabilities.cfg_range.default)
+                cfg = next(spec for spec in model.capabilities.options if spec.name == "cfg")
+                self.assertEqual(1.0, cfg.default)
                 self.assertEqual(8, model._workflow["6"]["inputs"]["steps"])
 
     def test_qwen21_output_size_comes_from_an_empty_latent(self):

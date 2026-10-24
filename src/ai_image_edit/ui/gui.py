@@ -129,9 +129,7 @@ def build_prompt_card() -> PromptCard:
 @dataclass
 class AdvancedCard:
     steps: ui.slider
-    cfg: Optional[ui.slider]
-    negative_prompt: Optional[ui.textarea]
-    denoise: Optional[ui.slider]
+    options: Dict[str, ui.element]  # the model's optional inputs' controls, by name
     sampler_name: Optional[ui.select]
     scheduler: Optional[ui.select]
     rescale_mode: ui.select
@@ -148,21 +146,16 @@ def build_advanced_card(caps: ModelCapabilities) -> AdvancedCard:
                     ui.label("Inference steps").classes("text-xs text-gray-400")
                     steps = create_value_slider(caps.step_range)
 
-                cfg = None
-                if caps.supports_cfg:
+                options: Dict[str, ui.element] = {}
+                for spec in caps.options:
+                    if spec.range is None:
+                        options[spec.name] = (
+                            ui.textarea(label=spec.label, value=spec.default).props("rows=2 outlined dark").classes("w-full")
+                        )
+                        continue
                     with ui.column().classes("w-full gap-0"):
-                        ui.label("CFG scale").classes("text-xs text-gray-400")
-                        cfg = create_value_slider(caps.cfg_range)
-
-                negative_prompt = None
-                if caps.supports_negative_prompt:
-                    negative_prompt = ui.textarea(label="Negative prompt").props("rows=2 outlined dark").classes("w-full")
-
-                denoise = None
-                if caps.supports_denoise:
-                    with ui.column().classes("w-full gap-0"):
-                        ui.label("Denoise").classes("text-xs text-gray-400")
-                        denoise = create_value_slider(caps.denoise_range)
+                        ui.label(spec.label).classes("text-xs text-gray-400")
+                        options[spec.name] = create_value_slider(spec.range)
 
                 sampler_name = None
                 if caps.sampler_choices:
@@ -200,9 +193,7 @@ def build_advanced_card(caps: ModelCapabilities) -> AdvancedCard:
                     with ui.button(icon="info").props("flat round dense size=sm").classes("text-gray-400"):
                         with ui.menu():
                             ui.label(COLOR_CORRECTION_INFO).classes("text-xs q-pa-sm").style("max-width: 280px")
-    return AdvancedCard(
-        steps, cfg, negative_prompt, denoise, sampler_name, scheduler, rescale_mode, color_correction, match_detail
-    )
+    return AdvancedCard(steps, options, sampler_name, scheduler, rescale_mode, color_correction, match_detail)
 
 
 FORMAT_LABELS = {"png": "PNG", "jpeg": "JPEG"}
@@ -541,11 +532,7 @@ def run(model: WorkflowModel) -> None:
                     steps=advanced.steps.value,
                     sampler=value_of(advanced.sampler_name),
                     scheduler=value_of(advanced.scheduler),
-                    options={
-                        "cfg": value_of(advanced.cfg),
-                        "denoise": value_of(advanced.denoise),
-                        "negative_prompt": value_of(advanced.negative_prompt),
-                    },
+                    options={name: control.value for name, control in advanced.options.items()},
                     lora_files=lora_files,
                     lora_strength=value_of(references.lora_strength),
                     color_correction=advanced.color_correction.value,

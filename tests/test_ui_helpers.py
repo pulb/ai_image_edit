@@ -3,7 +3,7 @@ import os
 import unittest
 from unittest import mock
 
-from ai_image_edit.core.types import GenerationProgress, ModelCapabilities, ProgressStage, RescaleMode
+from ai_image_edit.core.types import GenerationProgress, InputSpec, ModelCapabilities, ProgressStage, RangeSpec, RescaleMode
 from ai_image_edit.ui import helpers as common
 
 
@@ -52,7 +52,10 @@ class ParamsFromUiTest(unittest.TestCase):
             supported_aspect_ratios=["Original"], default_aspect_ratio="Original",
             supported_resolutions=[1024], default_resolution=1024,
             sampler_choices=["euler"], default_sampler="euler", scheduler_choices=["simple"], default_scheduler="simple",
-            supports_cfg=True, supports_denoise=False, supports_negative_prompt=True,
+            options=(
+                InputSpec("cfg", "CFG scale", 1.0, RangeSpec(1.0, 10.0, 1.0, 0.1)),
+                InputSpec("negative_prompt", "Negative prompt", ""),
+            ),
         )
         kwargs = dict(
             prompt="p", source_image_path="s.png", mask_path="m.png", reference_images=[], seed=1,

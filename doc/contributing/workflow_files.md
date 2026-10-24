@@ -6,7 +6,7 @@ model name (`--workflow <name>` or `MODEL_WORKFLOW=<name>`), and the file is fou
 
 ```json
 {
-  "format_version": 1,
+  "format_version": 2,
   "manifest": { ... how the app's inputs map onto the workflow ... },
   "workflow": { ... the workflow, exported from ComfyUI with "Save (API Format)" ... }
 }
@@ -35,13 +35,38 @@ mistyped node id or input name fails when the model loads.
 | `required_nodes`, `missing_nodes_hint` | Node classes ComfyUI must provide, checked on the first generation, and the advice shown if they are missing. |
 | `files` | Weight files, each written to `set`. `name` is the file name relative to `folder` (a folder below the ComfyUI root, e.g. `models/vae`) and `url` where to get it from (`https://`); optional `sha256` and `size` are verified after the download, `license` names an entry of `licenses`. See [Downloads](#downloads). |
 | `licenses` | `{id: {name, url}}` for the licenses the files refer to. |
-| `bind` | Where each app input goes: `prompt`, `seed`, `steps`, `sampler`, `scheduler` (required), `cfg`, `denoise`, `negative_prompt` (optional). An input that is not bound is not offered in the UI (`cfg`, `denoise`, `negative_prompt`). |
+| `bind` | Where the inputs every model has go: `prompt`, `seed`, `steps`, `sampler` and `scheduler`, all required. |
+| `inputs` | Optional. The model's own further inputs, shown in Advanced settings in the order given: `{name: {target, range, label}}`, see [Optional inputs](#optional-inputs). |
 | `constants` | Fixed values written into the workflow: `{target: value}`. |
 | `seed` | `min`, `max` of random seeds; `wrap` reduces a chosen seed modulo `max + 1`. |
 | `images` | `source`: target for the source image. `references`: further images, each a `LoadImage` node wired to `target` (`{n}` counts from `first_n`), with node ids from `loader_ids` (a list) or `loader_id_start`, up to `max`. Unused slots in the template are removed. |
 | `size` | `policy` (see `sizes.py`: `qwen21_tiers`, `fixed_area`), its settings, and `bind`, which maps the policy's named values to targets: `resolution`, `width` and `height` for `qwen21_tiers` (width and height go to an `EmptyLatentImage` that feeds the sampler, so the output size does not depend on the source image; the app scales every input image itself and sends `resolution` 0, so the encode node keeps their sizes: where the source keeps its framing (a mask, the "Original" ratio, or a chosen ratio within 2% of its own) it is fitted to exactly that size, otherwise it keeps its own ratio at the tier and the model recomposes it), `width` and `height` for `fixed_area`. A resolution is the side length in pixels of a square with the area to generate (1024 is "1K"); `fixed_area` takes `resolutions` (e.g. `[1024]`), an optional `default_resolution` and `multiple`. |
 | `loras` | Omit if the model has none. Chains one `loader_class` node per selected file from `first_id`; `from` are the links it starts from, `outputs` the names of its outputs, `feeds` the targets that receive the final links, `strength_inputs` the inputs that get the strength. `dir` is searched for LoRA files. `files` (`[{dir, name, url, sha256, size, license}]`) are LoRA files downloaded like `files` above if missing: `dir` is the subfolder of the LoRA (its display name; one LoRA can have several files), `name` the file. A LoRA downloaded in the background is added to the UI list as soon as its files are there. `DOWNLOAD_LORAS=0` skips these downloads. |
-| `capabilities` | What the UI offers: `supports_inpainting`, `num_annotation_colors`, `sampler`/`scheduler` (`default`, optional `choices`), and ranges (`min`, `max`, `default`, `step`) for `steps`, `cfg`, `denoise`, `lora_strength`. |
+| `capabilities` | What the UI offers: `supports_inpainting`, `num_annotation_colors`, `sampler`/`scheduler` (`default`, optional `choices`), and ranges (`min`, `max`, `default`, `step`) for `steps` and `lora_strength`. |
+
+## Optional inputs
+
+`inputs` lists the workflow inputs a model offers beyond the five in `bind`,
+such as a CFG scale or a negative prompt; the app knows nothing about them
+except what the entry says:
+
+```json
+"inputs": {
+  "cfg":             {"target": "6.cfg", "range": {"min": 1.0, "max": 10.0, "default": 1.0, "step": 0.1}, "label": "CFG scale"},
+  "negative_prompt": {"target": "5.negative_prompt"}
+}
+```
+
+- An input with a `range` (`min`, `max`, `default`, optional `step`) is a
+  slider, one without is a text field that starts with the workflow's
+  placeholder. The placeholder at `target` must be a number for a slider
+  and text for a text field, or the model does not load.
+- A slider's value is a whole number when the range and the placeholder are
+  all whole numbers, otherwise a decimal.
+- `label` is optional: without it the name is shown with spaces for
+  underscores and a capital first letter (`negative_prompt` is "Negative
+  prompt"). Names are lower case letters, digits and underscores, and must
+  not be one of the five `bind` names.
 
 ## Tests
 

@@ -66,6 +66,10 @@ Rules for any AI coding agent working in this repository.
   the worker thread, which the UI shows through a timer, and an optional
   cancel event, which stops only that request's ComfyUI job), `setup_progress()`, `shutdown()`,
   `list_loras()`, `resolution_for_source()`, `model_name`, `model_version` and `display_name`.
+  A request is a `GenerationParams` (`core/types.py`) of four groups: `images`,
+  `size`, `inference` (with `options`, the model's optional inputs by name, which
+  `capabilities.options` describes from the workflow file's `inputs`) and
+  `postprocessing`; each step of a generation gets only its group.
   `get_model()` in the same module finds a workflow file by bundled name or
   by path; its `lora_downloads` option (from `DOWNLOAD_LORAS`, read in
   `app.py`) skips downloading the workflow's own LoRA files.

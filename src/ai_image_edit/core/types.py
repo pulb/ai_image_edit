@@ -24,6 +24,27 @@ class RangeSpec:
     step: float = 1.0
 
 
+@dataclass(frozen=True)
+class InputSpec:
+    """
+    One of a model's optional inputs (the workflow file's "inputs"): a slider
+    over `range`, or a text field without one. integer: the slider's values
+    are whole numbers.
+    """
+
+    name: str
+    label: str
+    default: Any
+    range: Optional[RangeSpec] = None
+    integer: bool = False
+
+    def convert(self, value: Any) -> Any:
+        """A control's value as the workflow takes it."""
+        if self.range is None:
+            return str(value)
+        return int(round(float(value))) if self.integer else float(value)
+
+
 # The "derive the output size from the source image" aspect ratio label.
 ORIGINAL_ASPECT_RATIO = "Original"
 
@@ -95,13 +116,8 @@ class ModelCapabilities:
     scheduler_choices: Optional[List[str]] = None
     default_scheduler: Optional[str] = None
 
-    supports_cfg: bool = True
-    supports_denoise: bool = True
-    # False by default: a model whose workflow fixes its own negative prompt
-    # has nothing to ask for. A model that wants a user-facing negative-prompt
-    # box (only useful alongside supports_cfg, since CFG is what actually
-    # uses it) sets this True.
-    supports_negative_prompt: bool = False
+    # The model's optional inputs, in the order the UI shows them.
+    options: Tuple[InputSpec, ...] = ()
 
     # How many annotation colours the model understands (the first N of
     # ANNOTATION_COLORS, clipped to the palette's length if N is larger);
@@ -111,8 +127,6 @@ class ModelCapabilities:
     num_annotation_colors: int = 0
 
     step_range: RangeSpec = field(default_factory=lambda: RangeSpec(1, 50, 20, step=1))
-    cfg_range: RangeSpec = field(default_factory=lambda: RangeSpec(0.1, 10.0, 1.0, step=0.1))
-    denoise_range: RangeSpec = field(default_factory=lambda: RangeSpec(0.0, 1.0, 1.0, step=0.01))
     lora_strength_range: RangeSpec = field(default_factory=lambda: RangeSpec(0.1, 2.0, 0.7, step=0.05))
 
 

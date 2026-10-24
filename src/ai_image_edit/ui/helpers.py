@@ -93,16 +93,6 @@ def describe_error(exc: Exception) -> str:
     return str(exc) if isinstance(exc, GenerationError) else f"Unexpected error: {exc}"
 
 
-def _option_value(caps: ModelCapabilities, name: str, value: Any) -> Any:
-    """An option control's value as the model takes it, or None if the model has no such option."""
-    if value is None:
-        return None
-    if name == "negative_prompt":
-        return str(value) if caps.supports_negative_prompt else None
-    supported = {"cfg": caps.supports_cfg, "denoise": caps.supports_denoise}
-    return float(value) if supported.get(name) else None
-
-
 def params_from_ui(
     caps: ModelCapabilities,
     *,
@@ -136,7 +126,7 @@ def params_from_ui(
     rescale_mode is a RescaleMode or its value; anything else raises ValueError.
     """
     inpainting = caps.supports_inpainting
-    chosen = {name: _option_value(caps, name, value) for name, value in options.items()}
+    specs = {spec.name: spec for spec in caps.options}
     return GenerationParams(
         images=Images(
             source_path=source_image_path,
@@ -151,7 +141,9 @@ def params_from_ui(
             sampler=default_choice(sampler, caps.sampler_choices),
             scheduler=default_choice(scheduler, caps.scheduler_choices),
             seed=None if randomize_seed or seed is None else int(seed),
-            options={name: value for name, value in chosen.items() if value is not None},
+            options={
+                name: specs[name].convert(value) for name, value in options.items() if name in specs and value is not None
+            },
             lora_files=tuple(lora_files) if caps.supports_loras else (),
             lora_strength=lora_strength if caps.supports_loras and lora_strength is not None else caps.lora_strength_range.default,
         ),

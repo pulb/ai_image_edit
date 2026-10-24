@@ -27,7 +27,8 @@ from ai_image_edit.core import imaging
 from ai_image_edit.core.errors import GenerationCancelled, GenerationError
 from ai_image_edit.core.result_cache import cached_infer
 from ai_image_edit.core.types import (
-    GenerationParams, GenerationProgress, GenerationResult, Inference, ModelCapabilities, ProgressStage, RangeSpec,
+    GenerationParams, GenerationProgress, GenerationResult, Inference, InputSpec, ModelCapabilities, ProgressStage,
+    RangeSpec,
 )
 from ai_image_edit.sizes import POLICIES, ResolvedSize, SizePolicy, dimensions_from_source
 from ai_image_edit.workflows import available_workflows, read_workflow_file
@@ -184,6 +185,17 @@ class WorkflowModel:
 
         for key, target in m["bind"].items():
             need_node(target, f"bind.{key}")
+        for name, spec in m.get("inputs", {}).items():
+            need_node(spec["target"], f"inputs.{name}")
+            if name in REQUIRED_BINDINGS:
+                raise ValueError(f"{self.name}: inputs.{name}: {name!r} is a binding every workflow has, not an optional input")
+            node, key = _split(spec["target"])
+            placeholder = wf[node]["inputs"][key]
+            is_number = isinstance(placeholder, (int, float)) and not isinstance(placeholder, bool)
+            if "range" in spec and not is_number:
+                raise ValueError(f"{self.name}: inputs.{name} has a range, but its workflow input holds {placeholder!r}, not a number")
+            if "range" not in spec and not isinstance(placeholder, str):
+                raise ValueError(f"{self.name}: inputs.{name} needs a range: its workflow input holds {placeholder!r}, not text")
         for target in m.get("constants", {}):
             need_node(target, "constants")
         for spec in m["files"]:
@@ -238,7 +250,6 @@ class WorkflowModel:
     @cached_property
     def capabilities(self) -> ModelCapabilities:
         m, caps = self._manifest, self._manifest["capabilities"]
-        bind = m["bind"]
         kwargs: Dict[str, Any] = dict(
             max_reference_images=1 + self._max_references,  # the source image counts
             supports_loras=bool(m.get("loras")),
@@ -251,16 +262,30 @@ class WorkflowModel:
             default_sampler=caps["sampler"]["default"],
             scheduler_choices=_choices(caps["scheduler"].get("choices", "comfy_schedulers")),
             default_scheduler=caps["scheduler"]["default"],
-            supports_cfg="cfg" in bind,
-            supports_denoise="denoise" in bind,
-            supports_negative_prompt="negative_prompt" in bind,
+            options=tuple(self._input_spec(name, spec) for name, spec in m.get("inputs", {}).items()),
             num_annotation_colors=caps.get("num_annotation_colors", 0),
             step_range=_range(caps["steps"]),
         )
-        for field, key in (("cfg_range", "cfg"), ("denoise_range", "denoise"), ("lora_strength_range", "lora_strength")):
-            if key in caps:
-                kwargs[field] = _range(caps[key])
+        if "lora_strength" in caps:
+            kwargs["lora_strength_range"] = _range(caps["lora_strength"])
         return ModelCapabilities(**kwargs)
+
+    def _input_spec(self, name: str, spec: dict) -> InputSpec:
+        """
+        An optional input as the UI shows it: a slider over its range, or a text
+        field starting with the workflow's placeholder. The label defaults to the
+        name, with spaces for underscores. A slider takes whole numbers when its
+        range and the placeholder are all whole numbers.
+        """
+        label = spec.get("label") or name.replace("_", " ").capitalize()
+        node, key = _split(spec["target"])
+        placeholder = self._workflow[node]["inputs"][key]
+        if "range" not in spec:
+            return InputSpec(name, label, default=placeholder)
+        values = [spec["range"][k] for k in ("min", "max", "default", "step") if k in spec["range"]]
+        integer = isinstance(placeholder, int) and all(float(v).is_integer() for v in values)
+        rng = _range(spec["range"])
+        return InputSpec(name, label, default=int(rng.default) if integer else rng.default, range=rng, integer=integer)
 
     # ------------------------------------------------------------ lifecycle
 
@@ -415,7 +440,7 @@ class WorkflowModel:
     @property
     def _option_targets(self) -> Dict[str, str]:
         """The optional inputs (Inference.options) by name, with their workflow targets."""
-        return {name: target for name, target in self._manifest["bind"].items() if name not in REQUIRED_BINDINGS}
+        return {name: spec["target"] for name, spec in self._manifest.get("inputs", {}).items()}
 
     def build_workflow(
         self, inference: Inference, source_path: str, reference_paths: Sequence[str], size_values: Dict[str, Any],

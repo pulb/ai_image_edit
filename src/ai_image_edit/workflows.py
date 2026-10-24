@@ -12,7 +12,7 @@ from typing import Dict, Tuple
 
 import jsonschema
 
-FORMAT_VERSION = 1
+FORMAT_VERSION = 2
 
 # The workflow files shipped with the app, inside the installed package.
 PACKAGE_DIR = Path(__file__).resolve().parent / "data" / "workflows"
@@ -36,7 +36,11 @@ def read_workflow_file(path: Path) -> Tuple[dict, dict]:
         data = json.load(f)
     version = data.get("format_version") if isinstance(data, dict) else None
     if version != FORMAT_VERSION:
-        raise ValueError(f"{path}: unsupported format_version {version!r} (this app reads version {FORMAT_VERSION})")
+        hint = (
+            ": move negative_prompt, cfg and denoise from bind and capabilities into inputs"
+            " (see doc/contributing/workflow_files.md)" if version == 1 else ""
+        )
+        raise ValueError(f"{path}: unsupported format_version {version!r} (this app reads version {FORMAT_VERSION}){hint}")
     for key in ("manifest", "workflow"):
         if not isinstance(data.get(key), dict):
             raise ValueError(f"{path}: missing {key!r} section")

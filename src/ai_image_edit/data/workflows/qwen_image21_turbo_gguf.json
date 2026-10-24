@@ -1,5 +1,5 @@
 {
-  "format_version": 1,
+  "format_version": 2,
   "manifest": {
     "model_name": "Qwen-Image 2.1 Turbo GGUF",
     "model_version": "Q4_K_M",
@@ -87,13 +87,15 @@
       }
     ],
     "bind": {
-      "prompt":          "5.prompt",
-      "negative_prompt": "5.negative_prompt",
-      "seed":            "6.seed",
-      "steps":           "6.steps",
-      "cfg":             "6.cfg",
-      "sampler":         "6.sampler_name",
-      "scheduler":       "6.scheduler"
+      "prompt":    "5.prompt",
+      "seed":      "6.seed",
+      "steps":     "6.steps",
+      "sampler":   "6.sampler_name",
+      "scheduler": "6.scheduler"
+    },
+    "inputs": {
+      "cfg":             {"target": "6.cfg", "range": {"min": 1.0, "max": 10.0, "default": 1.0, "step": 0.1}, "label": "CFG scale"},
+      "negative_prompt": {"target": "5.negative_prompt"}
     },
     "seed": {"min": 0, "max": 2147483647, "wrap": true},
 
@@ -109,8 +111,7 @@
       "num_annotation_colors": 3,
       "sampler": {"default": "euler"},
       "scheduler": {"default": "simple"},
-      "steps": {"min": 1, "max": 16, "default": 8, "step": 1},
-      "cfg": {"min": 1.0, "max": 10.0, "default": 1.0, "step": 0.1}
+      "steps": {"min": 1, "max": 16, "default": 8, "step": 1}
     }
   },
   "workflow": {

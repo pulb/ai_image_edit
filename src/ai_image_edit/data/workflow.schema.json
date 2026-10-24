@@ -7,7 +7,7 @@
   "required": ["format_version", "manifest", "workflow"],
   "additionalProperties": false,
   "properties": {
-    "format_version": {"const": 1},
+    "format_version": {"const": 2},
     "manifest": {"$ref": "#/$defs/manifest"},
     "workflow": {"$ref": "#/$defs/workflow"}
   },
@@ -151,13 +151,25 @@
           "additionalProperties": false,
           "properties": {
             "prompt": {"$ref": "#/$defs/target"},
-            "negative_prompt": {"$ref": "#/$defs/target"},
             "seed": {"$ref": "#/$defs/target"},
             "steps": {"$ref": "#/$defs/target"},
-            "cfg": {"$ref": "#/$defs/target"},
-            "denoise": {"$ref": "#/$defs/target"},
             "sampler": {"$ref": "#/$defs/target"},
             "scheduler": {"$ref": "#/$defs/target"}
+          }
+        },
+        "inputs": {
+          "description": "The model's optional inputs, shown in Advanced settings in this order: a slider for an input with a range, a text field for one without. The label defaults to the name with spaces for underscores.",
+          "type": "object",
+          "propertyNames": {"pattern": "^[a-z][a-z0-9_]*$"},
+          "additionalProperties": {
+            "type": "object",
+            "required": ["target"],
+            "additionalProperties": false,
+            "properties": {
+              "target": {"$ref": "#/$defs/target"},
+              "range": {"$ref": "#/$defs/range"},
+              "label": {"type": "string", "minLength": 1}
+            }
           }
         },
         "constants": {
@@ -271,8 +283,6 @@
             "sampler": {"$ref": "#/$defs/choice_setting"},
             "scheduler": {"$ref": "#/$defs/choice_setting"},
             "steps": {"$ref": "#/$defs/range"},
-            "cfg": {"$ref": "#/$defs/range"},
-            "denoise": {"$ref": "#/$defs/range"},
             "lora_strength": {"$ref": "#/$defs/range"}
           }
         }
