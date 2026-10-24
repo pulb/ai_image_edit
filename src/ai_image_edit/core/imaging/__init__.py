@@ -31,7 +31,7 @@ def run_generation(
     annotated_image_path: Optional[str],
     gen_size: Optional[Tuple[int, int]],
     infer: Callable[[str], str],
-    postprocessing: Postprocessing = Postprocessing(),
+    postprocessing: Postprocessing,
     input_size: Optional[Tuple[int, int]] = None,
 ) -> str:
     """

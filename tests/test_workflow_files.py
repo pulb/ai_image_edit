@@ -32,7 +32,7 @@ from PIL import Image
 
 from ai_image_edit.core import imaging
 from ai_image_edit.core.errors import GenerationCancelled, GenerationError
-from ai_image_edit.core.types import GenerationParams, GenerationProgress, Images, Inference, ProgressStage, Size
+from ai_image_edit.core.types import GenerationParams, GenerationProgress, Images, Inference, Postprocessing, ProgressStage, Size
 from ai_image_edit.workflows import available_workflows
 from ai_image_edit import workflows as workflow_files
 from ai_image_edit.comfy import client
@@ -92,7 +92,7 @@ class ManifestModelTests(unittest.TestCase):
     def request(self, source="source.png", mask=None, aspect="Original", resolution=1024, **inference) -> GenerationParams:
         return GenerationParams(
             Images(str(self.tmp / source), mask, reference_paths=tuple(inference.pop("reference_paths", ()))),
-            Size(aspect, resolution), self.inference(**inference),
+            Size(aspect, resolution), self.inference(**inference), Postprocessing(),
         )
 
     def build(self, model: WorkflowModel, n_refs: int) -> dict:

@@ -23,7 +23,7 @@ from ai_image_edit.core import imaging
 from ai_image_edit.core.errors import GenerationCancelled
 from ai_image_edit.core.paths import WORK_DIR, to_url, trim_work_dir
 from ai_image_edit.core.types import (
-    DEFAULT_RESCALE_MODE, DEFAULT_SEED, ORIGINAL_ASPECT_RATIO, GenerationProgress, ModelCapabilities, ProgressStage, RescaleMode,
+    DEFAULT_SEED, ORIGINAL_ASPECT_RATIO, GenerationProgress, ModelCapabilities, Postprocessing, ProgressStage, RescaleMode,
 )
 from ai_image_edit.ui.assets import CLIENT_JS, WIDGET_CSS
 from ai_image_edit.ui.compare_slider import CompareSlider
@@ -167,9 +167,10 @@ def build_advanced_card(caps: ModelCapabilities) -> AdvancedCard:
 
             with ui.column().classes(GROUP_CLASSES + " p-6"):
                 ui.label("Postprocessing").classes("text-sm text-weight-bold q-mb-sm").style(f"color: {PRIMARY_COLOR}")
+                defaults = Postprocessing()
                 with ui.row().classes("w-full items-center no-wrap"):
                     rescale_mode = ui.select(
-                        RESCALE_MODE_OPTIONS, value=DEFAULT_RESCALE_MODE.value, label="Masked edits"
+                        RESCALE_MODE_OPTIONS, value=defaults.rescale_mode.value, label="Masked edits"
                     ).props("outlined dark").classes("flex-1 min-w-0")
                     with ui.button(icon="info").props("flat round dense size=sm").classes("text-gray-400"):
                         with ui.menu():
@@ -181,14 +182,14 @@ def build_advanced_card(caps: ModelCapabilities) -> AdvancedCard:
                                         ui.label(description).classes("text-xs")
 
                 with ui.row().classes("w-full items-center no-wrap"):
-                    match_detail = ui.switch("Match sharpness and grain", value=True)
+                    match_detail = ui.switch("Match sharpness and grain", value=defaults.match_detail)
                     ui.space()
                     with ui.button(icon="info").props("flat round dense size=sm").classes("text-gray-400"):
                         with ui.menu():
                             ui.label(MATCH_DETAIL_INFO).classes("text-xs q-pa-sm").style("max-width: 280px")
 
                 with ui.row().classes("w-full items-center no-wrap"):
-                    color_correction = ui.switch("Apply color corrections", value=False)
+                    color_correction = ui.switch("Apply color corrections", value=defaults.color_correction)
                     ui.space()
                     with ui.button(icon="info").props("flat round dense size=sm").classes("text-gray-400"):
                         with ui.menu():

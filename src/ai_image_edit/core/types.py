@@ -176,7 +176,10 @@ class Inference:
 
 @dataclass(frozen=True)
 class Postprocessing:
-    """What happens to the model's output in the app, the same for every model."""
+    """
+    What happens to the model's output in the app, the same for every model.
+    The defaults are those the UI's controls start with.
+    """
 
     feather_amount: int = int(FEATHER_RANGE.default)  # masked edits
     color_correction: bool = False  # unmasked edits
@@ -191,7 +194,7 @@ class GenerationParams:
     images: Images
     size: Size
     inference: Inference
-    postprocessing: Postprocessing = Postprocessing()
+    postprocessing: Postprocessing
 
 
 class ProgressStage(Enum):

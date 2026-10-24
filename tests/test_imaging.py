@@ -661,7 +661,7 @@ class ModelShiftTest(unittest.TestCase):
             self.image.save(src)
             self.moved(2.0, -1.5).save(out)
             with mock.patch.object(imaging, "align_to_input") as align:
-                result = imaging.run_generation(str(src), None, None, None, lambda path: str(out))
+                result = imaging.run_generation(str(src), None, None, None, lambda path: str(out), Postprocessing())
             align.assert_not_called()
             self.assertEqual(result, str(out))
 
