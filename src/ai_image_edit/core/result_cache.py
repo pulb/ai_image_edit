@@ -12,13 +12,13 @@ and identical inputs would share a result file, so proper session handling
 import hashlib
 import json
 import threading
-from dataclasses import asdict
+from dataclasses import fields
 from pathlib import Path
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Optional, Sequence
 
 from PIL import Image
 
-from ai_image_edit.core.types import GenerationParams
+from ai_image_edit.core.types import Inference
 
 
 def image_fingerprint(path: str) -> str:
@@ -52,40 +52,31 @@ class _LastResult:
 _cache = _LastResult()
 
 
-# GenerationParams fields that are not part of the key as they are: the source
-# and annotation paths (the model input's pixels are fingerprinted instead),
-# the reference images (fingerprinted too), the mask and what happens after
-# inference, and the raw seed settings (the resolved seed is passed in instead).
-_NOT_KEYED = frozenset({
-    "source_image_path", "annotated_image_path", "mask_path", "reference_images",
-    "feather_amount", "apply_color_correction_enabled", "match_detail_enabled", "rescale_mode", "seed", "randomize_seed",
-})
-
-
 def cached_infer(
     infer: Callable[[str], str],
     model: str,
-    params: GenerationParams,
+    inference: Inference,
+    reference_paths: Sequence[str],
     **derived: Any,
 ) -> Callable[[str], str]:
     """
     Wraps a model's infer callback (model input path -> raw output path).
     The key covers the model, the pixels of the model input image and of the
-    reference images, every other GenerationParams field except _NOT_KEYED
-    (so a new parameter is covered automatically; a field the model does
-    not use at worst causes an extra miss), and `derived`: values the
-    model computed from params, such as the resolved seed and the final
-    width and height. The mask is not part of the key: it only affects
-    compositing, after inference.
+    reference images, every field of `inference` (so a new one is covered
+    automatically; its seed must be the resolved one), and `derived`: values
+    the model computed for the request, such as the final width and height.
+    The mask and the postprocessing are not part of it: they only affect what
+    happens after inference.
     """
-    settings = {k: v for k, v in asdict(params).items() if k not in _NOT_KEYED}
+    settings = {f.name: getattr(inference, f.name) for f in fields(inference)}
+    settings["options"] = dict(inference.options)
 
     def wrapped(model_input_path: str) -> str:
         key = hashlib.sha256(json.dumps({
             "model": model,
             "input": image_fingerprint(model_input_path),
-            "references": [image_fingerprint(p) for p in params.reference_images],
-            "settings": settings,
+            "references": [image_fingerprint(p) for p in reference_paths],
+            "inference": settings,
             "derived": derived,
         }, sort_keys=True, default=str).encode()).hexdigest()
         cached = _cache.get(key)

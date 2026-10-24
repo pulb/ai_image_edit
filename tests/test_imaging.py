@@ -12,7 +12,7 @@ from PIL import Image, ImageFilter
 from ai_image_edit.core import imaging, paths
 from ai_image_edit.core.imaging import alignment, color, compositing
 from ai_image_edit.core.imaging.alignment import Block, ShiftMeasurement
-from ai_image_edit.core.types import RescaleMode
+from ai_image_edit.core.types import Postprocessing, RescaleMode
 
 RED, GREEN = (200, 30, 30), (30, 200, 30)
 
@@ -649,7 +649,7 @@ class ModelShiftTest(unittest.TestCase):
             self.mask().save(mask)
             with mock.patch.object(imaging, "composite_with_soft_transition", return_value="/final.png") as composite, \
                     contextlib.redirect_stdout(io.StringIO()):
-                imaging.run_generation(str(src), str(mask), *self.image.size, 0, False, lambda path: str(out))
+                imaging.run_generation(str(src), str(mask), None, self.image.size, lambda path: str(out), Postprocessing(feather_amount=0))
             composited = composite.call_args[0][1]
             self.assertNotEqual(composited, str(out))
             self.assertLess(self.remaining(Image.open(composited), self.mask()), 0.2)
@@ -661,7 +661,7 @@ class ModelShiftTest(unittest.TestCase):
             self.image.save(src)
             self.moved(2.0, -1.5).save(out)
             with mock.patch.object(imaging, "align_to_input") as align:
-                result = imaging.run_generation(str(src), None, None, None, 0, False, lambda path: str(out))
+                result = imaging.run_generation(str(src), None, None, None, lambda path: str(out))
             align.assert_not_called()
             self.assertEqual(result, str(out))
 
@@ -766,7 +766,8 @@ class OtherHelpersTest(unittest.TestCase):
             received = []
             with mock.patch.object(imaging, "composite_with_soft_transition", return_value="/out.png"):
                 imaging.run_generation(
-                    str(source), mask, 64, 48, 0, False, lambda path: received.append(path) or str(source), input_size=input_size,
+                    str(source), mask, None, (64, 48), lambda path: received.append(path) or str(source),
+                    Postprocessing(feather_amount=0), input_size=input_size,
                 )
             self.assertEqual(len(received), 1)
             return received[0] == str(source), Image.open(received[0]).size
@@ -803,7 +804,7 @@ class OtherHelpersTest(unittest.TestCase):
             Image.new("RGB", (64, 64), tinted).save(output)
             for corrected in (False, True):
                 with self.subTest(corrected=corrected), contextlib.redirect_stdout(io.StringIO()):
-                    result = imaging.run_generation(str(source), None, None, None, 0, corrected, lambda path: str(output))
+                    result = imaging.run_generation(str(source), None, None, None, lambda path: str(output), Postprocessing(color_correction=corrected))
                     with Image.open(result) as img:
                         pixel = np.array(img.getpixel((5, 5)), dtype=float)
                     target = np.array(grey if corrected else tinted, dtype=float)
@@ -815,7 +816,7 @@ class OtherHelpersTest(unittest.TestCase):
             Image.new("RGB", (64, 64), (100, 100, 100)).save(source)
             Image.new("RGB", (96, 54), (110, 100, 92)).save(output)  # another aspect ratio
             with contextlib.redirect_stdout(io.StringIO()) as log:
-                result = imaging.run_generation(str(source), None, None, None, 0, True, lambda path: str(output))
+                result = imaging.run_generation(str(source), None, None, None, lambda path: str(output), Postprocessing(color_correction=True))
             self.assertEqual(result, str(output))
             self.assertIn("another framing", log.getvalue())
 

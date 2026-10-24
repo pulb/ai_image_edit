@@ -2,11 +2,12 @@
 """Constants and helpers shared by the UI."""
 import hashlib
 import os
-from typing import List, Optional, Sequence
+from typing import Any, Mapping, Optional, Sequence
 
 from ai_image_edit.core.errors import GenerationError
 from ai_image_edit.core.types import (
-    DEFAULT_RESCALE_MODE, GenerationParams, GenerationProgress, ModelCapabilities, ProgressStage, RescaleMode,
+    DEFAULT_RESCALE_MODE, GenerationParams, GenerationProgress, Images, Inference, ModelCapabilities, Postprocessing,
+    ProgressStage, RescaleMode, Size,
 )
 
 # This app's one accent colour: the UI reads its purple from here.
@@ -92,6 +93,16 @@ def describe_error(exc: Exception) -> str:
     return str(exc) if isinstance(exc, GenerationError) else f"Unexpected error: {exc}"
 
 
+def _option_value(caps: ModelCapabilities, name: str, value: Any) -> Any:
+    """An option control's value as the model takes it, or None if the model has no such option."""
+    if value is None:
+        return None
+    if name == "negative_prompt":
+        return str(value) if caps.supports_negative_prompt else None
+    supported = {"cfg": caps.supports_cfg, "denoise": caps.supports_denoise}
+    return float(value) if supported.get(name) else None
+
+
 def params_from_ui(
     caps: ModelCapabilities,
     *,
@@ -99,53 +110,55 @@ def params_from_ui(
     source_image_path: str,
     mask_path: Optional[str],
     annotated_image_path: Optional[str] = None,
-    reference_images: List[str],
+    reference_images: Sequence[str],
     seed: Optional[float],
     randomize_seed: bool,
     aspect_ratio: str,
     resolution: int,
     steps: int,
-    cfg: Optional[float] = None,
-    denoise: Optional[float] = None,
-    sampler_name: Optional[str] = None,
-    scheduler: Optional[str] = None,
-    negative_prompt: Optional[str] = None,
-    lora_files: List[str],
+    sampler: Optional[str],
+    scheduler: Optional[str],
+    options: Mapping[str, Any],
+    lora_files: Sequence[str],
     lora_strength: Optional[float] = None,
-    apply_color_correction_enabled: bool,
+    color_correction: bool,
     feather_amount: Optional[int] = None,
     rescale_mode: Optional[str] = None,
-    match_detail_enabled: bool = True,
+    match_detail: bool = True,
 ) -> GenerationParams:
     """
-    Builds the GenerationParams for one generation. A control the model
-    doesn't support may be passed as None (or hold any value): the
-    capability decides, and the field gets a neutral value instead.
+    Builds the GenerationParams for one generation from the controls' values.
+    `options` holds the optional workflow inputs' controls by name; one the
+    model doesn't have, or that is None, is left out. Masks, LoRAs and the
+    masked-edit settings are dropped for a model without them.
 
-    cfg and lora_strength fall back to the capability's own declared
-    default (not a bare 0.0) when unsupported, since both ranges start above 0.
+    lora_strength falls back to the capability's own default.
     rescale_mode is a RescaleMode or its value; anything else raises ValueError.
     """
+    inpainting = caps.supports_inpainting
+    chosen = {name: _option_value(caps, name, value) for name, value in options.items()}
     return GenerationParams(
-        prompt=prompt or "",
-        source_image_path=source_image_path,
-        mask_path=mask_path if caps.supports_inpainting else None,
-        steps=steps,
-        reference_images=reference_images,
-        annotated_image_path=annotated_image_path,
-        seed=int(seed) if seed is not None else 0,
-        randomize_seed=bool(randomize_seed),
-        aspect_ratio=aspect_ratio,
-        resolution=resolution,
-        cfg=cfg if caps.supports_cfg and cfg is not None else caps.cfg_range.default,
-        denoise=denoise if caps.supports_denoise and denoise is not None else 1.0,
-        sampler_name=sampler_name if caps.sampler_choices else None,
-        scheduler=scheduler if caps.scheduler_choices else None,
-        negative_prompt=(negative_prompt or "") if caps.supports_negative_prompt else "",
-        lora_files=lora_files if caps.supports_loras else [],
-        lora_strength=lora_strength if caps.supports_loras and lora_strength is not None else caps.lora_strength_range.default,
-        apply_color_correction_enabled=bool(apply_color_correction_enabled),
-        match_detail_enabled=bool(match_detail_enabled),
-        feather_amount=int(feather_amount) if caps.supports_inpainting and feather_amount is not None else 0,
-        rescale_mode=RescaleMode(rescale_mode) if caps.supports_inpainting and rescale_mode is not None else DEFAULT_RESCALE_MODE,
+        images=Images(
+            source_path=source_image_path,
+            mask_path=mask_path if inpainting else None,
+            annotated_path=annotated_image_path,
+            reference_paths=tuple(reference_images),
+        ),
+        size=Size(aspect_ratio=aspect_ratio, resolution=resolution),
+        inference=Inference(
+            prompt=prompt or "",
+            steps=int(steps),
+            sampler=default_choice(sampler, caps.sampler_choices),
+            scheduler=default_choice(scheduler, caps.scheduler_choices),
+            seed=None if randomize_seed or seed is None else int(seed),
+            options={name: value for name, value in chosen.items() if value is not None},
+            lora_files=tuple(lora_files) if caps.supports_loras else (),
+            lora_strength=lora_strength if caps.supports_loras and lora_strength is not None else caps.lora_strength_range.default,
+        ),
+        postprocessing=Postprocessing(
+            feather_amount=int(feather_amount) if inpainting and feather_amount is not None else 0,
+            color_correction=bool(color_correction),
+            match_detail=bool(match_detail),
+            rescale_mode=RescaleMode(rescale_mode) if inpainting and rescale_mode is not None else DEFAULT_RESCALE_MODE,
+        ),
     )

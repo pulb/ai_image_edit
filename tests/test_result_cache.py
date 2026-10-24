@@ -7,7 +7,7 @@ from pathlib import Path
 from PIL import Image
 
 from ai_image_edit.core import result_cache
-from ai_image_edit.core.types import GenerationParams, RescaleMode
+from ai_image_edit.core.types import Inference
 
 
 class CacheKeyTest(unittest.TestCase):
@@ -26,28 +26,36 @@ class CacheKeyTest(unittest.TestCase):
         self.calls += 1
         return str(self.output)
 
-    def run_with(self, params):
-        wrapped = result_cache.cached_infer(self.infer, "model", params, seed=1)
+    def run_with(self, inference, references=()):
+        wrapped = result_cache.cached_infer(self.infer, "model", inference, references, width=64, height=64)
         return wrapped(str(self.source))
 
-    def params(self, **overrides):
-        return dataclasses.replace(
-            GenerationParams(prompt="p", source_image_path=str(self.source), mask_path=None, steps=8), **overrides
-        )
+    def inference(self, **overrides):
+        base = Inference(prompt="p", steps=8, sampler="euler", scheduler="simple", seed=1, options={"cfg": 1.0})
+        return dataclasses.replace(base, **overrides)
 
     def test_the_same_request_reuses_the_result(self):
-        self.run_with(self.params())
-        self.run_with(self.params())
-        self.assertEqual(self.calls, 1)
-
-    def test_what_happens_after_inference_does_not_change_the_key(self):
-        self.run_with(self.params())
-        self.run_with(self.params(rescale_mode=RescaleMode.EDIT, feather_amount=9, apply_color_correction_enabled=True, match_detail_enabled=False))
+        self.run_with(self.inference())
+        self.run_with(self.inference())
         self.assertEqual(self.calls, 1)
 
     def test_an_inference_setting_changes_the_key(self):
-        self.run_with(self.params())
-        self.run_with(self.params(steps=9))
+        self.run_with(self.inference())
+        self.run_with(self.inference(steps=9))
+        self.assertEqual(self.calls, 2)
+
+    def test_an_option_changes_the_key(self):
+        self.run_with(self.inference())
+        self.run_with(self.inference(options={"cfg": 2.0}))
+        self.assertEqual(self.calls, 2)
+
+    def test_the_reference_pixels_are_part_of_the_key(self):
+        reference = self.dir / "ref.png"
+        Image.new("RGB", (8, 8), (1, 2, 3)).save(reference)
+        self.run_with(self.inference(), [str(reference)])
+        self.run_with(self.inference(), [str(reference)])
+        Image.new("RGB", (8, 8), (4, 5, 6)).save(reference)
+        self.run_with(self.inference(), [str(reference)])
         self.assertEqual(self.calls, 2)
 
 

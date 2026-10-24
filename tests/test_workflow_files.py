@@ -32,7 +32,7 @@ from PIL import Image
 
 from ai_image_edit.core import imaging
 from ai_image_edit.core.errors import GenerationCancelled, GenerationError
-from ai_image_edit.core.types import GenerationParams, GenerationProgress, ProgressStage
+from ai_image_edit.core.types import GenerationParams, GenerationProgress, Images, Inference, ProgressStage, Size
 from ai_image_edit.workflows import available_workflows
 from ai_image_edit import workflows as workflow_files
 from ai_image_edit.comfy import client
@@ -82,14 +82,24 @@ class ManifestModelTests(unittest.TestCase):
             (self.tmp / spec["folder"] / spec["name"]).touch()
         return model
 
+    @staticmethod
+    def inference(model: WorkflowModel = None, **overrides) -> Inference:
+        """An Inference with every option the model has (none without a model)."""
+        options = {name: "not this" if name == "negative_prompt" else 1.0 for name in (model._option_targets if model else {})}
+        values = dict(prompt="a prompt", steps=4, sampler="euler", scheduler="simple", seed=1, options=options)
+        return Inference(**(values | overrides))
+
+    def request(self, source="source.png", mask=None, aspect="Original", resolution=1024, **inference) -> GenerationParams:
+        return GenerationParams(
+            Images(str(self.tmp / source), mask, reference_paths=tuple(inference.pop("reference_paths", ()))),
+            Size(aspect, resolution), self.inference(**inference),
+        )
+
     def build(self, model: WorkflowModel, n_refs: int) -> dict:
         m = model._manifest
         size_values = {name: 1024 for name in m["size"].get("bind", {})}
-        return model.build_workflow(
-            prompt="a prompt", negative_prompt="not this", source_path="/x/source.png",
-            reference_paths=[f"/x/ref{i}.png" for i in range(n_refs)], seed=1, steps=4, cfg=1.0, denoise=1.0,
-            sampler="euler", scheduler="simple", lora_files=LORAS if m.get("loras") else [], size_values=size_values,
-        )
+        inference = self.inference(model, lora_files=LORAS if m.get("loras") else (), lora_strength=0.7)
+        return model.build_workflow(inference, "/x/source.png", [f"/x/ref{i}.png" for i in range(n_refs)], size_values)
 
     def test_workflow_files_exist_and_are_listed(self):
         self.assertTrue(MANIFESTS, "no workflow file found in ai_image_edit/data/workflows")
@@ -211,13 +221,11 @@ class ManifestModelTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "no 'loras' section"):
                     model._splice_loras({}, LORAS, 0.7)
 
-    def run_generate(self, model, **params) -> int:
+    def run_generate(self, model, **inference) -> int:
         real = imaging.run_generation
         imaging.run_generation = lambda *args, **kwargs: "/out.png"
         try:
-            return model.generate(GenerationParams(
-                prompt="a hat", source_image_path=str(self.tmp / "source.png"), mask_path=None, steps=10, **params
-            )).actual_seed
+            return model.generate(self.request(prompt="a hat", steps=10, **inference)).actual_seed
         finally:
             imaging.run_generation = real
 
@@ -231,15 +239,12 @@ class ManifestModelTests(unittest.TestCase):
             return "p"
 
         real = imaging.run_generation
-        imaging.run_generation = lambda source, mask, w, h, feather, cc, infer, *a, **k: infer(source)
+        imaging.run_generation = lambda source, mask, annotated, size, infer, *a, **k: infer(source)
         try:
             with mock.patch.object(model, "_check_nodes"), mock.patch.object(model, "_check_setup"), \
                     mock.patch.object(client, "submit_workflow_and_wait", submit), \
                     mock.patch.object(client, "fetch_generated_image", return_value="/out.png"):
-                model.generate(GenerationParams(
-                    prompt="a new hat", source_image_path=str(self.tmp / "source.png"), mask_path=None, steps=10, seed=987,
-                    randomize_seed=False,
-                ), events.append)
+                model.generate(self.request(prompt="a new hat", steps=10, seed=987), events.append)
         finally:
             imaging.run_generation = real
         self.assertEqual(calls, ["6"])
@@ -265,14 +270,12 @@ class ManifestModelTests(unittest.TestCase):
         cancel = threading.Event()
         cancel.set()
         real = imaging.run_generation
-        imaging.run_generation = lambda source, mask, w, h, feather, cc, infer, *a, **k: infer(source)
+        imaging.run_generation = lambda source, mask, annotated, size, infer, *a, **k: infer(source)
         try:
             with mock.patch.object(model, "_check_nodes"), mock.patch.object(model, "_check_setup"), \
                     mock.patch.object(client, "submit_workflow_and_wait") as submit:
                 with self.assertRaises(GenerationCancelled):
-                    model.generate(GenerationParams(
-                        prompt="a cancelled hat", source_image_path=str(self.tmp / "source.png"), mask_path=None, steps=10,
-                    ), cancel=cancel)
+                    model.generate(self.request(prompt="a cancelled hat", steps=10), cancel=cancel)
         finally:
             imaging.run_generation = real
         submit.assert_not_called()
@@ -289,16 +292,9 @@ class ManifestModelTests(unittest.TestCase):
         for name in ("qwen_image21", "qwen_image21_gguf", "qwen_image21_turbo", "qwen_image21_turbo_gguf"):
             with self.subTest(workflow=name):
                 model = self.load(workflow_files.available_workflows()[name])
-                params = GenerationParams(
-                    prompt="p", source_image_path=str(self.tmp / "source.png"), mask_path=None, steps=4,
-                    aspect_ratio="16:9", resolution=1024,
-                )
-                size = model._size.resolve(params)
+                size = model._size.resolve(Size("16:9", 1024), str(self.tmp / "source.png"), masked=False)
                 self.assertEqual((1376, 768), (size.width, size.height))
-                wf = model.build_workflow(
-                    prompt="p", negative_prompt="", source_path="/x/source.png", reference_paths=[], seed=1, steps=4,
-                    cfg=1.0, denoise=1.0, sampler="euler", scheduler="simple", size_values=size.values,
-                )
+                wf = model.build_workflow(self.inference(model), "/x/source.png", [], size.values)
                 latent_id = wf["6"]["inputs"]["latent_image"][0]
                 self.assertEqual("EmptyLatentImage", wf[latent_id]["class_type"])
                 self.assertEqual((1376, 768), (wf[latent_id]["inputs"]["width"], wf[latent_id]["inputs"]["height"]))
@@ -317,20 +313,14 @@ class ManifestModelTests(unittest.TestCase):
             model = self.load(workflow_files.available_workflows()[name])
             for source, mask, aspect, fitted in cases:
                 with self.subTest(workflow=name, source=source, mask=mask, aspect=aspect):
-                    params = GenerationParams(
-                        prompt="p", source_image_path=str(self.tmp / source), mask_path=mask, steps=4,
-                        aspect_ratio=aspect, resolution=1024,
-                    )
-                    size = model._size.resolve(params)
-                    own_ratio = sizes.dimensions_from_source(params.source_image_path, size.reference_resolution)
+                    source_path = str(self.tmp / source)
+                    size = model._size.resolve(Size(aspect, 1024), source_path, masked=bool(mask))
+                    own_ratio = sizes.dimensions_from_source(source_path, size.reference_resolution)
                     self.assertEqual((size.width, size.height) if fitted else own_ratio, size.input_size)
-                    self.assertEqual(model._size.resolution_for_source(params.source_image_path) if mask else 1024, size.reference_resolution)
+                    self.assertEqual(model._size.resolution_for_source(source_path) if mask else 1024, size.reference_resolution)
                     self.assertEqual(0, size.values["resolution"])
                     self.assertEqual((size.width, size.height), (size.values["width"], size.values["height"]))
-                    wf = model.build_workflow(
-                        prompt="p", negative_prompt="", source_path="/x/source.png", reference_paths=[], seed=1, steps=4,
-                        cfg=1.0, denoise=1.0, sampler="euler", scheduler="simple", size_values=size.values,
-                    )
+                    wf = model.build_workflow(self.inference(model), "/x/source.png", [], size.values)
                     self.assertEqual(size.values["resolution"], wf["5"]["inputs"]["resolution"])
 
     def test_size_policies_resolve_exactly_the_values_they_declare(self):
@@ -340,11 +330,8 @@ class ManifestModelTests(unittest.TestCase):
             policy = policy_class(config)
             for aspect in policy.aspect_ratios:
                 with self.subTest(policy=name, aspect=aspect):
-                    params = GenerationParams(
-                        prompt="p", source_image_path=source, mask_path=None, steps=4,
-                        aspect_ratio=aspect, resolution=policy.default_resolution,
-                    )
-                    self.assertEqual(policy.value_names, set(policy.resolve(params).values))
+                    resolved = policy.resolve(Size(aspect, policy.default_resolution), source, masked=False)
+                    self.assertEqual(policy.value_names, set(resolved.values))
 
     def test_loading_rejects_a_size_binding_that_leaves_a_value_unused(self):
         data = json.loads(workflow_files.available_workflows()["qwen_image21"].read_text(encoding="utf-8"))
@@ -375,14 +362,31 @@ class ManifestModelTests(unittest.TestCase):
                 with self.subTest(model=path.stem):
                     seen = []
                     random.randint = lambda a, b: seen.append((a, b)) or a
-                    self.run_generate(model, randomize_seed=True)
+                    self.run_generate(model, seed=None)
                     self.assertEqual(seen, [(spec["min"], spec["max"])])
                     random.randint = real
                     chosen = 2 ** 40 + 5
                     expected = chosen % (spec["max"] + 1) if spec.get("wrap") else chosen
-                    self.assertEqual(self.run_generate(model, randomize_seed=False, seed=chosen), expected)
+                    self.assertEqual(self.run_generate(model, seed=chosen), expected)
         finally:
             random.randint = real
+
+    def test_options_reach_their_workflow_inputs(self):
+        for path in MANIFESTS:
+            model = self.load(path)
+            with self.subTest(model=path.stem):
+                inference = self.inference(model)
+                self.assertTrue(inference.options, "every bundled workflow has optional inputs")
+                wf = model.build_workflow(inference, "/x/source.png", [], {n: 1024 for n in model._manifest["size"]["bind"]})
+                for name, value in inference.options.items():
+                    node, _, key = model._option_targets[name].partition(".")
+                    self.assertEqual(wf[node]["inputs"][key], value)
+
+    def test_an_option_the_model_does_not_have_is_rejected(self):
+        for path in MANIFESTS:
+            with self.subTest(model=path.stem):
+                with self.assertRaisesRegex(ValueError, "no optional input"):
+                    self.run_generate(self.load(path), options={"nope": 1})
 
     def test_too_many_input_images_is_rejected(self):
         for path in MANIFESTS:
@@ -391,7 +395,7 @@ class ManifestModelTests(unittest.TestCase):
             limit = refs["max"] if refs else 0
             with self.subTest(model=path.stem):
                 with self.assertRaisesRegex(GenerationError, f"Up to {limit + 1} input images"):
-                    self.run_generate(model, reference_images=[f"/x/r{i}.png" for i in range(limit + 1)])
+                    self.run_generate(model, reference_paths=[f"/x/r{i}.png" for i in range(limit + 1)])
 
 
 if __name__ == "__main__":

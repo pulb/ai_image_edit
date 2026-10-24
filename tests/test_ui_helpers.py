@@ -45,37 +45,57 @@ class ResolutionTest(unittest.TestCase):
                 self.assertEqual(Qwen21Tiers({}).resolution_for_source(path), expected, size)
 
 
-class RescaleModeParamTest(unittest.TestCase):
+class ParamsFromUiTest(unittest.TestCase):
     def params(self, *, inpainting=True, **overrides):
         caps = ModelCapabilities(
             max_reference_images=1, supports_loras=False, supports_inpainting=inpainting,
             supported_aspect_ratios=["Original"], default_aspect_ratio="Original",
             supported_resolutions=[1024], default_resolution=1024,
+            sampler_choices=["euler"], default_sampler="euler", scheduler_choices=["simple"], default_scheduler="simple",
+            supports_cfg=True, supports_denoise=False, supports_negative_prompt=True,
         )
         kwargs = dict(
             prompt="p", source_image_path="s.png", mask_path="m.png", reference_images=[], seed=1,
-            randomize_seed=False, aspect_ratio="Original", resolution=1024, steps=8, lora_files=[],
-            apply_color_correction_enabled=False,
+            randomize_seed=False, aspect_ratio="Original", resolution=1024, steps=8, sampler="euler",
+            scheduler="simple", options={}, lora_files=[], color_correction=False,
         )
         return common.params_from_ui(caps, **(kwargs | overrides))
 
     def test_defaults_to_the_edited_area(self):
-        self.assertIs(self.params().rescale_mode, RescaleMode.EDIT)
+        self.assertIs(self.params().postprocessing.rescale_mode, RescaleMode.EDIT)
 
     def test_takes_an_enum_or_its_value(self):
-        self.assertIs(self.params(rescale_mode=RescaleMode.EDIT).rescale_mode, RescaleMode.EDIT)
-        self.assertIs(self.params(rescale_mode="edit").rescale_mode, RescaleMode.EDIT)
+        self.assertIs(self.params(rescale_mode=RescaleMode.EDIT).postprocessing.rescale_mode, RescaleMode.EDIT)
+        self.assertIs(self.params(rescale_mode="edit").postprocessing.rescale_mode, RescaleMode.EDIT)
 
     def test_unknown_value_is_rejected(self):
         with self.assertRaises(ValueError):
             self.params(rescale_mode="huge")
 
     def test_detail_matching_is_on_unless_switched_off(self):
-        self.assertTrue(self.params().match_detail_enabled)
-        self.assertFalse(self.params(match_detail_enabled=False).match_detail_enabled)
+        self.assertTrue(self.params().postprocessing.match_detail)
+        self.assertFalse(self.params(match_detail=False).postprocessing.match_detail)
 
     def test_ignored_without_inpainting(self):
-        self.assertIs(self.params(inpainting=False, rescale_mode="original").rescale_mode, RescaleMode.EDIT)
+        params = self.params(inpainting=False, rescale_mode="original")
+        self.assertIs(params.postprocessing.rescale_mode, RescaleMode.EDIT)
+        self.assertIsNone(params.images.mask_path)
+
+    def test_a_randomized_seed_is_none(self):
+        self.assertIsNone(self.params(randomize_seed=True).inference.seed)
+        self.assertEqual(self.params(seed=42.0).inference.seed, 42)
+
+    def test_only_the_models_options_are_sent(self):
+        options = self.params(options={"cfg": 3, "denoise": 0.5, "negative_prompt": None}).inference.options
+        self.assertEqual(dict(options), {"cfg": 3.0})
+        self.assertIsInstance(options["cfg"], float)
+
+    def test_the_request_cannot_be_changed(self):
+        params = self.params(options={"cfg": 2})
+        with self.assertRaises(Exception):
+            params.inference.options["cfg"] = 5
+        with self.assertRaises(Exception):
+            params.inference.steps = 9
 
     def test_every_mode_has_a_label(self):
         self.assertEqual(set(common.RESCALE_MODE_OPTIONS), {mode.value for mode in RescaleMode})

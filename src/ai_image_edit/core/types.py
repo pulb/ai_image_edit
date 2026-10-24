@@ -5,7 +5,8 @@ Deliberately dependency-free of both, so neither side needs to import the other.
 """
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import List, Optional
+from types import MappingProxyType
+from typing import Any, List, Mapping, Optional, Tuple
 
 
 # The colours a user can annotate an image with, in the order a model uses
@@ -115,54 +116,68 @@ class ModelCapabilities:
     lora_strength_range: RangeSpec = field(default_factory=lambda: RangeSpec(0.1, 2.0, 0.7, step=0.05))
 
 
-@dataclass
-class GenerationParams:
+@dataclass(frozen=True)
+class Images:
+    """The images of one request, as local paths."""
+
+    source_path: str
+    mask_path: Optional[str] = None
+    # The source with the user's annotations drawn in, same size as the source:
+    # what the model sees instead of it. Masking, compositing and colour
+    # correction still use the clean source.
+    annotated_path: Optional[str] = None
+    # Extra reference images beyond the source, in order; at most
+    # capabilities.max_reference_images - 1.
+    reference_paths: Tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class Size:
+    """The size the user chose: an aspect ratio label and a resolution (see sizes.py)."""
+
+    aspect_ratio: str
+    resolution: int
+
+
+@dataclass(frozen=True)
+class Inference:
     """
-    Bundles every input a model's generate() needs for one
-    generation. Some fields are meaningless for a given model (e.g. cfg
-    for a model whose capabilities.supports_cfg is False) — the model
-    ignores what it doesn't use, and the UI only renders/sets a field when
-    capabilities says it applies.
+    What the model's run gets besides the images and the size. seed None
+    means a random one. options are the model's optional workflow inputs by
+    name (see capabilities.options); one the model does not have is absent.
     """
 
     prompt: str
-    source_image_path: str
-    mask_path: Optional[str]
-
-    # No default: the sensible step count is model-specific (see
-    # capabilities.step_range), so the caller always states it.
     steps: int
+    sampler: str
+    scheduler: str
+    seed: Optional[int]
+    options: Mapping[str, Any] = field(default_factory=dict)
+    lora_files: Tuple[str, ...] = ()
+    lora_strength: Optional[float] = None
 
-    # Extra reference images beyond the primary source, in order. Length
-    # is bounded by capabilities.max_reference_images - 1.
-    reference_images: List[str] = field(default_factory=list)
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "options", MappingProxyType(dict(self.options)))
 
-    # The source image with the user's annotations drawn in, same size as
-    # source_image_path. What the model sees instead of the source; masking,
-    # compositing and colour correction still use the clean source.
-    annotated_image_path: Optional[str] = None
 
-    seed: int = 0
-    randomize_seed: bool = True
+@dataclass(frozen=True)
+class Postprocessing:
+    """What happens to the model's output in the app, the same for every model."""
 
-    aspect_ratio: str = ORIGINAL_ASPECT_RATIO
-    resolution: int = 1024
+    feather_amount: int = int(FEATHER_RANGE.default)  # masked edits
+    color_correction: bool = False  # unmasked edits
+    match_detail: bool = True  # masked edits
+    rescale_mode: RescaleMode = DEFAULT_RESCALE_MODE  # masked edits
 
-    cfg: float = 1.0
-    denoise: float = 1.0
-    sampler_name: Optional[str] = None
-    scheduler: Optional[str] = None
-    negative_prompt: str = ""
 
-    lora_files: List[str] = field(default_factory=list)
-    lora_strength: float = 0.7
+@dataclass(frozen=True)
+class GenerationParams:
+    """Every input of one generation, in the groups the steps of a generation use."""
 
-    apply_color_correction_enabled: bool = False
-    feather_amount: int = int(FEATHER_RANGE.default)
-    match_detail_enabled: bool = True
-
-    # Masked edits only.
-    rescale_mode: RescaleMode = DEFAULT_RESCALE_MODE
+    images: Images
+    size: Size
+    inference: Inference
+    postprocessing: Postprocessing = Postprocessing()
 
 
 class ProgressStage(Enum):

@@ -19,7 +19,7 @@ from typing import Any, Dict, FrozenSet, List, Optional, Tuple
 
 from PIL import Image
 
-from ai_image_edit.core.types import ORIGINAL_ASPECT_RATIO, GenerationParams
+from ai_image_edit.core.types import ORIGINAL_ASPECT_RATIO, Size
 
 
 @dataclass
@@ -59,7 +59,8 @@ class SizePolicy:
         """The resolution that fits the source image, or None if the policy has no such notion."""
         return None
 
-    def resolve(self, params: GenerationParams) -> ResolvedSize:
+    def resolve(self, size: Size, source_path: str, masked: bool) -> ResolvedSize:
+        """The size to generate at for the chosen size, the source image and whether the edit has a mask."""
         raise NotImplementedError
 
 
@@ -173,12 +174,12 @@ class Qwen21Tiers(SizePolicy):
     def resolution_for_source(self, source_image_path: str) -> Optional[int]:
         return _nearest_resolution(_image_size(source_image_path))
 
-    def resolve(self, params: GenerationParams) -> ResolvedSize:
-        source_size = _image_size(params.source_image_path)
+    def resolve(self, size: Size, source_path: str, masked: bool) -> ResolvedSize:
+        source_size = _image_size(source_path)
         # A mask only lines up with the source's own framing and resolution,
         # so both come from the source then.
-        aspect = ORIGINAL_ASPECT_RATIO if params.mask_path else params.aspect_ratio
-        resolution = _nearest_resolution(source_size) if params.mask_path else params.resolution
+        aspect = ORIGINAL_ASPECT_RATIO if masked else size.aspect_ratio
+        resolution = _nearest_resolution(source_size) if masked else size.resolution
         tier = _tier_size(resolution, aspect)
         width, height = tier or _dimensions_for(source_size, resolution)
         # A mask always takes the source's size (its aspect ratio is forced
@@ -229,17 +230,17 @@ class FixedArea(SizePolicy):
         width, height = _split_area(aspect_w / aspect_h, target_area)
         return (int(round(width / self.multiple) * self.multiple), int(round(height / self.multiple) * self.multiple))
 
-    def resolve(self, params: GenerationParams) -> ResolvedSize:
+    def resolve(self, size: Size, source_path: str, masked: bool) -> ResolvedSize:
         # A mask's coordinates only mean something relative to the source's
         # own framing, so a mask always gets the source's aspect ratio.
-        aspect = ORIGINAL_ASPECT_RATIO if params.mask_path else params.aspect_ratio
-        target_area = float(params.resolution) ** 2
+        aspect = ORIGINAL_ASPECT_RATIO if masked else size.aspect_ratio
+        target_area = float(size.resolution) ** 2
         if aspect == ORIGINAL_ASPECT_RATIO:
-            ratio_w, ratio_h = _image_size(params.source_image_path)
+            ratio_w, ratio_h = _image_size(source_path)
         else:
             ratio_w, ratio_h = self.RATIOS[aspect]
         width, height = self._dimensions_for(ratio_w, ratio_h, target_area)
-        return ResolvedSize(width, height, {"width": width, "height": height}, {}, f"resolution={params.resolution}")
+        return ResolvedSize(width, height, {"width": width, "height": height}, {}, f"resolution={size.resolution}")
 
 
 POLICIES = {

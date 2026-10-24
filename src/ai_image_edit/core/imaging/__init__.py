@@ -22,21 +22,17 @@ from ai_image_edit.core.imaging.color import (
 from ai_image_edit.core.imaging.compositing import apply_whole_image_color_correction, composite_with_soft_transition
 from ai_image_edit.core.imaging.files import JPEG_QUALITY, compose_annotations, prepare_upload, read_mask, save_as_jpeg
 from ai_image_edit.core.imaging.geometry import fit_image_to_size, resize_to_cover_and_crop
-from ai_image_edit.core.types import DEFAULT_RESCALE_MODE, RescaleMode
+from ai_image_edit.core.types import Postprocessing
 
 
 def run_generation(
     source_image_path: str,
     mask_path: Optional[str],
-    gen_width: Optional[int],
-    gen_height: Optional[int],
-    feather_amount: int,
-    apply_color_correction_enabled: bool,
+    annotated_image_path: Optional[str],
+    gen_size: Optional[Tuple[int, int]],
     infer: Callable[[str], str],
-    annotated_image_path: Optional[str] = None,
-    rescale_mode: RescaleMode = DEFAULT_RESCALE_MODE,
+    postprocessing: Postprocessing = Postprocessing(),
     input_size: Optional[Tuple[int, int]] = None,
-    match_detail: bool = True,
 ) -> str:
     """
     Orchestrates the crop -> infer -> align -> composite/color-correct sequence
@@ -46,28 +42,27 @@ def run_generation(
 
     - The model's input image is cropped/resized to exactly input_size via
       fit_image_to_size before infer() if that is set, and passed to infer()
-      unprepared otherwise. With a mask it is always fitted to
-      (gen_width, gen_height), which must be real dimensions then, as the
+      unprepared otherwise. With a mask it is always fitted to gen_size (the
+      generation's (width, height), which must be given then), as the
       composite maps the mask onto that image; an input_size of another size
       is a ValueError.
     - If mask_path is set, the result is lined up with the model's input
       (align_to_input) and composited back into the untouched original via
-      composite_with_soft_transition, feathered by feather_amount, as
-      rescale_mode selects, and sharpened and grained if match_detail.
+      composite_with_soft_transition, feathered by postprocessing.feather_amount,
+      as its rescale_mode selects, and sharpened and grained if its match_detail.
     - Otherwise the raw result is returned as-is, or color-corrected as a
-      whole if apply_color_correction_enabled is True and it shows the
-      input's framing (with a mask that flag has no effect:
+      whole if postprocessing.color_correction is set and it shows the
+      input's framing (with a mask that setting has no effect:
       composite_with_soft_transition() matches colours by itself).
-      rescale_mode is ignored.
 
     The model's input image is annotated_image_path if given, else
     source_image_path. Compositing and color correction always use the clean
     source_image_path, so annotations never end up in the result.
     """
     if mask_path:
-        if input_size not in (None, (gen_width, gen_height)):
-            raise ValueError(f"A masked edit needs its input at the generation size {(gen_width, gen_height)}, not {input_size}.")
-        input_size = (gen_width, gen_height)
+        if input_size not in (None, gen_size):
+            raise ValueError(f"A masked edit needs its input at the generation size {gen_size}, not {input_size}.")
+        input_size = gen_size
     model_source_path = annotated_image_path or source_image_path
     model_input_path = (
         fit_image_to_size(model_source_path, *input_size, Image.Resampling.LANCZOS) if input_size else model_source_path
@@ -79,9 +74,10 @@ def run_generation(
         # Pasted back onto the original, so lined up with the model's input first.
         output_path = align_to_input(model_input_path, output_path, mask_path)
         return composite_with_soft_transition(
-            source_image_path, output_path, mask_path, feather_amount, rescale_mode, match_detail
+            source_image_path, output_path, mask_path, postprocessing.feather_amount,
+            postprocessing.rescale_mode, postprocessing.match_detail,
         )
-    if apply_color_correction_enabled:
+    if postprocessing.color_correction:
         # The output shows the input's framing when it has the input's size:
         # the source fitted to it, or a source already that size. Otherwise it
         # was recomposed, and its colours differ because its content does.

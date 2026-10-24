@@ -539,17 +539,19 @@ def run(model: WorkflowModel) -> None:
                     aspect_ratio=editor_card.aspect_ratio.value,
                     resolution=editor_card.resolution.value,
                     steps=advanced.steps.value,
-                    cfg=value_of(advanced.cfg),
-                    denoise=value_of(advanced.denoise),
-                    sampler_name=value_of(advanced.sampler_name),
+                    sampler=value_of(advanced.sampler_name),
                     scheduler=value_of(advanced.scheduler),
-                    negative_prompt=value_of(advanced.negative_prompt),
+                    options={
+                        "cfg": value_of(advanced.cfg),
+                        "denoise": value_of(advanced.denoise),
+                        "negative_prompt": value_of(advanced.negative_prompt),
+                    },
                     lora_files=lora_files,
                     lora_strength=value_of(references.lora_strength),
-                    apply_color_correction_enabled=advanced.color_correction.value,
+                    color_correction=advanced.color_correction.value,
                     feather_amount=editor_inputs.feather_amount,
                     rescale_mode=advanced.rescale_mode.value,
-                    match_detail_enabled=advanced.match_detail.value,
+                    match_detail=advanced.match_detail.value,
                 )
                 latest_progress, started = GenerationProgress(ProgressStage.PREPARING), time.monotonic()
                 refresh_progress()

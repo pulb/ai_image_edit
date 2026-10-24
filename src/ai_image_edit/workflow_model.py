@@ -14,10 +14,10 @@ import subprocess
 import threading
 import time
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from functools import cached_property
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 from PIL import Image
 
@@ -27,7 +27,7 @@ from ai_image_edit.core import imaging
 from ai_image_edit.core.errors import GenerationCancelled, GenerationError
 from ai_image_edit.core.result_cache import cached_infer
 from ai_image_edit.core.types import (
-    GenerationParams, GenerationProgress, GenerationResult, ModelCapabilities, ProgressStage, RangeSpec,
+    GenerationParams, GenerationProgress, GenerationResult, Inference, ModelCapabilities, ProgressStage, RangeSpec,
 )
 from ai_image_edit.sizes import POLICIES, ResolvedSize, SizePolicy, dimensions_from_source
 from ai_image_edit.workflows import available_workflows, read_workflow_file
@@ -63,6 +63,8 @@ class SetupProgress:
 COMFY_POLL_SECONDS = 0.5
 
 _NAMED_CHOICES = {"comfy_samplers": SAMPLER_CHOICES, "comfy_schedulers": SCHEDULER_CHOICES}
+# The bindings every workflow has; the app fills them in from Inference's own fields.
+REQUIRED_BINDINGS = ("prompt", "seed", "steps", "sampler", "scheduler")
 
 
 def _split(target: str) -> Tuple[str, str]:
@@ -410,12 +412,15 @@ class WorkflowModel:
 
     # ------------------------------------------------------------ workflow
 
+    @property
+    def _option_targets(self) -> Dict[str, str]:
+        """The optional inputs (Inference.options) by name, with their workflow targets."""
+        return {name: target for name, target in self._manifest["bind"].items() if name not in REQUIRED_BINDINGS}
+
     def build_workflow(
-        self, *, prompt: str, negative_prompt: str = "", source_path: str, reference_paths: List[str],
-        seed: int, steps: int, cfg: float = 1.0, denoise: float = 1.0, sampler: str, scheduler: str,
-        lora_files: Optional[List[str]] = None, lora_strength: float = 0.7, size_values: Dict[str, Any],
+        self, inference: Inference, source_path: str, reference_paths: Sequence[str], size_values: Dict[str, Any],
     ) -> dict:
-        """The workflow template with the fields for one generation filled in."""
+        """The workflow template with the fields for one generation filled in; inference.seed must be resolved."""
         m = self._manifest
         wf = copy.deepcopy(self._workflow)
 
@@ -431,17 +436,20 @@ class WorkflowModel:
         put(m["images"]["source"], comfy_client.upload_image(source_path))
         self._place_references(wf, reference_paths)
 
-        values = {
-            "prompt": prompt.strip(), "negative_prompt": negative_prompt or "", "seed": seed, "steps": int(steps),
-            "cfg": float(cfg), "denoise": float(denoise), "sampler": sampler, "scheduler": scheduler,
+        required = {
+            "prompt": inference.prompt.strip(), "seed": inference.seed, "steps": int(inference.steps),
+            "sampler": inference.sampler, "scheduler": inference.scheduler,
         }
-        for name, target in m["bind"].items():
-            put(target, values[name])
+        for name in REQUIRED_BINDINGS:
+            put(m["bind"][name], required[name])
+        targets = self._option_targets
+        for name, value in inference.options.items():
+            put(targets[name], value)
         for name, target in m["size"].get("bind", {}).items():
             put(target, size_values[name])
 
-        if lora_files:
-            self._splice_loras(wf, lora_files, lora_strength)
+        if inference.lora_files:
+            self._splice_loras(wf, inference.lora_files, inference.lora_strength)
         return wf
 
     def _place_references(self, wf: dict, reference_paths: List[str]) -> None:
@@ -494,11 +502,12 @@ class WorkflowModel:
 
     # ------------------------------------------------------------ generation
 
-    def _pick_seed(self, params: GenerationParams) -> int:
+    def _pick_seed(self, seed: Optional[int]) -> int:
+        """The seed to use: a random one for None."""
         spec = self._manifest.get("seed", {"min": 0, "max": 2 ** 32 - 1})
-        if params.randomize_seed:
+        if seed is None:
             return random.randint(spec["min"], spec["max"])
-        seed = int(params.seed)
+        seed = int(seed)
         return seed % (spec["max"] + 1) if spec.get("wrap") else seed
 
     def generate(
@@ -532,27 +541,31 @@ class WorkflowModel:
                 raise GenerationCancelled("Generation cancelled.")
 
         self._check_setup()
-        prompt = (params.prompt or "").strip()
-        if not prompt:
+        images = params.images
+        if not params.inference.prompt.strip():
             raise GenerationError("Please enter a prompt.")
         max_images = 1 + self._max_references
-        if 1 + len(params.reference_images) > max_images:
+        if 1 + len(images.reference_paths) > max_images:
             raise GenerationError(f"Up to {max_images} input images are supported.")
+        unknown = set(params.inference.options) - set(self._option_targets)
+        if unknown:
+            raise ValueError(f"{self.name}: no optional input(s) {sorted(unknown)} (it has {sorted(self._option_targets)})")
 
         report(ProgressStage.PREPARING)
-        seed = self._pick_seed(params)
-        size: ResolvedSize = self._size.resolve(params)
+        inference = replace(params.inference, seed=self._pick_seed(params.inference.seed))
+        size: ResolvedSize = self._size.resolve(params.size, images.source_path, masked=bool(images.mask_path))
+        options = " ".join(f"{name}={value!r}" for name, value in inference.options.items())
         print(
-            f"[{self.name}] mask={'yes' if params.mask_path else 'no'} images={1 + len(params.reference_images)} "
-            f"gen_dims={size.width}x{size.height} {size.description} steps={params.steps} cfg={params.cfg} "
-            f"sampler={params.sampler_name} scheduler={params.scheduler}",
+            f"[{self.name}] mask={'yes' if images.mask_path else 'no'} images={1 + len(images.reference_paths)} "
+            f"gen_dims={size.width}x{size.height} {size.description} steps={inference.steps} "
+            f"sampler={inference.sampler} scheduler={inference.scheduler} {options}".rstrip(),
             flush=True,
         )
 
         def _infer(model_input_path: str) -> str:
             check_cancel()
             self._check_nodes()
-            reference_paths = params.reference_images
+            reference_paths = images.reference_paths
             if size.reference_resolution:
                 # Each reference keeps its own aspect ratio at reference_resolution's
                 # area, in multiples of 32: the Qwen-Image 2.1 encode node's own rule
@@ -564,19 +577,17 @@ class WorkflowModel:
                     )
                     for p in reference_paths
                 ]
-            workflow = self.build_workflow(
-                prompt=prompt, negative_prompt=params.negative_prompt, source_path=model_input_path,
-                reference_paths=reference_paths, seed=seed, steps=params.steps, cfg=params.cfg,
-                denoise=params.denoise, sampler=params.sampler_name, scheduler=params.scheduler,
-                lora_files=params.lora_files, lora_strength=params.lora_strength, size_values=size.values,
-            )
+            workflow = self.build_workflow(inference, model_input_path, reference_paths, size.values)
             t0 = time.time()
             sampler_node = _split(self._manifest["bind"]["steps"])[0]
             prompt_id = comfy_client.submit_workflow_and_wait(workflow, str(uuid.uuid4()), sampler_node, on_progress, cancel)
             print(f"[{self.name}] ComfyUI generation took {time.time() - t0:.1f}s", flush=True)
             return comfy_client.fetch_generated_image(prompt_id)
 
-        cached = cached_infer(_infer, self.display_name, params, seed=seed, **size.cache_kwargs, width=size.width, height=size.height)
+        cached = cached_infer(
+            _infer, self.display_name, inference, images.reference_paths,
+            **size.cache_kwargs, width=size.width, height=size.height,
+        )
 
         def infer(model_input_path: str) -> str:
             output_path = cached(model_input_path)
@@ -585,19 +596,10 @@ class WorkflowModel:
             return output_path
 
         final_output_path = imaging.run_generation(
-            params.source_image_path,
-            params.mask_path,
-            size.width,
-            size.height,
-            params.feather_amount,
-            params.apply_color_correction_enabled,
-            infer,
-            params.annotated_image_path,
-            params.rescale_mode,
-            input_size=size.input_size,
-            match_detail=params.match_detail_enabled,
+            images.source_path, images.mask_path, images.annotated_path, (size.width, size.height), infer,
+            params.postprocessing, input_size=size.input_size,
         )
-        return GenerationResult(before_path=params.source_image_path, after_path=final_output_path, actual_seed=seed)
+        return GenerationResult(before_path=images.source_path, after_path=final_output_path, actual_seed=inference.seed)
 
 
 def get_model(workflow: str, variant: Optional[str] = None, **options: bool) -> WorkflowModel:
