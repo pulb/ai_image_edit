@@ -13,7 +13,8 @@ from PIL import Image, ImageFilter
 
 from ai_image_edit.core.imaging.geometry import resize_to_cover_and_crop
 
-# Minimum standard deviation (0-255 scale, matching PIL's LAB representation)
+# Minimum standard deviation per channel (L*, a*, b*; for L* the equivalent of
+# 4 on the 0-255 scale of PIL's LAB mode, which it was tuned on)
 # a channel needs before we trust it enough to rescale by a std-dev ratio.
 # Below this, we only shift the mean — rescaling by ratio when src_std is
 # tiny can blow up small noise into huge swings (e.g. tgt_std/src_std =
@@ -22,7 +23,7 @@ from ai_image_edit.core.imaging.geometry import resize_to_cover_and_crop
 # (chrominance) channels are typically lower-variance than L in natural
 # photos, so they'll fall back to a mean-only shift more often — that's
 # expected and conservative, not a sign anything's wrong.
-COLOR_MATCH_STD_EPS = 4.0
+COLOR_MATCH_STD_EPS = (4.0 / 2.55, 4.0, 4.0)
 # Clamp on how aggressively we're allowed to rescale variance, for the same reason.
 COLOR_MATCH_RATIO_CLAMP = (0.5, 2.0)
 
@@ -120,9 +121,6 @@ _XYZ_TO_RGB = np.linalg.inv(_RGB_TO_XYZ)
 # D65 reference white.
 _LAB_XN, _LAB_YN, _LAB_ZN = 0.95047, 1.00000, 1.08883
 _LAB_DELTA = 6 / 29
-# Scales L from its standard 0-100 range to 0-255, matching how PIL's "LAB"
-# image mode scales L — so COLOR_MATCH_STD_EPS stays valid without retuning.
-_LAB_L_SCALE = 2.55
 
 
 def ramp(value, bounds: Tuple[float, float]):
@@ -148,9 +146,9 @@ def rgb_to_lab(arr: np.ndarray) -> np.ndarray:
     """
     Converts an (H, W, 3) array of 0-255 sRGB values to CIE L*a*b*, in float
     (no 8-bit quantization round-trip, unlike PIL's built-in "LAB" mode).
-    a/b keep their real signed values, unlike PIL's mode which stores
-    negative a/b via byte wraparound. L is scaled to 0-255 to match PIL's
-    convention, so COLOR_MATCH_STD_EPS stays meaningful for L.
+    L is on its standard 0-100 scale and a/b keep their real signed values,
+    unlike PIL's mode, which scales L to 0-255 and stores negative a/b via
+    byte wraparound.
     """
     rgb = arr.astype(np.float64) / 255.0
     linear = _srgb_to_linear(rgb)
@@ -165,7 +163,7 @@ def rgb_to_lab(arr: np.ndarray) -> np.ndarray:
 
     fx, fy, fz = f(x), f(y), f(z)
 
-    L = (116 * fy - 16) * _LAB_L_SCALE
+    L = 116 * fy - 16
     a = 500 * (fx - fy)
     b = 200 * (fy - fz)
 
@@ -173,8 +171,8 @@ def rgb_to_lab(arr: np.ndarray) -> np.ndarray:
 
 
 def lab_to_rgb(arr: np.ndarray) -> np.ndarray:
-    """Inverse of rgb_to_lab() — converts back to 0-255 sRGB, in float. See its docstring for the scale convention."""
-    L = arr[:, :, 0].astype(np.float64) / _LAB_L_SCALE
+    """Inverse of rgb_to_lab() — converts back to 0-255 sRGB, in float."""
+    L = arr[:, :, 0].astype(np.float64)
     a = arr[:, :, 1].astype(np.float64)
     b = arr[:, :, 2].astype(np.float64)
 
@@ -214,7 +212,7 @@ def _correction_from_lab(src_arr: np.ndarray, tgt_arr: np.ndarray) -> List[Tuple
         src_mean, src_std = src_ch.mean(), src_ch.std()
         tgt_mean, tgt_std = tgt_ch.mean(), tgt_ch.std()
 
-        if src_std < COLOR_MATCH_STD_EPS:
+        if src_std < COLOR_MATCH_STD_EPS[i]:
             # Not enough variance to safely rescale by ratio — just shift the mean
             # so we still correct color cast without amplifying noise.
             corrections.append((tgt_mean - src_mean, 1.0))
@@ -248,10 +246,8 @@ def _dilate(binary: np.ndarray, steps: int) -> np.ndarray:
 
 
 def _delta_e(lab_diff: np.ndarray) -> np.ndarray:
-    """CIE76 delta E of (..., 3) L*a*b* differences, with L on the 0-255 scale of rgb_to_lab()."""
-    scaled = np.array(lab_diff, dtype=np.float32)
-    scaled[..., 0] /= _LAB_L_SCALE
-    return np.linalg.norm(scaled, axis=-1)
+    """CIE76 delta E of (..., 3) L*a*b* differences."""
+    return np.linalg.norm(np.asarray(lab_diff, dtype=np.float32), axis=-1)
 
 
 def _samples(gen: Image.Image, orig: Image.Image, mask: Image.Image) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -350,7 +346,7 @@ def _local_field(gen_lab: np.ndarray, orig_lab: np.ndarray, masked: np.ndarray) 
 
     norm = np.maximum(blur(weight), 1e-300)
     field = np.stack([blur(offsets[:, :, i] * strength * weight) / norm for i in range(3)], axis=-1)
-    limit = np.array([COLOR_LOCAL_LIMIT_DE * _LAB_L_SCALE, COLOR_LOCAL_LIMIT_DE, COLOR_LOCAL_LIMIT_DE])
+    limit = COLOR_LOCAL_LIMIT_DE
     return np.clip(field, -limit, limit).astype(np.float32)
 
 

@@ -679,7 +679,7 @@ class WholeImageColorTest(unittest.TestCase):
         """img with d_lab (L* on its 0-100 scale, a*, b*) added inside region (left, top, right, bottom)."""
         lab = imaging.rgb_to_lab(np.asarray(img, dtype=np.float32))
         x0, y0, x1, y1 = region
-        lab[y0:y1, x0:x1] += np.array([d_lab[0] * color._LAB_L_SCALE, d_lab[1], d_lab[2]], dtype=np.float32)
+        lab[y0:y1, x0:x1] += np.array(d_lab, dtype=np.float32)
         return Image.fromarray(imaging.lab_to_rgb(lab).astype(np.uint8))
 
     def difference(self, img, region):
