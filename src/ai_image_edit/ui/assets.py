@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """
-The UI's stylesheet (static/widgets.css, with the accent colour filled in)
+The UI's stylesheet (static/widgets.css, with the accent and frame colours filled in)
 and client-side JavaScript (static/client.js), and the editor's starting values.
 
 Stylesheet:
@@ -54,7 +54,7 @@ Client-side JS:
 from pathlib import Path
 
 from ai_image_edit.core.types import FEATHER_RANGE
-from ai_image_edit.ui.helpers import PRIMARY_COLOR
+from ai_image_edit.ui.helpers import FRAME_BORDER, FRAME_BORDER_HOVER, PRIMARY_COLOR
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 
@@ -70,6 +70,11 @@ DEFAULT_FEATHER_AMOUNT = int(FEATHER_RANGE.default)
 # at draw time, like the brush). This is the default of the stroke slider.
 ANNOTATION_STROKE = 3
 
-WIDGET_CSS = (STATIC_DIR / "widgets.css").read_text(encoding="utf-8").replace("__PRIMARY_COLOR__", PRIMARY_COLOR)
+WIDGET_CSS = (
+    (STATIC_DIR / "widgets.css").read_text(encoding="utf-8")
+    .replace("__PRIMARY_COLOR__", PRIMARY_COLOR)
+    .replace("__FRAME_BORDER_HOVER__", FRAME_BORDER_HOVER)
+    .replace("__FRAME_BORDER__", FRAME_BORDER)
+)
 
 CLIENT_JS = (STATIC_DIR / "client.js").read_text(encoding="utf-8")

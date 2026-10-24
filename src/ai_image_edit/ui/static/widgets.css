@@ -5,9 +5,20 @@
     position: relative;
     width: 100%;
     overflow: hidden;
-    border: 1px solid #444;
+    border: 1px solid __FRAME_BORDER__;
     border-radius: 8px;
     background: #000;
+}
+
+/* NiceGUI's outlined text and select fields (Quasar's q-field) in the same
+   grey frame, lighter while hovered. A focused field keeps Quasar's own
+   frame, which its 2px frame in the primary colour (::after) covers. */
+.q-field--outlined.q-field--dark:not(.q-field--highlighted) .q-field__control:before {
+    border-color: __FRAME_BORDER__;
+}
+
+.q-field--outlined.q-field--dark:not(.q-field--highlighted) .q-field__control:hover:before {
+    border-color: __FRAME_BORDER_HOVER__;
 }
 
 .aie-upload-box {

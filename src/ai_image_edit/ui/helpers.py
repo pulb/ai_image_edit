@@ -12,6 +12,11 @@ from ai_image_edit.core.types import (
 # This app's one accent colour: the UI reads its purple from here.
 PRIMARY_COLOR = "#7c3aed"
 
+# The grey frame of the image boxes and of the text and select fields, and the
+# lighter grey a field's frame turns while the pointer is over it.
+FRAME_BORDER = "#444"
+FRAME_BORDER_HOVER = "#888"
+
 # Newest work-dir files trim_work_dir() never deletes: the files of the
 # generation that just finished (source, mask, annotated, result, ...). The
 # files the page still uses are protected separately, however old they are.
