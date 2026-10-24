@@ -29,9 +29,13 @@ the image.
    ([license](https://huggingface.co/Qwen/Qwen-Image-2.1/raw/main/LICENSE)). Choose one of the GPUs the template recommends
    that has enough memory: at least 48 GB of VRAM for `qwen_image21` and `qwen_image21_turbo`, at least
    16 GB for the GGUF workflows.
-2. Optional: attach a network volume (a Pod mounts it at `/workspace`) so the
-   multi-GB weights download once instead of on every fresh container. Mount it at `/home/user/app/models` if the Pod lets you choose the
-   mount path (otherwise the weights are stored on the Pod's disk).
+2. Set the Pod's volume mount path to `/home/user/app/models`
+   (`--volume-mount-path` with `runpodctl`), so the multi-GB weights are
+   downloaded once. RunPod mounts the volume at `/workspace` by default, which
+   leaves the weights on the container disk, and that is wiped whenever the Pod
+   stops or restarts. The Pod's own volume disk keeps them until the Pod is
+   terminated. A network volume keeps them after that too, but it can only be
+   attached when the Pod is created.
 
 ## Image storage
 
@@ -49,7 +53,19 @@ the Pod URL can use the app. Set the Pod environment variable `APP_PASSWORD`
 to put the whole app behind a password login page; without it the app does not
 start, and its page says that `APP_PASSWORD` is not set. Details: [Docker](../docker/DEPLOY.md#password-login).
 
+## When the app cannot start
+
+The page says which part failed (for example a missing `APP_PASSWORD` or an
+invalid setting); the details are in the Pod's logs. See
+[Docker](../docker/DEPLOY.md#when-the-app-cannot-start).
+
 ## Updating
 
-RunPod can't swap a running Pod's image. Terminate and recreate the Pod on
-the new tag (console or `runpodctl`).
+Change the Pod's image to the new tag, for example
+`runpodctl pod update <pod-id> --image ghcr.io/pulb/ai_image_edit:latest`. The
+Pod restarts on it; weights on its volume (see [Pod setup](#pod-setup)) are kept.
+
+`latest` is the newest build of `main`, and every build is also tagged
+`sha-<short commit>`. To try a branch, run the *Build Docker image* workflow on
+it (GitHub: Actions → Build Docker image → Run workflow) and use the `sha-` tag
+it pushes.
