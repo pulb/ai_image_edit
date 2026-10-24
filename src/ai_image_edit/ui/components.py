@@ -58,10 +58,10 @@ def call_js(ns: str, fn: str, *args, timeout: float = 5.0):
     return ui.run_javascript(f"{ns}.{fn}({arglist})", timeout=timeout)
 
 
-async def init_widget(ns: str, widget_id: str, label: str) -> None:
-    """Run `ns.init(widget_id)`; a timeout is logged, not fatal."""
+async def init_widget(ns: str, widget_id: str, label: str, *args) -> None:
+    """Run `ns.init(widget_id, *args)`; a timeout is logged, not fatal."""
     try:
-        await call_js(ns, "init", widget_id, timeout=10.0)
+        await call_js(ns, "init", widget_id, *args, timeout=10.0)
     except TimeoutError:
         print(f"[{label}] {ns}.init('{widget_id}') timed out — the widget may not respond until the page is reloaded.", flush=True)
 

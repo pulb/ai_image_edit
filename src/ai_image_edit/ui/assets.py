@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """
-The UI's stylesheet (static/widgets.css) and client-side JavaScript
-(static/client.js), with the values they share with the Python side filled in.
+The UI's stylesheet (static/widgets.css, with the accent colour filled in)
+and client-side JavaScript (static/client.js), and the editor's starting values.
 
 Stylesheet:
     Named classes for this app's bespoke widget markup (the mask editor,
@@ -53,19 +53,17 @@ Client-side JS:
 """
 from pathlib import Path
 
-from ai_image_edit.core.types import ANNOTATION_COLORS, FEATHER_RANGE
+from ai_image_edit.core.types import FEATHER_RANGE
 from ai_image_edit.ui.helpers import PRIMARY_COLOR
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 
-# The brush default is duplicated into the JS-side initial state
-# (__DEFAULT_BRUSH_SIZE__ in client.js) as well as the Python-side ui.slider.
-# The maximum is shared by the mask brush and the annotation stroke.
+# The starting values of the editor's sliders, which MaskEditor also passes
+# to AIE.init in client.js. The maximum is shared by the mask brush and the
+# annotation stroke.
 DEFAULT_BRUSH_SIZE = 48
 MAX_BRUSH_SIZE = 80
 
-# Same idea for feather: the default is duplicated into the JS initial state
-# (__DEFAULT_FEATHER_AMOUNT__) and the slider.
 DEFAULT_FEATHER_AMOUNT = int(FEATHER_RANGE.default)
 
 # Annotation stroke width in on-screen CSS pixels (converted to image pixels
@@ -74,11 +72,4 @@ ANNOTATION_STROKE = 3
 
 WIDGET_CSS = (STATIC_DIR / "widgets.css").read_text(encoding="utf-8").replace("__PRIMARY_COLOR__", PRIMARY_COLOR)
 
-CLIENT_JS = (
-    (STATIC_DIR / "client.js").read_text(encoding="utf-8")
-    .replace("__DEFAULT_BRUSH_SIZE__", str(DEFAULT_BRUSH_SIZE))
-    .replace("__DEFAULT_FEATHER_AMOUNT__", str(DEFAULT_FEATHER_AMOUNT))
-    .replace("__MASK_TINT__", PRIMARY_COLOR)
-    .replace("__ANNOTATION_COLOR__", ANNOTATION_COLORS[0])
-    .replace("__ANNOTATION_STROKE__", str(ANNOTATION_STROKE))
-)
+CLIENT_JS = (STATIC_DIR / "client.js").read_text(encoding="utf-8")

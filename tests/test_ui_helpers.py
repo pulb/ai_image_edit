@@ -89,7 +89,7 @@ class AssetsTest(unittest.TestCase):
         for text in (assets.CLIENT_JS, assets.WIDGET_CSS):
             self.assertTrue(text.strip())
             self.assertEqual(re.findall(r"__[A-Z_]+__", text), [])
-        self.assertIn(str(assets.DEFAULT_BRUSH_SIZE), assets.CLIENT_JS)
+        self.assertIn("options.brush", assets.CLIENT_JS)  # the editor's starting values come from AIE.init
 
 
 class ProgressTextTest(unittest.TestCase):

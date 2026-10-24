@@ -9,6 +9,7 @@ from ai_image_edit.core.paths import to_url
 from ai_image_edit.core.types import ANNOTATION_COLORS, FEATHER_RANGE, RangeSpec
 from ai_image_edit.ui.assets import ANNOTATION_STROKE, DEFAULT_BRUSH_SIZE, DEFAULT_FEATHER_AMOUNT, MAX_BRUSH_SIZE
 from ai_image_edit.ui.components import GROUP_CLASSES, PLACEHOLDER_TEXT, SliderPopup, attach_file_picker, call_js, create_image_frame, init_widget, save_data_url
+from ai_image_edit.ui.helpers import PRIMARY_COLOR
 
 
 class EditorInputs(NamedTuple):
@@ -86,7 +87,13 @@ class MaskEditor:
     async def create(cls, **options) -> "MaskEditor":
         """A MaskEditor (options are __init__'s), with its browser side set up."""
         editor = cls(**options)
-        await init_widget("AIE", editor._id, "MaskEditor")
+        await init_widget("AIE", editor._id, "MaskEditor", {
+            "brush": DEFAULT_BRUSH_SIZE,
+            "feather": DEFAULT_FEATHER_AMOUNT,
+            "annotationColor": ANNOTATION_COLORS[0],
+            "annotationStroke": ANNOTATION_STROKE,
+            "maskTint": PRIMARY_COLOR,
+        })
         return editor
 
     def _build_controls(self, supports_mask: bool, num_annotation_colors: int) -> None:

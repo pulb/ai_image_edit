@@ -109,7 +109,9 @@ AIU.attachPanZoom = function (wrap, state, enabled) {
     window.addEventListener('mouseup', function () { dragStart = null; });
 };
 
-AIE.init = function (id) {
+// options: the starting brush size, feather amount, annotation colour and
+// stroke width, and the mask's tint (see MaskEditor.create).
+AIE.init = function (id, options) {
     const canvas = document.getElementById(id + '_canvas');
     const maskCanvas = document.createElement('canvas');
     const overlayCanvas = document.getElementById(id + '_overlay');
@@ -128,8 +130,8 @@ AIE.init = function (id) {
         canvas: canvas, ctx: canvas.getContext('2d'),
         maskCanvas: maskCanvas, overlayCanvas: overlayCanvas, annotCanvas: annotCanvas,
         zoomwrap: document.getElementById(id + '_zoomwrap'),
-        img: null, drawing: false, brush: __DEFAULT_BRUSH_SIZE__, lastX: 0, lastY: 0, hasMask: false,
-        feather: __DEFAULT_FEATHER_AMOUNT__, hasAnnotation: false, annotColor: '__ANNOTATION_COLOR__', annotStroke: __ANNOTATION_STROKE__,
+        img: null, drawing: false, brush: options.brush, lastX: 0, lastY: 0, hasMask: false,
+        feather: options.feather, hasAnnotation: false, annotColor: options.annotationColor, annotStroke: options.annotationStroke,
         mode: 'zoom',
     });
     // A mask stroke is painted onto two layers: the exported mask, opaque
@@ -140,7 +142,7 @@ AIE.init = function (id) {
     // background) and composed onto the source image by the server.
     const maskLayers = [
         [maskCanvas.getContext('2d'), '#ffffff'],
-        [overlayCanvas.getContext('2d'), '__MASK_TINT__'],
+        [overlayCanvas.getContext('2d'), options.maskTint],
     ];
     const annotCtx = annotCanvas.getContext('2d');
 
