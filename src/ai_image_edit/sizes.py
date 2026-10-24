@@ -93,18 +93,39 @@ def _round32(v: float) -> int:
     return max(32, int(round(v / 32)) * 32)
 
 
-def _tier_size(resolution: int, aspect_ratio: str) -> Tuple[Optional[int], Optional[int]]:
+def _image_size(path: str) -> Tuple[int, int]:
+    with Image.open(path) as img:
+        return img.size
+
+
+def _split_area(ratio: float, area: float) -> Tuple[float, float]:
+    """The (width, height) of the given area at the given aspect ratio (width / height)."""
+    width = math.sqrt(area * ratio)
+    return width, width / ratio
+
+
+def _tier_size(resolution: int, aspect_ratio: str) -> Optional[Tuple[int, int]]:
     """
     Width/height for a resolution and a named aspect ratio: the model
     card's size for that ratio, scaled by resolution / QWEN21_BASE_RESOLUTION.
-    Returns (None, None) for ORIGINAL_ASPECT_RATIO and for unknown names; use
+    None for ORIGINAL_ASPECT_RATIO and for unknown names; use
     dimensions_from_source() then.
     """
-    if not aspect_ratio or aspect_ratio == ORIGINAL_ASPECT_RATIO or aspect_ratio not in QWEN21_ASPECT_RATIOS:
-        return None, None
+    if aspect_ratio not in QWEN21_ASPECT_RATIOS:
+        return None
     base_w, base_h = QWEN21_ASPECT_RATIOS[aspect_ratio]
     scale = resolution / QWEN21_BASE_RESOLUTION
     return _round32(base_w * scale), _round32(base_h * scale)
+
+
+def _dimensions_for(source_size: Tuple[int, int], resolution: int) -> Tuple[int, int]:
+    """dimensions_from_source() for a source of the given (width, height)."""
+    src_w, src_h = source_size
+    target_area = float(resolution) ** 2
+    if src_w % 32 == 0 and src_h % 32 == 0 and 0.9 <= src_w * src_h / target_area <= 1.1:
+        return src_w, src_h
+    w, h = _split_area(src_w / src_h, target_area)
+    return _round32(w), _round32(h)
 
 
 def dimensions_from_source(source_image_path: str, resolution: int) -> Tuple[int, int]:
@@ -117,29 +138,18 @@ def dimensions_from_source(source_image_path: str, resolution: int) -> Tuple[int
     already a valid size for the tier (multiples of 32, area within 10% of the
     tier's) keeps its own size.
     """
-    with Image.open(source_image_path) as img:
-        src_w, src_h = img.size
-    target_area = float(resolution) ** 2
-    if src_w % 32 == 0 and src_h % 32 == 0 and 0.9 <= src_w * src_h / target_area <= 1.1:
-        return src_w, src_h
-    ratio = src_w / src_h
-    w = math.sqrt(target_area * ratio)
-    h = w / ratio
-    return _round32(w), _round32(h)
+    return _dimensions_for(_image_size(source_image_path), resolution)
 
 
-def _nearest_resolution(source_image_path: str) -> int:
-    """The resolution closest to the source image's own (the side of a square of its area)."""
-    with Image.open(source_image_path) as img:
-        side = math.sqrt(img.width * img.height)
+def _nearest_resolution(source_size: Tuple[int, int]) -> int:
+    """The resolution closest to a source of the given size (the side of a square of its area)."""
+    side = math.sqrt(source_size[0] * source_size[1])
     return min(QWEN21_RESOLUTIONS, key=lambda r: abs(math.log(side / r)))
 
 
-def _ratio_matches(source_image_path: str, width: int, height: int) -> bool:
+def _ratio_matches(source_size: Tuple[int, int], width: int, height: int) -> bool:
     """Whether the source's aspect ratio is within QWEN21_FIT_ASPECT_TOLERANCE of width:height."""
-    with Image.open(source_image_path) as img:
-        source_ratio = img.width / img.height
-    return abs(source_ratio / (width / height) - 1) <= QWEN21_FIT_ASPECT_TOLERANCE
+    return abs(source_size[0] / source_size[1] / (width / height) - 1) <= QWEN21_FIT_ASPECT_TOLERANCE
 
 
 class Qwen21Tiers(SizePolicy):
@@ -161,24 +171,23 @@ class Qwen21Tiers(SizePolicy):
     value_names = frozenset({"resolution", "width", "height"})
 
     def resolution_for_source(self, source_image_path: str) -> Optional[int]:
-        return _nearest_resolution(source_image_path)
+        return _nearest_resolution(_image_size(source_image_path))
 
     def resolve(self, params: GenerationParams) -> ResolvedSize:
+        source_size = _image_size(params.source_image_path)
         # A mask only lines up with the source's own framing and resolution,
         # so both come from the source then.
         aspect = ORIGINAL_ASPECT_RATIO if params.mask_path else params.aspect_ratio
-        resolution = self.resolution_for_source(params.source_image_path) if params.mask_path else params.resolution
-        width, height = _tier_size(resolution, aspect)
-        from_source = width is None or height is None
-        if from_source:
-            width, height = dimensions_from_source(params.source_image_path, resolution)
-        # A mask always takes the from_source path (its aspect ratio is forced
+        resolution = _nearest_resolution(source_size) if params.mask_path else params.resolution
+        tier = _tier_size(resolution, aspect)
+        width, height = tier or _dimensions_for(source_size, resolution)
+        # A mask always takes the source's size (its aspect ratio is forced
         # to "Original" above), so it needs no check of its own here.
-        if from_source or _ratio_matches(params.source_image_path, width, height):
+        if tier is None or _ratio_matches(source_size, width, height):
             input_size = (width, height)
         else:
             # A clearly different ratio: the whole image, at its own ratio.
-            input_size = dimensions_from_source(params.source_image_path, resolution)
+            input_size = _dimensions_for(source_size, resolution)
         # The encode node would rescale the images by a rule of its own, which
         # can land a few pixels off the size the latent is sampled at, and
         # sampling at another size than the scaled input shifts the edit
@@ -217,9 +226,7 @@ class FixedArea(SizePolicy):
         self.multiple = int(config.get("multiple", 8))
 
     def _dimensions_for(self, aspect_w: int, aspect_h: int, target_area: float) -> Tuple[int, int]:
-        ratio = aspect_w / aspect_h
-        width = math.sqrt(target_area * ratio)
-        height = width / ratio
+        width, height = _split_area(aspect_w / aspect_h, target_area)
         return (int(round(width / self.multiple) * self.multiple), int(round(height / self.multiple) * self.multiple))
 
     def resolve(self, params: GenerationParams) -> ResolvedSize:
@@ -228,8 +235,7 @@ class FixedArea(SizePolicy):
         aspect = ORIGINAL_ASPECT_RATIO if params.mask_path else params.aspect_ratio
         target_area = float(params.resolution) ** 2
         if aspect == ORIGINAL_ASPECT_RATIO:
-            with Image.open(params.source_image_path) as img:
-                ratio_w, ratio_h = img.size
+            ratio_w, ratio_h = _image_size(params.source_image_path)
         else:
             ratio_w, ratio_h = self.RATIOS[aspect]
         width, height = self._dimensions_for(ratio_w, ratio_h, target_area)

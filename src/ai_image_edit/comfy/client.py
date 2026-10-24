@@ -116,10 +116,8 @@ def missing_nodes(class_names: List[str]) -> List[str]:
         raise _unreachable(e)
 
 
-def upload_image(filepath: Optional[str]) -> Optional[str]:
-    """Uploads an image file path to ComfyUI, returning the server-side filename."""
-    if not filepath:
-        return None
+def upload_image(filepath: str) -> str:
+    """Uploads an image file to ComfyUI, returning the server-side filename."""
     try:
         with open(filepath, "rb") as f:
             files = {"image": f}
@@ -194,12 +192,13 @@ def submit_workflow_and_wait(
     Setting cancel stops the prompt (see cancel_prompt()) within about
     CANCEL_POLL_SECONDS and raises GenerationCancelled.
     """
-    last: List[Optional[GenerationProgress]] = [None]  # repeats are not reported
+    last: Optional[GenerationProgress] = None  # repeats are not reported
 
     def report(stage: ProgressStage, step: Optional[int] = None, total: Optional[int] = None) -> None:
+        nonlocal last
         progress = GenerationProgress(stage, step, total)
-        if on_progress is not None and progress != last[0]:
-            last[0] = progress
+        if on_progress is not None and progress != last:
+            last = progress
             on_progress(progress)
 
     ws = websocket.WebSocket()

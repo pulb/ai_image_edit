@@ -25,7 +25,9 @@ PART_SIZE = 64 * 1024 * 1024  # a file is fetched in pieces of this size, severa
 
 
 class DownloadError(RuntimeError):
-    fatal = False  # True: trying again cannot help (a refused or missing file)
+    def __init__(self, message: str, fatal: bool = False) -> None:
+        super().__init__(message)
+        self.fatal = fatal  # True: trying again cannot help (a refused or missing file)
 
 
 class DownloadCancelled(DownloadError):
@@ -68,13 +70,9 @@ def connections() -> int:
 
 def _check_status(url: str, status: int) -> None:
     if status in (401, 403):
-        error = DownloadError(f"{url}: access denied (HTTP {status}). If the file needs a login, set HF_TOKEN.")
-    elif status >= 400:
-        error = DownloadError(f"{url}: HTTP {status}")
-    else:
-        return
-    error.fatal = status < 500
-    raise error
+        raise DownloadError(f"{url}: access denied (HTTP {status}). If the file needs a login, set HF_TOKEN.", fatal=True)
+    if status >= 400:
+        raise DownloadError(f"{url}: HTTP {status}", fatal=status < 500)
 
 
 def _probe(url: str) -> Optional[int]:
@@ -140,7 +138,7 @@ def _fetch_part(url: str, part: Path, start: int, end: int, progress: _Progress,
         except DownloadCancelled:
             raise
         except (requests.RequestException, DownloadError) as exc:
-            if getattr(exc, "fatal", False):
+            if isinstance(exc, DownloadError) and exc.fatal:
                 raise
             progress.subtract(fetched)
             fetched = 0
@@ -261,43 +259,39 @@ def download_file(
 
 
 class DownloadStatus:
-    """Thread-safe progress of the background download, shown to the user while it runs."""
+    """
+    Progress of the background download, shown to the user while it runs. The
+    download thread replaces each field whole, so readers need no lock.
+    """
 
     def __init__(self) -> None:
-        self._lock = threading.Lock()
-        self._message = ""
-        self._error: Optional[str] = None
-        self._fraction: Optional[float] = None
+        self.message = ""
+        self.error: Optional[str] = None
+        self.fraction: Optional[float] = None  # how much of all downloads is done (0 to 1), None while not known
         self.finished = threading.Event()
 
-    def set_fraction(self, fraction: Optional[float]) -> None:
-        with self._lock:
-            self._fraction = fraction
-
-    def set_message(self, message: str) -> None:
-        with self._lock:
-            self._message = message
-
     def fail(self, error: str) -> None:
-        with self._lock:
-            self._error = error
+        self.error = error
         self.finished.set()
 
-    @property
-    def message(self) -> str:
-        with self._lock:
-            return self._message
 
-    @property
-    def fraction(self) -> Optional[float]:
-        """How much of all downloads is done (0 to 1), or None while that is not known."""
-        with self._lock:
-            return self._fraction
+class _FileProgress:
+    """Reports one file's download to the status: its percentage, and the share of all files if their sizes are known."""
 
-    @property
-    def error(self) -> Optional[str]:
-        with self._lock:
-            return self._error
+    def __init__(self, status: DownloadStatus, label: str, before: int, grand_total: Optional[int]) -> None:
+        self._status, self._label, self._before, self._grand_total = status, label, before, grand_total
+        self._last_pct: Optional[int] = None
+
+    def __call__(self, done: int, total: Optional[int]) -> None:
+        if self._grand_total:
+            self._status.fraction = min(1.0, (self._before + done) / self._grand_total)
+        if not total:
+            self._status.message = f"Downloading {self._label}: {done / 1e9:.1f} GB"
+            return
+        pct = int(done * 100 / total)
+        if pct != self._last_pct:
+            self._last_pct = pct
+            self._status.message = f"Downloading {self._label}: {pct}%"
 
 
 def run_downloads(
@@ -311,30 +305,17 @@ def run_downloads(
     (from the item or the server).
     """
     try:
-        status.set_message("Checking the file sizes")
+        status.message = "Checking the file sizes"
         sizes = [item.get("size") or remote_size(item["url"]) for item in items]
         grand_total = sum(sizes) if items and all(sizes) else None
         completed = 0
-        for index, item in enumerate(items, 1):
+        for index, (item, size) in enumerate(zip(items, sizes), 1):
             label = f"{item['dest'].name} ({index}/{len(items)})"
-            last_pct = -1
-
-            def progress(done: int, total: Optional[int], label: str = label, before: int = completed) -> None:
-                nonlocal last_pct
-                if grand_total:
-                    status.set_fraction(min(1.0, (before + done) / grand_total))
-                pct = int(done * 100 / total) if total else None
-                if pct is None or pct != last_pct:
-                    if pct is not None:
-                        last_pct = pct
-                    gb = done / 1e9
-                    status.set_message(f"Downloading {label}: {pct}%" if pct is not None else f"Downloading {label}: {gb:.1f} GB")
-
-            status.set_message(f"Downloading {label}")
+            status.message = f"Downloading {label}"
             download_file(item["url"], item["dest"], sha256=item.get("sha256"), size=item.get("size"),
-                          progress=progress, cancel=cancel)
-            completed += sizes[index - 1] or 0
-        status.set_message("")
+                          progress=_FileProgress(status, label, completed, grand_total), cancel=cancel)
+            completed += size or 0
+        status.message = ""
         if on_done:
             on_done()
         status.finished.set()

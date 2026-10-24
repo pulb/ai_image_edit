@@ -309,10 +309,15 @@ class ModelStartTests(ServerCase):
         self.assertRegex(progress.error, "failed.*404")
 
     def test_fraction_covers_all_files_together(self):
-        status = downloads.DownloadStatus()
         seen = []
-        original = status.set_fraction
-        status.set_fraction = lambda value: (seen.append(value), original(value))
+
+        class RecordingStatus(downloads.DownloadStatus):
+            def __setattr__(self, name, value):
+                if name == "fraction" and value is not None:
+                    seen.append(value)
+                super().__setattr__(name, value)
+
+        status = RecordingStatus()
         items = [
             {"url": self.url + "/f", "dest": self.tmp / "a.bin"},
             {"url": self.url + "/f", "dest": self.tmp / "b.bin", "size": len(PAYLOAD)},

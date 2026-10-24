@@ -109,9 +109,9 @@ def trim_work_dir(keep: int = 0, protect: Iterable[str] = ()) -> None:
                 files.append((st.st_mtime, st.st_size, p))
         except OSError:
             continue
-    files.sort(key=lambda f: f[0], reverse=True)
+    files.sort(key=lambda f: f[0])  # oldest first
     total = sum(size for _, size, _ in files)
-    for _, size, p in reversed(files[keep:]):
+    for _, size, p in files[:max(0, len(files) - keep)]:
         if total <= WORK_MAX_BYTES:
             break
         if p.resolve() in protected:

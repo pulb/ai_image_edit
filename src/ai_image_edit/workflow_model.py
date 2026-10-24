@@ -9,13 +9,13 @@ Workflow targets are written "<node id>.<input name>", e.g. "6.seed"; the
 input name may itself contain dots ("5.images.image_2").
 """
 import copy
-import os
 import random
 import subprocess
 import threading
 import time
 import uuid
 from dataclasses import dataclass
+from functools import cached_property
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
@@ -233,7 +233,7 @@ class WorkflowModel:
         refs = self._manifest["images"].get("references")
         return refs["max"] if refs else 0
 
-    @property
+    @cached_property
     def capabilities(self) -> ModelCapabilities:
         m, caps = self._manifest, self._manifest["capabilities"]
         bind = m["bind"]
@@ -262,8 +262,12 @@ class WorkflowModel:
 
     # ------------------------------------------------------------ lifecycle
 
+    def _model_files(self) -> List[Tuple[dict, Path]]:
+        """The model's weight files (not the LoRAs), with where each one goes."""
+        return [(spec, Path(spec["folder"]) / spec["name"]) for spec in self._manifest["files"]]
+
     def _pending_downloads(self) -> List[dict]:
-        wanted = [(spec, Path(spec["folder"]) / spec["name"]) for spec in self._manifest.get("files", [])]
+        wanted = self._model_files()
         # LoRA files: each goes into its own subfolder of loras.dir (the subfolder is the display name).
         loras = self._manifest.get("loras", {})
         if self._lora_downloads:
@@ -275,12 +279,7 @@ class WorkflowModel:
 
     def _weights_bytes(self) -> int:
         """Total size of the model files (not the LoRAs), which ComfyUI loads for a generation."""
-        total = 0
-        for spec in self._manifest.get("files", []):
-            path = Path(spec["folder"]) / spec["name"]
-            if path.is_file():
-                total += path.stat().st_size
-        return total
+        return sum(path.stat().st_size for _, path in self._model_files() if path.is_file())
 
     def _launch_comfy(self) -> None:
         args, reason = gpu.comfy_extra_args(self._weights_bytes(), self._manifest.get("vram_headroom_gb"))
@@ -313,7 +312,7 @@ class WorkflowModel:
             for spec in nodes:
                 if self._cancel_downloads.is_set():
                     return
-                status.set_message(f"Installing {spec['name']}")
+                status.message = f"Installing {spec['name']}"
                 custom_nodes.install(spec)
             if not self._cancel_downloads.is_set():
                 self._launch_comfy()
@@ -366,24 +365,22 @@ class WorkflowModel:
         loras_cfg = self._manifest.get("loras")
         if not loras_cfg:
             return {}
-        lora_dir = loras_cfg["dir"]
-        if not os.path.exists(lora_dir):
+        lora_dir = Path(loras_cfg["dir"])
+        if not lora_dir.exists():
             self._warn_once(f"LoRA folder not found at expected path: {lora_dir}")
             return {}
 
+        def is_weights(path: Path) -> bool:
+            return path.suffix in (".safetensors", ".pt")
+
         loras: Dict[str, List[str]] = {}
-        for entry in sorted(os.listdir(lora_dir)):
-            entry_path = os.path.join(lora_dir, entry)
-            if os.path.isdir(entry_path):
-                files = sorted(
-                    os.path.join(entry, f)
-                    for f in os.listdir(entry_path)
-                    if f.endswith((".safetensors", ".pt"))
-                )
+        for entry in sorted(lora_dir.iterdir()):
+            if entry.is_dir():
+                files = sorted(str(Path(entry.name) / f.name) for f in entry.iterdir() if is_weights(f))
                 if files:
-                    loras[entry] = files
-            elif entry.endswith((".safetensors", ".pt")):
-                loras[entry] = [entry]
+                    loras[entry.name] = files
+            elif is_weights(entry):
+                loras[entry.name] = [entry.name]
 
         if not loras:
             self._warn_once(f"No LoRA files found in {lora_dir}")
