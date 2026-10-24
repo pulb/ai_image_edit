@@ -10,7 +10,7 @@ from nicegui import ui
 from nicegui import run as nicegui_run
 
 from ai_image_edit.core import imaging
-from ai_image_edit.core.paths import WORK_DIR, to_url
+from ai_image_edit.core.paths import new_work_file, to_url
 from ai_image_edit.core.types import RangeSpec
 from ai_image_edit.ui.helpers import PRIMARY_COLOR
 
@@ -30,7 +30,7 @@ async def save_uploaded_file(file) -> str:
     """
     suffix = Path(file.name).suffix or ".png"
     stem = Path(file.name).stem or "upload"
-    path = WORK_DIR / f"{stem}_{uuid.uuid4().hex}{suffix}"
+    path = new_work_file(stem, suffix)
     await file.save(path)
     return await nicegui_run.io_bound(imaging.prepare_upload, str(path))
 
@@ -47,7 +47,7 @@ def save_data_url(data_url: str, filename_hint: str = "mask.png") -> str:
     raw = base64.b64decode(b64data)
     suffix = Path(filename_hint).suffix or ".png"
     stem = Path(filename_hint).stem or "mask"
-    path = WORK_DIR / f"{stem}_{uuid.uuid4().hex}{suffix}"
+    path = new_work_file(stem, suffix)
     path.write_bytes(raw)
     return str(path)
 

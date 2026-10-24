@@ -9,7 +9,9 @@ from unittest import mock
 import numpy as np
 from PIL import Image, ImageFilter
 
-from ai_image_edit.core import imaging
+from ai_image_edit.core import imaging, paths
+from ai_image_edit.core.imaging import alignment, color, compositing
+from ai_image_edit.core.imaging.alignment import Block, ShiftMeasurement
 from ai_image_edit.core.types import RescaleMode
 
 RED, GREEN = (200, 30, 30), (30, 200, 30)
@@ -20,7 +22,7 @@ class CompositeBase(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
         self.dir = Path(self.tmp.name)
-        patcher = mock.patch.object(imaging, "WORK_DIR", self.dir)
+        patcher = mock.patch.object(paths, "WORK_DIR", self.dir)
         patcher.start()
         self.addCleanup(patcher.stop)
 
@@ -76,7 +78,7 @@ class CompositeTest(CompositeBase):
             self.assertEqual(out.getpixel(point), original.getpixel(point))
         self.assertNotEqual(out.getpixel((32, 32)), original.getpixel((32, 32)))  # inside
 
-    @mock.patch.object(imaging, "apply_color_match", side_effect=lambda img, match, box: img)
+    @mock.patch.object(compositing, "apply_color_match", side_effect=lambda img, match, box: img)
     def test_feathering_softens_the_edge(self, _):
         base = Image.new("RGB", (64, 64), (100, 100, 100))
         orig, gen = self.save("o.png", base), self.save("g.png", Image.new("RGB", (64, 64), (200, 200, 200)))
@@ -130,7 +132,7 @@ class CompositeAtOriginalSizeTest(CompositeBase):
             out = self.composite(orig, gen, mask)
         return out, log.getvalue()
 
-    @mock.patch.object(imaging, "apply_color_match", side_effect=lambda img, match, box: img)
+    @mock.patch.object(compositing, "apply_color_match", side_effect=lambda img, match, box: img)
     def test_an_edit_at_the_same_size_is_not_resampled(self, _):
         orig = self.patterned((64, 64))
         gen = Image.new("RGB", (64, 64), (240, 240, 240))
@@ -153,7 +155,7 @@ class CompositeAtOriginalSizeTest(CompositeBase):
         self.check_untouched_outside(out, orig, (12, 9, 20, 15))
         self.assertNotEqual(out.getpixel((16, 12)), orig.getpixel((16, 12)))
 
-    @mock.patch.object(imaging, "apply_color_match", side_effect=lambda img, match, box: img)
+    @mock.patch.object(compositing, "apply_color_match", side_effect=lambda img, match, box: img)
     def test_the_edited_area_comes_from_the_generated_image_at_the_right_place(self, _):
         orig = Image.new("RGB", (128, 128), (60, 60, 60))
         gen = Image.new("RGB", (64, 64), (60, 60, 60))
@@ -162,7 +164,7 @@ class CompositeAtOriginalSizeTest(CompositeBase):
         self.assertGreater(out.getpixel((100, 20))[0], 200)
         self.assertLess(out.getpixel((20, 100))[0], 100)
 
-    @mock.patch.object(imaging, "apply_color_match", side_effect=lambda img, match, box: img)
+    @mock.patch.object(compositing, "apply_color_match", side_effect=lambda img, match, box: img)
     def test_a_different_aspect_ratio_is_mapped_through_the_cover_crop(self, _):
         # Generated 64x48 covers the original 128x64 scaled by 0.75: the 4:3 frame
         # sees the middle 85 columns of the original, so its edges stay untouched.
@@ -177,7 +179,7 @@ class CompositeAtOriginalSizeTest(CompositeBase):
     def test_the_feather_is_scaled_with_the_original(self):
         orig = Image.new("RGB", (128, 128), (100, 100, 100))
         gen = Image.new("RGB", (64, 64), (200, 200, 200))
-        with mock.patch.object(imaging, "apply_color_match", side_effect=lambda img, match, box: img):
+        with mock.patch.object(compositing, "apply_color_match", side_effect=lambda img, match, box: img):
             hard = self.composite(orig, gen, self.mask((128, 128), (48, 48, 80, 80)), 0).convert("L")
             soft = self.composite(orig, gen, self.mask((128, 128), (48, 48, 80, 80)), 4).convert("L")
         self.assertEqual(hard.getpixel((47, 64)), 100)
@@ -200,7 +202,7 @@ class CompositeAtOriginalSizeTest(CompositeBase):
                 with mock.patch("builtins.print"):
                     gen_path = imaging.fit_image_to_size(orig_path, *gen_size, Image.Resampling.LANCZOS)
                 mask = self.mask(orig_size, (round(w * 0.05), round(h * 0.05), round(w * 0.95), round(h * 0.95)))
-                with mock.patch.object(imaging, "DETAIL_ENLARGEMENT_RAMP", (100.0, 101.0)):
+                with mock.patch.object(compositing, "DETAIL_ENLARGEMENT_RAMP", (100.0, 101.0)):
                     out = Image.open(imaging.composite_with_soft_transition(
                         orig_path, gen_path, self.save("m.png", mask), 0, RescaleMode.EDIT,
                     )).convert("L")
@@ -254,15 +256,15 @@ class MaskedColorCorrectionTest(CompositeBase):
 
     def test_a_strong_drift_is_corrected_in_full(self):
         gen = self.edited(tinted(self.orig, red=40, blue=-30))
-        with mock.patch.object(imaging, "COLOR_DRIFT_RAMP", (0.0, 1e-6)):
+        with mock.patch.object(color, "COLOR_DRIFT_RAMP", (0.0, 1e-6)):
             full = self.correct(gen)
         self.assertEqual(self.correct(gen), full)
 
     def test_a_drift_within_the_ramp_is_corrected_partly(self):
         gen = self.edited(tinted(self.orig, red=40, blue=-30))
-        with mock.patch.object(imaging, "COLOR_DRIFT_RAMP", (0.0, 1e-6)):
+        with mock.patch.object(color, "COLOR_DRIFT_RAMP", (0.0, 1e-6)):
             full = self.correct(gen)
-        with mock.patch.object(imaging, "COLOR_DRIFT_RAMP", (0.0, 1000.0)):
+        with mock.patch.object(color, "COLOR_DRIFT_RAMP", (0.0, 1000.0)):
             partial = self.correct(gen)
         for (shift, scale), (full_shift, full_scale) in zip(partial, full):
             self.assertLess(abs(shift), abs(full_shift) + 1e-9)
@@ -368,7 +370,7 @@ class LocalColorMatchTest(CompositeBase):
     def test_the_offsets_are_limited(self):
         orig = self.wall()
         gen = self.tint_inside(orig, grey=40)
-        with mock.patch.object(imaging, "COLOR_LOCAL_OUTLIER_DE", 1000.0), mock.patch.object(imaging, "COLOR_LOCAL_LIMIT_DE", 2.0):
+        with mock.patch.object(color, "COLOR_LOCAL_OUTLIER_DE", 1000.0), mock.patch.object(color, "COLOR_LOCAL_LIMIT_DE", 2.0):
             match = self.match(gen, orig)
         self.assertLessEqual(float(abs(match.field[:, :, 1:]).max()), 2.0 + 1e-4)
         self.assertLessEqual(float(abs(match.field[:, :, 0]).max()), 2.0 * 2.55 + 1e-4)
@@ -405,29 +407,29 @@ class DetailMatchTest(unittest.TestCase):
         return Image.new("RGB", size, (128, 128, 128))
 
     def level(self, img):
-        return imaging._noise_level(img)
+        return compositing._noise_level(img)
 
     def test_a_patch_that_is_not_enlarged_is_left_alone(self):
         patch = self.smooth_patch()
-        out = imaging._match_detail(patch, self.noisy_original(), self.BOX, 1.0)
+        out = compositing._match_detail(patch, self.noisy_original(), self.BOX, 1.0)
         self.assertEqual(list(out.getdata()), list(patch.getdata()))
 
     def test_a_smooth_patch_gets_the_originals_grain(self):
         original = self.noisy_original()
-        out = imaging._match_detail(self.smooth_patch(), original, self.BOX, 1.7)
-        wanted = imaging._noise_level(original.crop(self.BOX))
+        out = compositing._match_detail(self.smooth_patch(), original, self.BOX, 1.7)
+        wanted = compositing._noise_level(original.crop(self.BOX))
         self.assertAlmostEqual(self.level(out), wanted, delta=wanted * 0.2)
 
     def test_the_grain_is_the_same_every_time(self):
         original = self.noisy_original()
-        first = imaging._match_detail(self.smooth_patch(), original, self.BOX, 1.7)
-        second = imaging._match_detail(self.smooth_patch(), original, self.BOX, 1.7)
+        first = compositing._match_detail(self.smooth_patch(), original, self.BOX, 1.7)
+        second = compositing._match_detail(self.smooth_patch(), original, self.BOX, 1.7)
         self.assertEqual(list(first.getdata()), list(second.getdata()))
 
     def test_no_grain_is_added_when_the_patch_is_already_as_noisy(self):
         original = self.noisy_original(sigma=2.0)
         patch = self.noisy_original(sigma=4.0, size=(160, 160))
-        out = imaging._match_detail(patch, original, self.BOX, 1.7)
+        out = compositing._match_detail(patch, original, self.BOX, 1.7)
         # only sharpened: still around the patch's own level, nothing added on top
         self.assertLess(self.level(out), self.level(patch) * 1.5)
 
@@ -439,18 +441,18 @@ class DetailMatchTest(unittest.TestCase):
         return patch.filter(ImageFilter.GaussianBlur(1.0))
 
     def contrast(self, img):
-        return float(imaging._luma(img).std())
+        return float(compositing._luma(img).std())
 
     def test_sharpening_raises_the_contrast_of_fine_detail(self):
         flat = Image.new("RGB", (280, 280), (128, 128, 128))  # no grain to match, so only sharpening
-        out = imaging._match_detail(self.soft_texture(), flat, self.BOX, 1.7)
+        out = compositing._match_detail(self.soft_texture(), flat, self.BOX, 1.7)
         self.assertGreater(self.contrast(out), self.contrast(self.soft_texture()) * 1.05)
 
     def test_the_effect_scales_with_the_enlargement(self):
         flat = Image.new("RGB", (280, 280), (128, 128, 128))
         patch = self.soft_texture()
-        partly = imaging._match_detail(patch, flat, self.BOX, 1.3)
-        fully = imaging._match_detail(patch, flat, self.BOX, 1.7)
+        partly = compositing._match_detail(patch, flat, self.BOX, 1.3)
+        fully = compositing._match_detail(patch, flat, self.BOX, 1.7)
         self.assertGreater(self.contrast(partly), self.contrast(patch))
         self.assertGreater(self.contrast(fully), self.contrast(partly))
 
@@ -460,16 +462,16 @@ class DetailMatchTest(unittest.TestCase):
         gen = Image.new("RGB", (200, 200), (128, 128, 128))
         mask = Image.new("L", (400, 400), 0)
         mask.paste(255, (100, 100, 300, 300))
-        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(imaging, "WORK_DIR", Path(tmp)):
-            paths = []
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(paths, "WORK_DIR", Path(tmp)):
+            files = []
             for name, img in (("o", orig), ("g", gen), ("m", mask)):
-                paths.append(str(Path(tmp) / f"{name}.png"))
-                img.save(paths[-1])
-            out = Image.open(imaging.composite_with_soft_transition(*paths, 0, RescaleMode.EDIT)).convert("RGB")
-            plain = Image.open(imaging.composite_with_soft_transition(*paths, 0, RescaleMode.EDIT, match_detail=False)).convert("RGB")
+                files.append(str(Path(tmp) / f"{name}.png"))
+                img.save(files[-1])
+            out = Image.open(imaging.composite_with_soft_transition(*files, 0, RescaleMode.EDIT)).convert("RGB")
+            plain = Image.open(imaging.composite_with_soft_transition(*files, 0, RescaleMode.EDIT, match_detail=False)).convert("RGB")
         edited = out.crop((140, 140, 260, 260))
-        self.assertGreater(imaging._noise_level(edited), 1.5)  # a flat patch would be 0
-        self.assertEqual(imaging._noise_level(plain.crop((140, 140, 260, 260))), 0)  # switched off
+        self.assertGreater(compositing._noise_level(edited), 1.5)  # a flat patch would be 0
+        self.assertEqual(compositing._noise_level(plain.crop((140, 140, 260, 260))), 0)  # switched off
 
 
 class ModelShiftTest(unittest.TestCase):
@@ -502,7 +504,8 @@ class ModelShiftTest(unittest.TestCase):
     def test_a_shift_is_measured_to_a_tenth_of_a_pixel(self):
         for dx, dy in ((2.5, -1.25), (0.3, 0.0), (-4.0, 3.7), (0.0, 0.0)):
             with self.subTest(dx=dx, dy=dy):
-                shift, stretch, _ = imaging._fit_displacement(imaging.measure_shift(self.image, self.moved(dx, dy)))
+                fit = alignment._fit_displacement(imaging.measure_shift(self.image, self.moved(dx, dy)))
+                shift, stretch = fit.shift, fit.stretch
                 self.assertAlmostEqual(shift[0], dx, delta=0.1)
                 self.assertAlmostEqual(shift[1], dy, delta=0.1)
                 self.assertAlmostEqual(stretch[0], 0.0, delta=0.001)
@@ -510,17 +513,17 @@ class ModelShiftTest(unittest.TestCase):
 
     def test_a_mask_is_measured_around_and_left_out(self):
         result = imaging.measure_shift(self.image, self.edited(self.moved(1.5, -2.0)), self.mask())
-        left, top, right, bottom = result["region"]
+        left, top, right, bottom = result.region
         self.assertTrue(left < 300 and top < 200 and right > 600 and bottom > 460)
         self.assertTrue(left > 0 or right < 900)  # not the whole image
-        centre = [blk for blk in result["blocks"] if blk["coverage"] < imaging.ALIGN_MIN_COVERAGE]
+        centre = [blk for blk in result.blocks if blk.coverage < alignment.ALIGN_MIN_COVERAGE]
         self.assertEqual(len(centre), 1)  # the block over the mask
-        shift, _, _ = imaging._fit_displacement(result)
+        shift = alignment._fit_displacement(result).shift
         self.assertAlmostEqual(shift[0], 1.5, delta=0.1)
         self.assertAlmostEqual(shift[1], -2.0, delta=0.1)
 
     def test_a_stretch_is_measured(self):
-        _, stretch, _ = imaging._fit_displacement(imaging.measure_shift(self.image, self.moved(zoom=1.01)))
+        stretch = alignment._fit_displacement(imaging.measure_shift(self.image, self.moved(zoom=1.01))).stretch
         self.assertAlmostEqual(stretch[0], 0.01, delta=0.001)
         self.assertAlmostEqual(stretch[1], 0.01, delta=0.001)
 
@@ -529,10 +532,10 @@ class ModelShiftTest(unittest.TestCase):
         rng = np.random.default_rng(1)
         output[440:, :300] = 30 + rng.normal(0, 2, (220, 300, 1))  # a plain area, redrawn: nothing to match
         result = imaging.measure_shift(self.image, Image.fromarray(output))
-        self.assertIsNone(result["blocks"][6]["shift"])  # bottom left
-        shift, _, residual = imaging._fit_displacement(result)
-        self.assertAlmostEqual(shift[0], -3.0, delta=0.1)
-        self.assertLess(residual, 0.2)
+        self.assertIsNone(result.blocks[6].shift)  # bottom left
+        fit = alignment._fit_displacement(result)
+        self.assertAlmostEqual(fit.shift[0], -3.0, delta=0.1)
+        self.assertLess(fit.residual, 0.2)
 
     def test_nothing_to_compare_gives_none(self):
         self.assertIsNone(imaging.measure_shift(self.image, self.image, Image.new("L", self.image.size, 255)))
@@ -543,7 +546,7 @@ class ModelShiftTest(unittest.TestCase):
         image or None if unchanged, the log). Without a mask an empty one is
         used, which measures blocks over the whole image.
         """
-        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(imaging, "WORK_DIR", Path(tmp)):
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(paths, "WORK_DIR", Path(tmp)):
             src, out, mask_path = Path(tmp) / "in.png", Path(tmp) / "out.png", Path(tmp) / "m.png"
             self.image.save(src)
             output.save(out)
@@ -556,7 +559,7 @@ class ModelShiftTest(unittest.TestCase):
 
     def remaining(self, aligned, mask=None):
         result = imaging.measure_shift(self.image, aligned, mask)
-        return max(abs(v) for blk in result["blocks"] if blk["shift"] for v in blk["shift"])
+        return max(abs(v) for blk in result.counted for v in blk.shift)
 
     def test_the_log_reports_the_measurement(self):
         _, log = self.align(self.edited(self.moved(2.0, 1.0)), self.mask())
@@ -603,12 +606,11 @@ class ModelShiftTest(unittest.TestCase):
         for blocks in self.SELFIE_RUNS:
             with self.subTest(blocks=blocks[0]):
                 xs, ys = np.linspace(100, 800, 4), np.linspace(150, 510, 4)
-                result = {"region": (100, 150, 800, 510), "blocks": [{
-                    "centre": ((xs[i % 3] + xs[i % 3 + 1]) / 2, (ys[i // 3] + ys[i // 3 + 1]) / 2),
-                    "shift": None if b is None else b[:2], "confidence": 0.0 if b is None else b[2],
-                    "coverage": 0.0 if b is None else 1.0,
-                } for i, b in enumerate(blocks)]}
-                with mock.patch.object(imaging, "measure_shift", return_value=result):
+                result = ShiftMeasurement((100, 150, 800, 510), [Block(
+                    ((xs[i % 3] + xs[i % 3 + 1]) / 2, (ys[i // 3] + ys[i // 3 + 1]) / 2),
+                    None if b is None else b[:2], 0.0 if b is None else b[2], 0.0 if b is None else 1.0,
+                ) for i, b in enumerate(blocks)])
+                with mock.patch.object(alignment, "measure_shift", return_value=result):
                     aligned, log = self.align(self.image, self.mask())
                 self.assertIsNotNone(aligned)
                 self.assertIn("Corrected", log)
@@ -640,7 +642,7 @@ class ModelShiftTest(unittest.TestCase):
         self.assertIn("recomposition", log)
 
     def test_a_masked_generation_composites_the_aligned_output(self):
-        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(imaging, "WORK_DIR", Path(tmp)):
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(paths, "WORK_DIR", Path(tmp)):
             src, out, mask = Path(tmp) / "in.png", Path(tmp) / "out.png", Path(tmp) / "m.png"
             self.image.save(src)
             self.edited(self.moved(2.0, -1.5)).save(out)
@@ -654,7 +656,7 @@ class ModelShiftTest(unittest.TestCase):
 
 
     def test_an_unmasked_generation_is_not_aligned(self):
-        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(imaging, "WORK_DIR", Path(tmp)):
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(paths, "WORK_DIR", Path(tmp)):
             src, out = Path(tmp) / "in.png", Path(tmp) / "out.png"
             self.image.save(src)
             self.moved(2.0, -1.5).save(out)
@@ -677,7 +679,7 @@ class WholeImageColorTest(unittest.TestCase):
         """img with d_lab (L* on its 0-100 scale, a*, b*) added inside region (left, top, right, bottom)."""
         lab = imaging.rgb_to_lab(np.asarray(img, dtype=np.float32))
         x0, y0, x1, y1 = region
-        lab[y0:y1, x0:x1] += np.array([d_lab[0] * imaging._LAB_L_SCALE, d_lab[1], d_lab[2]], dtype=np.float32)
+        lab[y0:y1, x0:x1] += np.array([d_lab[0] * color._LAB_L_SCALE, d_lab[1], d_lab[2]], dtype=np.float32)
         return Image.fromarray(imaging.lab_to_rgb(lab).astype(np.uint8))
 
     def difference(self, img, region):
@@ -685,7 +687,7 @@ class WholeImageColorTest(unittest.TestCase):
         x0, y0, x1, y1 = region
         a = imaging.rgb_to_lab(np.asarray(img, dtype=np.float32))[y0:y1, x0:x1]
         b = imaging.rgb_to_lab(np.asarray(self.orig, dtype=np.float32))[y0:y1, x0:x1]
-        return float(imaging._delta_e(a - b).mean())
+        return float(color._delta_e(a - b).mean())
 
     def corrected(self, gen):
         log = io.StringIO()
@@ -739,7 +741,7 @@ class WholeImageColorTest(unittest.TestCase):
         with contextlib.redirect_stdout(io.StringIO()):
             match = imaging.whole_image_color_match(gen, orig)
         out = gen if match is None else imaging.apply_color_match(gen, match, (0, 0, *gen.size))
-        change = imaging._delta_e(
+        change = color._delta_e(
             imaging.rgb_to_lab(np.asarray(out, dtype=np.float32)) - imaging.rgb_to_lab(np.asarray(gen, dtype=np.float32))
         )
         self.assertLess(float(np.percentile(change, 99)), 1.0)  # not visible
@@ -758,7 +760,7 @@ class OtherHelpersTest(unittest.TestCase):
 
     def run_generation(self, size, input_size, mask=None):
         """The path infer() receives for a source of `size` that is to be generated at (64, 48)."""
-        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(imaging, "WORK_DIR", Path(tmp)):
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(paths, "WORK_DIR", Path(tmp)):
             source = Path(tmp) / "s.png"
             Image.new("RGB", size, RED).save(source)
             received = []
@@ -783,7 +785,7 @@ class OtherHelpersTest(unittest.TestCase):
         self.assertEqual(self.run_generation((100, 80), None), (True, (100, 80)))
 
     def test_whole_image_colour_correction_keeps_the_size(self):
-        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(imaging, "WORK_DIR", Path(tmp)):
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(paths, "WORK_DIR", Path(tmp)):
             orig, gen = Path(tmp) / "o.png", Path(tmp) / "g.png"
             Image.new("RGB", (16, 16), (100, 100, 100)).save(orig)
             Image.new("RGB", (32, 32), (110, 100, 92)).save(gen)
@@ -795,7 +797,7 @@ class OtherHelpersTest(unittest.TestCase):
 
     def test_an_unmasked_generation_is_colour_corrected_only_when_asked(self):
         grey, tinted = (100, 100, 100), (110, 100, 92)
-        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(imaging, "WORK_DIR", Path(tmp)):
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(paths, "WORK_DIR", Path(tmp)):
             source, output = Path(tmp) / "s.png", Path(tmp) / "o.png"
             Image.new("RGB", (64, 64), grey).save(source)
             Image.new("RGB", (64, 64), tinted).save(output)
@@ -808,7 +810,7 @@ class OtherHelpersTest(unittest.TestCase):
                     self.assertLessEqual(float(np.abs(pixel - target).max()), 1)
 
     def test_a_recomposed_unmasked_generation_is_not_colour_corrected(self):
-        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(imaging, "WORK_DIR", Path(tmp)):
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(paths, "WORK_DIR", Path(tmp)):
             source, output = Path(tmp) / "s.png", Path(tmp) / "o.png"
             Image.new("RGB", (64, 64), (100, 100, 100)).save(source)
             Image.new("RGB", (96, 54), (110, 100, 92)).save(output)  # another aspect ratio

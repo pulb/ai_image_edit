@@ -5,6 +5,7 @@ where uploaded and generated files live so the browser can load them.
 """
 import os
 import shutil
+import uuid
 from pathlib import Path
 from typing import Iterable
 from urllib.parse import quote, unquote
@@ -120,6 +121,11 @@ def trim_work_dir(keep: int = 0, protect: Iterable[str] = ()) -> None:
             total -= size
         except OSError:
             continue
+
+
+def new_work_file(prefix: str, suffix: str = ".png") -> Path:
+    """A fresh, unused path in WORK_DIR: `<prefix>_<random hex><suffix>`."""
+    return WORK_DIR / f"{prefix}_{uuid.uuid4().hex}{suffix}"
 
 
 def to_url(path_str: str) -> str:
