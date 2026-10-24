@@ -35,10 +35,12 @@ REQUEST_TIMEOUT_SECONDS = 60
 # a sampler step). A single node that reports nothing, such as loading the
 # weights from a slow disk, must finish within it. COMFY_GENERATION_TIMEOUT,
 # applied by read_settings().
-STALL_TIMEOUT_SECONDS = 300
+DEFAULT_STALL_TIMEOUT_SECONDS = 300
+STALL_TIMEOUT_SECONDS = DEFAULT_STALL_TIMEOUT_SECONDS
 # Seconds a job may take in all, from submission, including the wait behind
 # other jobs in ComfyUI's queue. COMFY_GENERATION_MAX_TIME, applied by read_settings().
-MAX_GENERATION_SECONDS = 1800
+DEFAULT_MAX_GENERATION_SECONDS = 1800
+MAX_GENERATION_SECONDS = DEFAULT_MAX_GENERATION_SECONDS
 # How often submit_workflow_and_wait checks whether it was cancelled.
 CANCEL_POLL_SECONDS = 0.5
 
@@ -55,8 +57,8 @@ def _seconds(name: str, default: int) -> int:
 def read_settings() -> None:
     """Applies COMFY_GENERATION_TIMEOUT and COMFY_GENERATION_MAX_TIME; raises ValueError for an invalid value."""
     global STALL_TIMEOUT_SECONDS, MAX_GENERATION_SECONDS
-    STALL_TIMEOUT_SECONDS = _seconds("COMFY_GENERATION_TIMEOUT", 300)
-    MAX_GENERATION_SECONDS = _seconds("COMFY_GENERATION_MAX_TIME", 1800)
+    STALL_TIMEOUT_SECONDS = _seconds("COMFY_GENERATION_TIMEOUT", DEFAULT_STALL_TIMEOUT_SECONDS)
+    MAX_GENERATION_SECONDS = _seconds("COMFY_GENERATION_MAX_TIME", DEFAULT_MAX_GENERATION_SECONDS)
 
 
 def _unreachable(error: Exception) -> GenerationError:

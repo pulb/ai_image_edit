@@ -263,7 +263,7 @@ class ModelStartTests(ServerCase):
         model.start()
         progress = model.setup_progress()
         self.assertEqual((progress.done, progress.message, progress.error, progress.fraction), (False, "Starting ComfyUI", None, None))
-        with self.assertRaisesRegex(GenerationError, "still starting"):
+        with self.assertRaisesRegex(GenerationError, r"still being set up \(Starting ComfyUI\)"):
             model._check_setup()
         self.comfy_answers.set()
         self.wait_for(lambda: model.setup_progress().done)

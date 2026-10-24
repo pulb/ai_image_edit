@@ -63,7 +63,6 @@ class SetupProgress:
 COMFY_POLL_SECONDS = 0.5
 
 _NAMED_CHOICES = {"comfy_samplers": SAMPLER_CHOICES, "comfy_schedulers": SCHEDULER_CHOICES}
-_BINDABLE = {"prompt", "negative_prompt", "seed", "steps", "cfg", "sampler", "scheduler", "denoise"}
 
 
 def _split(target: str) -> Tuple[str, str]:
@@ -99,6 +98,7 @@ class WorkflowModel:
         self, name: str, manifest: dict, workflow: dict, variant: Optional[str] = None, *, lora_downloads: bool = True,
     ) -> None:
         self.name = name
+        self._check_variants(name, manifest)
         self._manifest = self._with_variant(name, manifest, variant)
         self._workflow = workflow
         self._lora_downloads = lora_downloads
@@ -124,6 +124,17 @@ class WorkflowModel:
         return cls(path.stem, manifest, workflow, variant, **options)
 
     @staticmethod
+    def _check_variants(name: str, manifest: dict) -> None:
+        """Every variant may only change files the manifest lists, and only name licenses it defines."""
+        targets = {spec["set"] for spec in manifest["files"]}
+        for variant, chosen in manifest.get("variants", {}).items():
+            for target, changes in chosen.get("files", {}).items():
+                if target not in targets:
+                    raise ValueError(f"{name}: variant {variant!r} changes {target!r}, which is not in files")
+                if changes.get("license") and changes["license"] not in manifest.get("licenses", {}):
+                    raise ValueError(f"{name}: variant {variant!r} changes {target!r}: unknown license {changes['license']!r}")
+
+    @staticmethod
     def _with_variant(name: str, manifest: dict, variant: Optional[str]) -> dict:
         """
         The manifest with a variant applied: its files replace the entries of the
@@ -140,13 +151,11 @@ class WorkflowModel:
         manifest = copy.deepcopy(manifest)
         chosen = variants[variant]
         for target, changes in chosen.get("files", {}).items():
-            matches = [spec for spec in manifest["files"] if spec["set"] == target]
-            if not matches:
-                raise ValueError(f"{name}: variant {variant!r} changes {target!r}, which is not in files")
+            spec = next(spec for spec in manifest["files"] if spec["set"] == target)  # see _check_variants()
             if "name" in changes or "url" in changes:
                 for key in ("sha256", "size"):
-                    matches[0].pop(key, None)
-            matches[0].update(changes)
+                    spec.pop(key, None)
+            spec.update(changes)
         if "model_version" in chosen:
             manifest["model_version"] = chosen["model_version"]
         return manifest
@@ -154,7 +163,12 @@ class WorkflowModel:
     # ------------------------------------------------------------ validation
 
     def _validate(self) -> None:
-        """Catches manifest mistakes (typos in node ids, unknown settings) at load time."""
+        """
+        Catches the manifest mistakes the schema cannot see (typos in node ids,
+        unknown licenses) at load time. Of what the schema checks, only size.bind
+        is checked again, against the policy class, which keeps sizes.py and the
+        schema in step.
+        """
         m, wf = self._manifest, self._workflow
 
         def need_node(target: str, what: str) -> None:
@@ -166,26 +180,16 @@ class WorkflowModel:
             if key not in wf[node].get("inputs", {}):
                 raise ValueError(f"{self.name}: {what} {target!r}: node {node!r} has no input {key!r} in the workflow")
 
-        unknown = set(m.get("bind", {})) - _BINDABLE
-        if unknown:
-            raise ValueError(f"{self.name}: unknown bind name(s) {sorted(unknown)} (known: {sorted(_BINDABLE)})")
-        for key in ("prompt", "seed", "steps", "sampler", "scheduler"):
-            if key not in m.get("bind", {}):
-                raise ValueError(f"{self.name}: bind.{key} is required")
         for key, target in m["bind"].items():
             need_node(target, f"bind.{key}")
         for target in m.get("constants", {}):
             need_node(target, "constants")
-        for spec in m.get("files", []):
+        for spec in m["files"]:
             need_node(spec["set"], "files")
-            if "name" not in spec or "url" not in spec:
-                raise ValueError(f"{self.name}: files entry for {spec['set']!r} needs a 'name' and a 'url'")
+        loras = m.get("loras")
+        for spec in m["files"] + (loras.get("files", []) if loras else []):
             if spec.get("license") and spec["license"] not in m.get("licenses", {}):
-                raise ValueError(f"{self.name}: files entry {spec['set']!r}: unknown license {spec['license']!r}")
-        for variant, chosen in m.get("variants", {}).items():
-            for target in chosen.get("files", {}):
-                if target not in {spec["set"] for spec in m["files"]}:
-                    raise ValueError(f"{self.name}: variant {variant!r} changes {target!r}, which is not in files")
+                raise ValueError(f"{self.name}: files entry {spec.get('set') or spec['name']!r}: unknown license {spec['license']!r}")
         need_node(m["images"]["source"], "images.source")
         refs = m["images"].get("references")
         if refs:
@@ -193,8 +197,6 @@ class WorkflowModel:
             if ref_node not in wf:
                 raise ValueError(f"{self.name}: images.references.target refers to node {ref_node!r}, which is not in the workflow")
             ids = refs.get("loader_ids")
-            if ids is None and "loader_id_start" not in refs:
-                raise ValueError(f"{self.name}: images.references needs loader_ids or loader_id_start")
             if ids is not None and len(ids) < refs["max"]:
                 raise ValueError(f"{self.name}: images.references.loader_ids has fewer entries than max")
         bound = set(m["size"].get("bind", {}))
@@ -205,11 +207,7 @@ class WorkflowModel:
             )
         for key, target in m["size"].get("bind", {}).items():
             need_node(target, f"size.bind.{key}")
-        loras = m.get("loras")
         if loras:
-            for spec in loras.get("files", []):
-                if spec.get("license") and spec["license"] not in m.get("licenses", {}):
-                    raise ValueError(f"{self.name}: loras.files {spec['name']!r}: unknown license {spec['license']!r}")
             for targets in loras["feeds"].values():
                 for target in targets:
                     need_node(target, "loras.feeds")
@@ -329,7 +327,7 @@ class WorkflowModel:
         status = self._download_status
         if status is not None:
             if status.error:
-                return SetupProgress(done=True, error=f"Setting up the model failed: {status.error}")
+                return SetupProgress(done=True, error=f"Setting up the model failed: {status.error}. Restart the app to retry.")
             if not status.finished.is_set():
                 return SetupProgress(done=False, message=status.message, fraction=status.fraction)
         if self._process is None:
@@ -341,16 +339,12 @@ class WorkflowModel:
         return SetupProgress(fraction=status.fraction if status is not None else None)
 
     def _check_setup(self) -> None:
-        status = self._download_status
-        if status is not None:
-            if status.error:
-                raise GenerationError(f"Setting up the model failed: {status.error}. Restart the app to retry.")
-            if not status.finished.is_set():
-                raise GenerationError(f"The model is still being set up. {status.message}".strip())
-        if self._comfy_error:
-            raise GenerationError(self._comfy_error)
-        if self._process is not None and not self._comfy_ready.is_set():
-            raise GenerationError("ComfyUI is still starting. Please wait a moment and try again.")
+        progress = self.setup_progress()
+        if progress.error:
+            raise GenerationError(progress.error)
+        if not progress.done:
+            detail = f" ({progress.message})" if progress.message else ""
+            raise GenerationError(f"The model is still being set up{detail}. Please wait a moment and try again.")
 
     def shutdown(self) -> None:
         self._cancel_downloads.set()

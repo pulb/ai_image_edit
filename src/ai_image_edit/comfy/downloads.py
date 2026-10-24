@@ -49,12 +49,21 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+DEFAULT_CONNECTIONS = 8
+MAX_CONNECTIONS = 32
+
+
 def connections() -> int:
-    """How many parts of a file are fetched at once (DOWNLOAD_CONNECTIONS, default 8, at most 32)."""
-    try:
-        return max(1, min(32, int(os.environ.get("DOWNLOAD_CONNECTIONS", "8"))))
-    except ValueError:
-        return 8
+    """
+    How many parts of a file are fetched at once: DOWNLOAD_CONNECTIONS (default 8,
+    at most 32). Raises ValueError for a value that is not a whole number of at least 1.
+    """
+    raw = os.environ.get("DOWNLOAD_CONNECTIONS", "").strip()
+    if not raw:
+        return DEFAULT_CONNECTIONS
+    if not raw.isdigit() or int(raw) < 1:
+        raise ValueError(f"DOWNLOAD_CONNECTIONS={raw!r} is not a number of connections.")
+    return min(MAX_CONNECTIONS, int(raw))
 
 
 def _check_status(url: str, status: int) -> None:

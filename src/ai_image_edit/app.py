@@ -88,6 +88,7 @@ def start_model(args: argparse.Namespace) -> WorkflowModel:
     try:
         client.read_settings()
         paths.read_settings()
+        downloads.connections()
     except ValueError as exc:
         raise StartupError("Configuration", str(exc)) from exc
     variant = args.variant or os.environ.get("MODEL_VARIANT") or None

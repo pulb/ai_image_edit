@@ -39,7 +39,8 @@ class SelectionTests(unittest.TestCase):
         env.start()
         self.addCleanup(env.stop)
         for name in ("MODEL_WORKFLOW", "MODEL_VARIANT", "REQUIRE_PASSWORD", "DOWNLOAD_LORAS",
-                     "COMFY_GENERATION_TIMEOUT", "COMFY_GENERATION_MAX_TIME", "AI_IMAGE_EDIT_WORK_MAX_SIZE"):
+                     "COMFY_GENERATION_TIMEOUT", "COMFY_GENERATION_MAX_TIME", "AI_IMAGE_EDIT_WORK_MAX_SIZE",
+                     "DOWNLOAD_CONNECTIONS"):
             os.environ.pop(name, None)
         # main() applies these settings; each test gets the values back afterwards.
         for module, name in ((client, "STALL_TIMEOUT_SECONDS"), (client, "MAX_GENERATION_SECONDS"), (paths, "WORK_MAX_BYTES")):
@@ -98,7 +99,8 @@ class SelectionTests(unittest.TestCase):
 
     def test_invalid_numeric_settings_show_the_error_page(self):
         for name, value in (("COMFY_GENERATION_TIMEOUT", "5min"), ("COMFY_GENERATION_MAX_TIME", "0"),
-                            ("AI_IMAGE_EDIT_WORK_MAX_SIZE", "lots")):
+                            ("AI_IMAGE_EDIT_WORK_MAX_SIZE", "lots"), ("DOWNLOAD_CONNECTIONS", "many"),
+                            ("DOWNLOAD_CONNECTIONS", "0")):
             with self.subTest(name=name), mock.patch.dict(os.environ, {name: value}):
                 self.error_page.reset_mock()
                 self.assertEqual(self.assert_error_page("Configuration", f"{name}={value!r}"), "")
@@ -244,6 +246,13 @@ class VariantTests(unittest.TestCase):
         manifest, workflow = read_workflow_file(GGUF)
         manifest["variants"]["bad"] = {"files": {"9.nothing": {"name": "x"}}}
         with self.assertRaisesRegex(ValueError, "not in files"):
+            WorkflowModel("x", manifest, workflow)
+
+    def test_every_variant_is_checked_for_unknown_licenses(self):
+        manifest, workflow = read_workflow_file(GGUF)
+        target = manifest["files"][0]["set"]
+        manifest["variants"]["bad"] = {"files": {target: {"license": "nope"}}}
+        with self.assertRaisesRegex(ValueError, "variant 'bad'.*unknown license 'nope'"):
             WorkflowModel("x", manifest, workflow)
 
 
