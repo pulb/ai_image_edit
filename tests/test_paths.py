@@ -4,25 +4,25 @@ import tempfile
 import unittest
 from pathlib import Path
 from unittest import mock
+from urllib.parse import unquote
 
 from ai_image_edit.core import paths
-from ai_image_edit.core.paths import WORK_DIR, from_url, to_url, trim_work_dir
+from ai_image_edit.core.paths import WORK_DIR, new_work_file, to_url, trim_work_dir
 
 
 class UrlTest(unittest.TestCase):
-    def test_round_trip_with_special_characters(self):
+    def test_special_characters_are_escaped(self):
         for name in ("plain.png", "my photo.png", "photo#1.jpg", "100%.png", "a?b&c=d.png", "größe.png"):
-            path = str(WORK_DIR / name)
-            url = to_url(path)
+            url = to_url(str(WORK_DIR / name))
             self.assertNotIn("#", url)
             self.assertNotIn("?", url)
-            self.assertEqual(from_url(url), path)
+            self.assertEqual(unquote(url.removeprefix("/files/")), name)
 
-    def test_absolute_url_from_the_browser(self):
-        self.assertEqual(from_url("http://localhost:7860/files/photo%231.jpg"), str(WORK_DIR / "photo#1.jpg"))
-
-    def test_stays_inside_the_work_dir(self):
-        self.assertEqual(from_url("/files/..%2F..%2Fetc%2Fpasswd"), str(WORK_DIR / "passwd"))
+    def test_new_work_files_are_unique(self):
+        a, b = new_work_file("x"), new_work_file("x", ".jpg")
+        self.assertNotEqual(a.stem, b.stem)
+        self.assertEqual((a.parent, a.suffix, b.suffix), (WORK_DIR, ".png", ".jpg"))
+        self.assertTrue(a.name.startswith("x_"))
 
 
 class WorkMaxSizeTest(unittest.TestCase):

@@ -36,13 +36,13 @@ Client-side JS:
             the server to do so, which would make drawing feel laggy. A raw
             <canvas> keeps every brush stroke fully client-side; the Brush
             size slider is a regular ui.slider, but wired up with js_handler
-            (see create_mask_editor) so it still calls AIE.setBrush directly
+            (see MaskEditor) so it still calls AIE.setBrush directly
             in the browser, with no server round-trip. When a mask goes from
             empty to non-empty or back, AIE pushes that as an 'aie_mask_state'
             event via emitEvent(...) — the documented pattern for a
             browser-side state change to reach Python without being tied to
             one specific DOM event (see the "Custom events" section of the
-            Generic Events docs) — which create_mask_editor listens for with
+            Generic Events docs) — which MaskEditor listens for with
             ui.on(...) and passes on to its on_mask_change callback, used to
             keep Aspect ratio and Resolution in sync.
 

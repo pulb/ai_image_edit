@@ -55,7 +55,7 @@ class RescaleModeParamTest(unittest.TestCase):
         kwargs = dict(
             prompt="p", source_image_path="s.png", mask_path="m.png", reference_images=[], seed=1,
             randomize_seed=False, aspect_ratio="Original", resolution=1024, steps=8, lora_files=[],
-            apply_color_correction=False,
+            apply_color_correction_enabled=False,
         )
         return common.params_from_ui(caps, **(kwargs | overrides))
 
@@ -72,7 +72,7 @@ class RescaleModeParamTest(unittest.TestCase):
 
     def test_detail_matching_is_on_unless_switched_off(self):
         self.assertTrue(self.params().match_detail_enabled)
-        self.assertFalse(self.params(match_detail=False).match_detail_enabled)
+        self.assertFalse(self.params(match_detail_enabled=False).match_detail_enabled)
 
     def test_ignored_without_inpainting(self):
         self.assertIs(self.params(inpainting=False, rescale_mode="original").rescale_mode, RescaleMode.EDIT)

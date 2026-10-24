@@ -120,7 +120,7 @@ AIE.init = function (id) {
     // space at draw time, since the canvas's internal resolution (the
     // image's native size) is usually far larger than its rendered size.
     // mode is 'zoom' (the default), 'mask' or 'annotate'; the radio group
-    // in create_mask_editor switches it. They are mutually exclusive, so a
+    // in MaskEditor switches it. They are mutually exclusive, so a
     // single finger can safely mean "pan" in zoom mode, since drawing is
     // only ever active in the other two. Annotations use their own
     // stroke width (annotStroke, CSS pixels) in the selected colour.
@@ -371,8 +371,8 @@ AIS.setImages = function (id, beforeUrl, afterUrl) {
     const before = document.getElementById(id + '_before');
     if (after) { after.src = afterUrl; after.style.display = 'block'; }
     if (before) { before.src = beforeUrl; before.style.display = 'block'; }
-    // The slider's own value is reset from Python (see set_images in
-    // create_compare_slider) — this just re-applies the clip/handle
+    // The slider's own value is reset from Python (see
+    // CompareSlider.set_images) — this just re-applies the clip/handle
     // position to match, since a Python-side value push alone doesn't
     // touch the clip-path.
     AIS.applyClip(id, 50);
@@ -397,11 +397,6 @@ AIS.setCompare = function (id, enabled) {
     handle.style.display = display;
     if (range) range.style.display = display;
     if (enabled) AIS.applyClip(id, state.sliderValue);
-};
-
-AIS.getAfterUrl = function (id) {
-    const el = document.getElementById(id + '_after');
-    return (el && el.getAttribute('src')) ? el.src : null;
 };
 
 AIS.reset = function (id) {

@@ -8,14 +8,12 @@ import shutil
 import uuid
 from pathlib import Path
 from typing import Iterable
-from urllib.parse import quote, unquote
+from urllib.parse import quote
 
 # Where uploaded, generated, and composited images live for the lifetime of
 # the process. Served to the browser at /files/<name>
 # (see ui/gui.py's app.add_static_files) so client-side
-# <canvas>/<img> elements can load them by URL. This also doubles as the
-# single source of truth for "what's the current result" — see
-# get_after_path() in ui/compare_slider.py.
+# <canvas>/<img> elements can load them by URL.
 #
 # Defaults to a folder under /dev/shm (RAM-backed, so images never reach
 # persistent storage) and falls back to ./app_work where /dev/shm is not
@@ -131,9 +129,3 @@ def new_work_file(prefix: str, suffix: str = ".png") -> Path:
 def to_url(path_str: str) -> str:
     """Converts a local WORK_DIR file path into the URL it's served at."""
     return f"/files/{quote(Path(path_str).name, safe='')}"
-
-
-def from_url(url: str) -> str:
-    """Inverse of to_url() — recovers the local WORK_DIR path from a (possibly absolute) served URL."""
-    filename = Path(unquote(url.rstrip("/").split("/")[-1])).name
-    return str(WORK_DIR / filename)

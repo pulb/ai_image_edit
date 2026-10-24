@@ -69,7 +69,9 @@ async def init_widget(ns: str, widget_id: str, label: str) -> None:
 class StatusLine:
     """
     A small grey status text over a thin progress bar, the same wherever the
-    page reports progress. Hidden until show() is called.
+    page reports progress. Hidden until show() is called. With the class
+    aie-progress-overlay (and created inside the result image's frame) it is
+    the progress of a generation, on a dark panel centered over the image.
     """
 
     def __init__(self, classes: str = "") -> None:
@@ -95,13 +97,6 @@ class StatusLine:
     def hide(self) -> None:
         self.box.set_visibility(False)
         self.bar.set_value(0)
-
-
-class GenerationProgressOverlay(StatusLine):
-    """The progress of a generation, on a dark panel centered over the result image (create it inside that frame)."""
-
-    def __init__(self) -> None:
-        super().__init__("aie-progress-overlay")
 
 
 GROUP_BG = "#1f1f1f"
@@ -158,8 +153,7 @@ def create_image_frame(box_class: str, on_clear: Callable) -> Tuple[ui.element, 
     badge. Returns (box, badge); the box's content goes in `with box:`.
     """
     with ui.element("div").classes("aie-corner-wrap"):
-        with ui.element("div").classes(box_class) as box:
-            pass
+        box = ui.element("div").classes(box_class)
         badge = create_clear_badge(on_clear)
     return box, badge
 
@@ -188,7 +182,7 @@ def attach_file_picker(
     uploader.on_upload(handle_upload)
 
 
-def create_simple_image_upload(label: str) -> dict:
+class ImageSlot:
     """
     A click-to-upload image box with no editing — used for the reference
     image slots. Clicking anywhere in the box calls pickFiles()
@@ -204,40 +198,38 @@ def create_simple_image_upload(label: str) -> dict:
     rather than raw HTML so a NiceGUI click handler can be attached to it
     directly (see attach_file_picker).
 
-    Returns holder — holder['path'] always reflects the currently selected
-    file's local path (or None). holder['container'] is the slot's element
-    (to show or hide it) and holder['clear'] removes the selected image.
+    `path` always reflects the currently selected file's local path (or
+    None); clear() removes the selected image and set_visible() shows or
+    hides the whole slot.
     """
-    holder: dict = {"path": None}
 
-    with ui.column().classes("w-full gap-1") as container:
-        ui.label(label).classes("text-sm text-gray-400")
+    def __init__(self, label: str) -> None:
+        self.path: Optional[str] = None
+        with ui.column().classes("w-full gap-1") as self._container:
+            ui.label(label).classes("text-sm text-gray-400")
+            box, self._badge = create_image_frame("aie-upload-box", self.clear)
+            with box:
+                self._placeholder = ui.label(PLACEHOLDER_TEXT).classes("aie-placeholder")
+                self._preview = ui.image().classes("aie-preview")
+                self._preview.set_visibility(False)
+            attach_file_picker(box, self._show_file)
 
-        def clear_image() -> None:
-            holder["path"] = None
-            preview.set_visibility(False)
-            placeholder.set_visibility(True)
-            badge.set_visibility(False)
+    def clear(self) -> None:
+        self.path = None
+        self._show(False)
 
-        box, badge = create_image_frame("aie-upload-box", clear_image)
-        with box:
-            placeholder = ui.label(PLACEHOLDER_TEXT).classes("aie-placeholder")
-            preview = ui.image().classes("aie-preview")
-            preview.set_visibility(False)
+    def set_visible(self, visible: bool) -> None:
+        self._container.set_visibility(visible)
 
-        async def handle_file(path: str) -> None:
-            holder["path"] = path
-            preview.set_source(to_url(path))
-            preview.set_visibility(True)
-            placeholder.set_visibility(False)
-            badge.set_visibility(True)
+    async def _show_file(self, path: str) -> None:
+        self.path = path
+        self._preview.set_source(to_url(path))
+        self._show(True)
 
-        attach_file_picker(box, handle_file)
-
-    holder["container"] = container
-    holder["clear"] = clear_image
-
-    return holder
+    def _show(self, has_image: bool) -> None:
+        self._preview.set_visibility(has_image)
+        self._placeholder.set_visibility(not has_image)
+        self._badge.set_visibility(has_image)
 
 
 class SliderPopup:
