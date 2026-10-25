@@ -35,19 +35,15 @@ async def save_uploaded_file(file) -> str:
     return await nicegui_run.io_bound(imaging.prepare_upload, str(path))
 
 
-def save_data_url(data_url: str, filename_hint: str = "mask.png") -> str:
+def save_data_url(data_url: str, stem: str) -> str:
     """
     Decodes a `data:image/png;base64,...` URL — as produced by
-    canvas.toDataURL() for the drawn mask — into a WORK_DIR file, returning
-    its local path. The mask is the one piece of image data that's
-    inherently synthesized client-side (drawn, not uploaded), so it has no
-    original file to read bytes from — this is its only source.
+    canvas.toDataURL() for the drawn mask and annotations — into a WORK_DIR file, returning
+    its local path, `<stem>_<random hex>.png`.
     """
     _header, b64data = data_url.split(",", 1)
     raw = base64.b64decode(b64data)
-    suffix = Path(filename_hint).suffix or ".png"
-    stem = Path(filename_hint).stem or "mask"
-    path = new_work_file(stem, suffix)
+    path = new_work_file(stem)
     path.write_bytes(raw)
     return str(path)
 

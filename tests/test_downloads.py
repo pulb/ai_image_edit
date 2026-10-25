@@ -328,6 +328,17 @@ class ModelStartTests(ServerCase):
         self.assertTrue(0 < seen[0] < 0.5)
         self.assertAlmostEqual(seen[-1], 1.0)
 
+    def test_each_file_is_probed_once(self):
+        items = [
+            {"url": self.url + "/f", "dest": self.tmp / "a.bin"},
+            {"url": self.url + "/f", "dest": self.tmp / "b.bin", "size": len(PAYLOAD)},
+        ]
+        status = downloads.DownloadStatus()
+        with mock.patch.object(downloads, "_probe", wraps=downloads._probe) as probe:
+            downloads.run_downloads(items, status, threading.Event())
+        self.assertTrue(status.finished.is_set() and status.error is None)
+        self.assertEqual(probe.call_count, 2)
+
     def test_fraction_is_unknown_if_the_server_gives_no_size(self):
         Handler.ranges = False
         status = downloads.DownloadStatus()

@@ -192,7 +192,7 @@ class MaskEditor:
         if not data:
             return EditorInputs(None, None, int(FEATHER_RANGE.default))
         return EditorInputs(
-            save_data_url(data["mask"], "mask.png") if data["mask"] else None,
-            save_data_url(data["annotations"], "annotations.png") if data["annotations"] else None,
+            save_data_url(data["mask"], "mask") if data["mask"] else None,
+            save_data_url(data["annotations"], "annotations") if data["annotations"] else None,
             int(data["feather"]),
         )

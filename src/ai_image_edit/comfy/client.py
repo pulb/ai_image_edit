@@ -79,7 +79,7 @@ def _max_time_error() -> GenerationError:
     )
 
 
-def launch_comfy_process(extra_args: Optional[List[str]] = None) -> subprocess.Popen:
+def launch_comfy_process(extra_args: List[str]) -> subprocess.Popen:
     """
     Starts the ComfyUI server in the background with the given extra command
     line arguments (see gpu.py). -u forces unbuffered output, so startup
@@ -90,7 +90,7 @@ def launch_comfy_process(extra_args: Optional[List[str]] = None) -> subprocess.P
     # ComfyUI's input/output/temp folders live under WORK_DIR too, so
     # everything the app handles sits in one place (RAM-backed by default).
     comfy_dir = WORK_DIR.resolve() / "comfy"
-    args = ["--port", str(PORT), *(extra_args or [])]
+    args = ["--port", str(PORT), *extra_args]
     for name in ("input", "output", "temp"):
         (comfy_dir / name).mkdir(parents=True, exist_ok=True)
         args += [f"--{name}-directory", str(comfy_dir / name)]
@@ -174,7 +174,7 @@ def cancel_prompt(prompt_id: str) -> None:
 def submit_workflow_and_wait(
     workflow: dict,
     client_id: str,
-    sampler_node: Optional[str] = None,
+    sampler_node: str,
     on_progress: Optional[Callable[[GenerationProgress], None]] = None,
     cancel: Optional[threading.Event] = None,
 ) -> str:
@@ -187,7 +187,7 @@ def submit_workflow_and_wait(
 
     on_progress, if given, is called (on this thread) whenever the stage
     changes and on every step of sampler_node; progress from other nodes is
-    not reported as sampling. Without a sampler_node, any node's steps are.
+    not reported as sampling.
 
     Setting cancel stops the prompt (see cancel_prompt()) within about
     CANCEL_POLL_SECONDS and raises GenerationCancelled.
@@ -258,7 +258,7 @@ def submit_workflow_and_wait(
             if msg_type == "execution_start":
                 report(ProgressStage.PREPARING)
             elif msg_type == "progress":
-                if sampler_node is None or str(data.get("node")) == sampler_node:
+                if str(data.get("node")) == sampler_node:
                     sampled = True
                     report(ProgressStage.SAMPLING, data.get("value"), data.get("max"))
             elif msg_type == "executing":
@@ -270,19 +270,10 @@ def submit_workflow_and_wait(
                 raise GenerationError(f"ComfyUI Error: {data.get('exception_message', 'Unknown error')}")
             elif msg_type == "execution_interrupted":
                 raise GenerationError("The generation was interrupted in ComfyUI.")
-    except GenerationError:
-        # A real execution failure or timeout — surface it, don't let the
-        # narrower except below swallow it.
-        raise
     except (websocket.WebSocketException, OSError) as e:
-        # Genuinely flaky websocket/network trouble (connection reset,
-        # protocol error, ...) — the prompt may still have completed on the
-        # ComfyUI side, so don't fail outright; let the history fetch
-        # afterward be the final word. Deliberately narrower than a bare
-        # `except Exception`: a bug in *this* loop (e.g. malformed JSON
-        # from json.loads, a missing key in message["data"]) should not be
-        # swallowed and reported as "just a flaky websocket" — it should
-        # propagate so it's actually visible and fixed.
+        # The prompt may still have finished in ComfyUI, so the history fetch
+        # afterwards has the final word. Narrow on purpose: a bug in this loop
+        # should surface, not pass as a dropped connection.
         print(f"Websocket error: {e}", flush=True)
     finally:
         ws.close()

@@ -230,18 +230,19 @@ def _download_single(
 def download_file(
     url: str, dest: Path, *, sha256: Optional[str] = None, size: Optional[int] = None,
     progress: Optional[Callable[[int, Optional[int]], None]] = None,
-    cancel: Optional[threading.Event] = None,
+    cancel: Optional[threading.Event] = None, remote_total: Optional[int] = None,
 ) -> None:
     """
     Downloads url to dest (no-op if dest exists), over several connections if the server
     allows ranges. progress(done, total) is called as data arrives, from any thread.
+    remote_total is the size remote_size() already found, which saves asking again.
     """
     if dest.is_file():
         return
     dest.parent.mkdir(parents=True, exist_ok=True)
     part = dest.with_name(dest.name + ".part")
 
-    total = _probe(url)
+    total = remote_total or _probe(url)
     if total:
         _download_parts(url, part, total, progress, cancel)
     else:
@@ -306,14 +307,16 @@ def run_downloads(
     """
     try:
         status.message = "Checking the file sizes"
-        sizes = [item.get("size") or remote_size(item["url"]) for item in items]
+        remote = [None if item.get("size") else remote_size(item["url"]) for item in items]
+        sizes = [item.get("size") or found for item, found in zip(items, remote)]
         grand_total = sum(sizes) if items and all(sizes) else None
         completed = 0
-        for index, (item, size) in enumerate(zip(items, sizes), 1):
+        for index, (item, size, found) in enumerate(zip(items, sizes, remote), 1):
             label = f"{item['dest'].name} ({index}/{len(items)})"
             status.message = f"Downloading {label}"
             download_file(item["url"], item["dest"], sha256=item.get("sha256"), size=item.get("size"),
-                          progress=_FileProgress(status, label, completed, grand_total), cancel=cancel)
+                          progress=_FileProgress(status, label, completed, grand_total), cancel=cancel,
+                          remote_total=found)
             completed += size or 0
         status.message = ""
         if on_done:
