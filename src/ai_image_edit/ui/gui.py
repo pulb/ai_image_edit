@@ -5,7 +5,7 @@ NiceGUI UI. Entry point is run(model), called through ui/__init__.py
 
 UI-only: renders controls, collects a GenerationParams, and calls
 model.generate(). Controls (mask editor, before/after slider, reference
-slots, LoRA panel, sampler/scheduler/cfg/denoise, aspect-ratio/resolution)
+slots, LoRA panel, the model's optional inputs, aspect-ratio/resolution)
 are shown or hidden based on the active model's declared capabilities.
 """
 
@@ -34,7 +34,6 @@ from ai_image_edit.ui.helpers import (
     PORT,
     PRIMARY_COLOR,
     RECENT_FILES_KEPT,
-    default_choice,
     describe_error,
     describe_progress,
     params_from_ui,
@@ -130,8 +129,6 @@ def build_prompt_card() -> PromptCard:
 class AdvancedCard:
     steps: ui.slider
     options: Dict[str, ui.element]  # the model's optional inputs' controls, by name
-    sampler_name: Optional[ui.select]
-    scheduler: Optional[ui.select]
     rescale_mode: ui.select
     color_correction: ui.switch
     match_detail: ui.switch
@@ -148,22 +145,18 @@ def build_advanced_card(caps: ModelCapabilities) -> AdvancedCard:
 
                 options: Dict[str, ui.element] = {}
                 for spec in caps.options:
-                    if spec.range is None:
+                    if spec.range is not None:
+                        with ui.column().classes("w-full gap-0"):
+                            ui.label(spec.label).classes("text-xs text-gray-400")
+                            options[spec.name] = create_value_slider(spec.range)
+                    elif spec.choices:
+                        options[spec.name] = (
+                            ui.select(list(spec.choices), value=spec.default, label=spec.label).props("outlined dark").classes("w-full")
+                        )
+                    else:
                         options[spec.name] = (
                             ui.textarea(label=spec.label, value=spec.default).props("rows=2 outlined dark").classes("w-full")
                         )
-                        continue
-                    with ui.column().classes("w-full gap-0"):
-                        ui.label(spec.label).classes("text-xs text-gray-400")
-                        options[spec.name] = create_value_slider(spec.range)
-
-                sampler_name = None
-                if caps.sampler_choices:
-                    sampler_name = ui.select(caps.sampler_choices, value=default_choice(caps.default_sampler, caps.sampler_choices), label="Sampler name").props("outlined dark").classes("w-full")
-
-                scheduler = None
-                if caps.scheduler_choices:
-                    scheduler = ui.select(caps.scheduler_choices, value=default_choice(caps.default_scheduler, caps.scheduler_choices), label="Scheduler").props("outlined dark").classes("w-full")
 
             with ui.column().classes(GROUP_CLASSES + " p-6"):
                 ui.label("Postprocessing").classes("text-sm text-weight-bold q-mb-sm").style(f"color: {PRIMARY_COLOR}")
@@ -194,7 +187,7 @@ def build_advanced_card(caps: ModelCapabilities) -> AdvancedCard:
                     with ui.button(icon="info").props("flat round dense size=sm").classes("text-gray-400"):
                         with ui.menu():
                             ui.label(COLOR_CORRECTION_INFO).classes("text-xs q-pa-sm").style("max-width: 280px")
-    return AdvancedCard(steps, options, sampler_name, scheduler, rescale_mode, color_correction, match_detail)
+    return AdvancedCard(steps, options, rescale_mode, color_correction, match_detail)
 
 
 FORMAT_LABELS = {"png": "PNG", "jpeg": "JPEG"}
@@ -531,8 +524,6 @@ def run(model: WorkflowModel) -> None:
                     aspect_ratio=editor_card.aspect_ratio.value,
                     resolution=editor_card.resolution.value,
                     steps=advanced.steps.value,
-                    sampler=value_of(advanced.sampler_name),
-                    scheduler=value_of(advanced.scheduler),
                     options={name: control.value for name, control in advanced.options.items()},
                     lora_files=lora_files,
                     lora_strength=value_of(references.lora_strength),

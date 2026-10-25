@@ -28,8 +28,8 @@ class RangeSpec:
 class InputSpec:
     """
     One of a model's optional inputs (the workflow file's "inputs"): a slider
-    over `range`, or a text field without one. integer: the slider's values
-    are whole numbers.
+    over `range`, a dropdown of `choices`, or a text field with neither.
+    integer: the slider's values are whole numbers.
     """
 
     name: str
@@ -37,6 +37,7 @@ class InputSpec:
     default: Any
     range: Optional[RangeSpec] = None
     integer: bool = False
+    choices: Tuple[str, ...] = ()
 
     def convert(self, value: Any) -> Any:
         """A control's value as the workflow takes it."""
@@ -78,8 +79,7 @@ class ModelCapabilities:
     reads this once (via WorkflowModel.capabilities) to decide which
     controls to render, instead of hardcoding assumptions about any one
     model — e.g. how many reference-image upload boxes to draw, whether to
-    show the LoRA panel, or which sampler/scheduler/aspect-ratio/resolution
-    choices to offer.
+    show the LoRA panel, or which aspect-ratio/resolution choices to offer.
     """
 
     # Total number of reference/source images this model accepts, primary
@@ -106,15 +106,6 @@ class ModelCapabilities:
     # default_resolution must be one of supported_resolutions.
     supported_resolutions: List[int]
     default_resolution: int
-
-    # None hides the corresponding UI control entirely rather than showing
-    # a dropdown with a meaningless single choice. default_sampler/
-    # default_scheduler must be one of the respective choices list (or
-    # None, when that list itself is None).
-    sampler_choices: Optional[List[str]] = None
-    default_sampler: Optional[str] = None
-    scheduler_choices: Optional[List[str]] = None
-    default_scheduler: Optional[str] = None
 
     # The model's optional inputs, in the order the UI shows them.
     options: Tuple[InputSpec, ...] = ()
@@ -163,8 +154,6 @@ class Inference:
 
     prompt: str
     steps: int
-    sampler: str
-    scheduler: str
     seed: Optional[int]
     options: Mapping[str, Any] = field(default_factory=dict)
     lora_files: Tuple[str, ...] = ()

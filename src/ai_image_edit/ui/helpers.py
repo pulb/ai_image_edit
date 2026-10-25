@@ -52,13 +52,6 @@ def resolution_label(resolution: int) -> str:
     return f"{resolution / 1024:g}K"
 
 
-def default_choice(default: Optional[str], choices: Optional[Sequence[str]]) -> Optional[str]:
-    """The model's declared default if it is one of `choices`, else the first choice (None if there are none)."""
-    if not choices:
-        return None
-    return default if default in choices else choices[0]
-
-
 PROGRESS_TEXT = {
     ProgressStage.PREPARING: "Preparing",
     ProgressStage.QUEUED: "Waiting for another generation",
@@ -106,8 +99,6 @@ def params_from_ui(
     aspect_ratio: str,
     resolution: int,
     steps: int,
-    sampler: Optional[str],
-    scheduler: Optional[str],
     options: Mapping[str, Any],
     lora_files: Sequence[str],
     lora_strength: Optional[float] = None,
@@ -138,8 +129,6 @@ def params_from_ui(
         inference=Inference(
             prompt=prompt or "",
             steps=int(steps),
-            sampler=default_choice(sampler, caps.sampler_choices),
-            scheduler=default_choice(scheduler, caps.scheduler_choices),
             seed=None if randomize_seed or seed is None else int(seed),
             options={
                 name: specs[name].convert(value) for name, value in options.items() if name in specs and value is not None

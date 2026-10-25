@@ -88,13 +88,13 @@
     "bind": {
       "prompt":    "5.prompt",
       "seed":      "6.seed",
-      "steps":     "6.steps",
-      "sampler":   "6.sampler_name",
-      "scheduler": "6.scheduler"
+      "steps":     "6.steps"
     },
     "inputs": {
       "cfg":             {"target": "6.cfg", "range": {"min": 1.0, "max": 10.0, "default": 1.0, "step": 0.1}, "label": "CFG scale"},
-      "negative_prompt": {"target": "5.negative_prompt"}
+      "negative_prompt": {"target": "5.negative_prompt"},
+      "sampler":         {"target": "6.sampler_name", "choices": "comfy_samplers"},
+      "scheduler":       {"target": "6.scheduler", "choices": "comfy_schedulers"}
     },
     "seed": {"min": 0, "max": 2147483647, "wrap": true},
 
@@ -108,8 +108,6 @@
     "capabilities": {
       "supports_inpainting": true,
       "num_annotation_colors": 3,
-      "sampler": {"default": "euler"},
-      "scheduler": {"default": "simple"},
       "steps": {"min": 8, "max": 60, "default": 40, "step": 1}
     }
   },

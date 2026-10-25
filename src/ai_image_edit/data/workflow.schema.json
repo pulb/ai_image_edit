@@ -35,15 +35,6 @@
         {"type": "array", "items": {"type": "string"}, "minItems": 1}
       ]
     },
-    "choice_setting": {
-      "type": "object",
-      "required": ["default"],
-      "additionalProperties": false,
-      "properties": {
-        "default": {"type": "string"},
-        "choices": {"$ref": "#/$defs/choices"}
-      }
-    },
     "link": {
       "description": "A reference to an output of a node: [node id, output slot].",
       "type": "array",
@@ -147,27 +138,27 @@
         },
         "bind": {
           "type": "object",
-          "required": ["prompt", "seed", "steps", "sampler", "scheduler"],
+          "required": ["prompt", "seed", "steps"],
           "additionalProperties": false,
           "properties": {
             "prompt": {"$ref": "#/$defs/target"},
             "seed": {"$ref": "#/$defs/target"},
-            "steps": {"$ref": "#/$defs/target"},
-            "sampler": {"$ref": "#/$defs/target"},
-            "scheduler": {"$ref": "#/$defs/target"}
+            "steps": {"$ref": "#/$defs/target"}
           }
         },
         "inputs": {
-          "description": "The model's optional inputs, shown in Advanced settings in this order: a slider for an input with a range, a text field for one without. The label defaults to the name with spaces for underscores.",
+          "description": "The model's optional inputs, shown in Advanced settings in this order: a slider for an input with a range, a dropdown for one with choices, a text field for one with neither. The default is the workflow's placeholder, except for a slider's. The label defaults to the name with spaces for underscores.",
           "type": "object",
           "propertyNames": {"pattern": "^[a-z][a-z0-9_]*$"},
           "additionalProperties": {
             "type": "object",
             "required": ["target"],
             "additionalProperties": false,
+            "not": {"required": ["range", "choices"]},
             "properties": {
               "target": {"$ref": "#/$defs/target"},
               "range": {"$ref": "#/$defs/range"},
+              "choices": {"$ref": "#/$defs/choices"},
               "label": {"type": "string", "minLength": 1}
             }
           }
@@ -275,13 +266,11 @@
         },
         "capabilities": {
           "type": "object",
-          "required": ["supports_inpainting", "sampler", "scheduler", "steps"],
+          "required": ["supports_inpainting", "steps"],
           "additionalProperties": false,
           "properties": {
             "supports_inpainting": {"type": "boolean"},
             "num_annotation_colors": {"type": "integer", "minimum": 0},
-            "sampler": {"$ref": "#/$defs/choice_setting"},
-            "scheduler": {"$ref": "#/$defs/choice_setting"},
             "steps": {"$ref": "#/$defs/range"},
             "lora_strength": {"$ref": "#/$defs/range"}
           }

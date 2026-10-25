@@ -31,7 +31,7 @@ class CacheKeyTest(unittest.TestCase):
         return wrapped(str(self.source))
 
     def inference(self, **overrides):
-        base = Inference(prompt="p", steps=8, sampler="euler", scheduler="simple", seed=1, options={"cfg": 1.0})
+        base = Inference(prompt="p", steps=8, seed=1, options={"cfg": 1.0, "sampler": "euler"})
         return dataclasses.replace(base, **overrides)
 
     def test_the_same_request_reuses_the_result(self):
@@ -46,8 +46,9 @@ class CacheKeyTest(unittest.TestCase):
 
     def test_an_option_changes_the_key(self):
         self.run_with(self.inference())
-        self.run_with(self.inference(options={"cfg": 2.0}))
-        self.assertEqual(self.calls, 2)
+        self.run_with(self.inference(options={"cfg": 2.0, "sampler": "euler"}))
+        self.run_with(self.inference(options={"cfg": 2.0, "sampler": "dpmpp_2m"}))
+        self.assertEqual(self.calls, 3)
 
     def test_the_reference_pixels_are_part_of_the_key(self):
         reference = self.dir / "ref.png"

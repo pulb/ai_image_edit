@@ -65,7 +65,7 @@ COMFY_POLL_SECONDS = 0.5
 
 _NAMED_CHOICES = {"comfy_samplers": SAMPLER_CHOICES, "comfy_schedulers": SCHEDULER_CHOICES}
 # The bindings every workflow has; the app fills them in from Inference's own fields.
-REQUIRED_BINDINGS = ("prompt", "seed", "steps", "sampler", "scheduler")
+REQUIRED_BINDINGS = ("prompt", "seed", "steps")
 
 
 def _split(target: str) -> Tuple[str, str]:
@@ -196,6 +196,8 @@ class WorkflowModel:
                 raise ValueError(f"{self.name}: inputs.{name} has a range, but its workflow input holds {placeholder!r}, not a number")
             if "range" not in spec and not isinstance(placeholder, str):
                 raise ValueError(f"{self.name}: inputs.{name} needs a range: its workflow input holds {placeholder!r}, not text")
+            if "choices" in spec and placeholder not in _choices(spec["choices"]):
+                raise ValueError(f"{self.name}: inputs.{name}: its workflow input holds {placeholder!r}, which is not one of its choices")
         for target in m.get("constants", {}):
             need_node(target, "constants")
         for spec in m["files"]:
@@ -258,10 +260,6 @@ class WorkflowModel:
             default_aspect_ratio=self._size.default_aspect_ratio,
             supported_resolutions=list(self._size.resolutions),
             default_resolution=self._size.default_resolution,
-            sampler_choices=_choices(caps["sampler"].get("choices", "comfy_samplers")),
-            default_sampler=caps["sampler"]["default"],
-            scheduler_choices=_choices(caps["scheduler"].get("choices", "comfy_schedulers")),
-            default_scheduler=caps["scheduler"]["default"],
             options=tuple(self._input_spec(name, spec) for name, spec in m.get("inputs", {}).items()),
             num_annotation_colors=caps.get("num_annotation_colors", 0),
             step_range=_range(caps["steps"]),
@@ -272,16 +270,17 @@ class WorkflowModel:
 
     def _input_spec(self, name: str, spec: dict) -> InputSpec:
         """
-        An optional input as the UI shows it: a slider over its range, or a text
-        field starting with the workflow's placeholder. The label defaults to the
-        name, with spaces for underscores. A slider takes whole numbers when its
-        range and the placeholder are all whole numbers.
+        An optional input as the UI shows it: a slider over its range, or a
+        dropdown of its choices or a text field, both starting with the workflow's
+        placeholder. The label defaults to the name, with spaces for underscores.
+        A slider takes whole numbers when its range and the placeholder are all
+        whole numbers.
         """
         label = spec.get("label") or name.replace("_", " ").capitalize()
         node, key = _split(spec["target"])
         placeholder = self._workflow[node]["inputs"][key]
         if "range" not in spec:
-            return InputSpec(name, label, default=placeholder)
+            return InputSpec(name, label, default=placeholder, choices=tuple(_choices(spec.get("choices", []))))
         values = [spec["range"][k] for k in ("min", "max", "default", "step") if k in spec["range"]]
         integer = isinstance(placeholder, int) and all(float(v).is_integer() for v in values)
         rng = _range(spec["range"])
@@ -461,10 +460,7 @@ class WorkflowModel:
         put(m["images"]["source"], comfy_client.upload_image(source_path))
         self._place_references(wf, reference_paths)
 
-        required = {
-            "prompt": inference.prompt.strip(), "seed": inference.seed, "steps": int(inference.steps),
-            "sampler": inference.sampler, "scheduler": inference.scheduler,
-        }
+        required = {"prompt": inference.prompt.strip(), "seed": inference.seed, "steps": int(inference.steps)}
         for name in REQUIRED_BINDINGS:
             put(m["bind"][name], required[name])
         targets = self._option_targets
@@ -575,6 +571,10 @@ class WorkflowModel:
         unknown = set(params.inference.options) - set(self._option_targets)
         if unknown:
             raise ValueError(f"{self.name}: no optional input(s) {sorted(unknown)} (it has {sorted(self._option_targets)})")
+        for spec in self.capabilities.options:
+            value = params.inference.options.get(spec.name)
+            if spec.choices and value is not None and value not in spec.choices:
+                raise ValueError(f"{self.name}: {value!r} is not one of the choices of {spec.name}")
 
         report(ProgressStage.PREPARING)
         inference = replace(params.inference, seed=self._pick_seed(params.inference.seed))
@@ -582,8 +582,7 @@ class WorkflowModel:
         options = " ".join(f"{name}={value!r}" for name, value in inference.options.items())
         print(
             f"[{self.name}] mask={'yes' if images.mask_path else 'no'} images={1 + len(images.reference_paths)} "
-            f"gen_dims={size.width}x{size.height} {size.description} steps={inference.steps} "
-            f"sampler={inference.sampler} scheduler={inference.scheduler} {options}".rstrip(),
+            f"gen_dims={size.width}x{size.height} {size.description} steps={inference.steps} {options}".rstrip(),
             flush=True,
         )
 

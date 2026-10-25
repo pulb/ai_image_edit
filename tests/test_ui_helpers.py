@@ -51,16 +51,16 @@ class ParamsFromUiTest(unittest.TestCase):
             max_reference_images=1, supports_loras=False, supports_inpainting=inpainting,
             supported_aspect_ratios=["Original"], default_aspect_ratio="Original",
             supported_resolutions=[1024], default_resolution=1024,
-            sampler_choices=["euler"], default_sampler="euler", scheduler_choices=["simple"], default_scheduler="simple",
             options=(
                 InputSpec("cfg", "CFG scale", 1.0, RangeSpec(1.0, 10.0, 1.0, 0.1)),
                 InputSpec("negative_prompt", "Negative prompt", ""),
+                InputSpec("sampler", "Sampler", "euler", choices=("euler", "dpmpp_2m")),
             ),
         )
         kwargs = dict(
             prompt="p", source_image_path="s.png", mask_path="m.png", reference_images=[], seed=1,
-            randomize_seed=False, aspect_ratio="Original", resolution=1024, steps=8, sampler="euler",
-            scheduler="simple", options={}, lora_files=[], color_correction=False,
+            randomize_seed=False, aspect_ratio="Original", resolution=1024, steps=8,
+            options={}, lora_files=[], color_correction=False,
         )
         return common.params_from_ui(caps, **(kwargs | overrides))
 
@@ -92,6 +92,9 @@ class ParamsFromUiTest(unittest.TestCase):
         options = self.params(options={"cfg": 3, "denoise": 0.5, "negative_prompt": None}).inference.options
         self.assertEqual(dict(options), {"cfg": 3.0})
         self.assertIsInstance(options["cfg"], float)
+
+    def test_a_choice_is_passed_as_text(self):
+        self.assertEqual(dict(self.params(options={"sampler": "dpmpp_2m"}).inference.options), {"sampler": "dpmpp_2m"})
 
     def test_the_request_cannot_be_changed(self):
         params = self.params(options={"cfg": 2})

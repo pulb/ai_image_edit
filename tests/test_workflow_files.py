@@ -38,7 +38,7 @@ from ai_image_edit import workflows as workflow_files
 from ai_image_edit.comfy import client
 from ai_image_edit import sizes
 from ai_image_edit.sizes import POLICIES
-from ai_image_edit.workflow_model import REQUIRED_BINDINGS, WorkflowModel
+from ai_image_edit.workflow_model import REQUIRED_BINDINGS, SAMPLER_CHOICES, SCHEDULER_CHOICES, WorkflowModel
 
 import jsonschema
 
@@ -84,9 +84,15 @@ class ManifestModelTests(unittest.TestCase):
 
     @staticmethod
     def inference(model: WorkflowModel = None, **overrides) -> Inference:
-        """An Inference with every option the model has (none without a model)."""
-        options = {name: "not this" if name == "negative_prompt" else 1.0 for name in (model._option_targets if model else {})}
-        values = dict(prompt="a prompt", steps=4, sampler="euler", scheduler="simple", seed=1, options=options)
+        """An Inference with a value other than the default for every option the model has (none without a model)."""
+        def value(spec):
+            if spec.range is not None:
+                return 1.0
+            if spec.choices:
+                return next(c for c in spec.choices if c != spec.default)
+            return "not this"
+        options = {spec.name: value(spec) for spec in (model.capabilities.options if model else ())}
+        values = dict(prompt="a prompt", steps=4, seed=1, options=options)
         return Inference(**(values | overrides))
 
     def request(self, source="source.png", mask=None, aspect="Original", resolution=1024, **inference) -> GenerationParams:
@@ -156,6 +162,10 @@ class ManifestModelTests(unittest.TestCase):
             "input with an unknown key": lambda d: d["manifest"]["inputs"]["cfg"].update(kind="slider"),
             "input name that is not lower case": lambda d: d["manifest"]["inputs"].update(CFG=d["manifest"]["inputs"].pop("cfg")),
             "empty input label": lambda d: d["manifest"]["inputs"]["cfg"].update(label=""),
+            "input with a range and choices": lambda d: d["manifest"]["inputs"]["cfg"].update(choices=["a"]),
+            "unknown named choices": lambda d: d["manifest"]["inputs"]["sampler"].update(choices="comfy_nodes"),
+            "sampler in bind": lambda d: d["manifest"]["bind"].update(sampler="2.sampler_name"),
+            "sampler in capabilities": lambda d: d["manifest"]["capabilities"].update(sampler={"default": "euler"}),
         }
         for what, mutate in mistakes.items():
             with self.subTest(what):
@@ -181,11 +191,13 @@ class ManifestModelTests(unittest.TestCase):
 
     # The optional inputs every bundled workflow offers: (name, label, slider?, default), in order.
     EXPECTED_OPTIONS = {
-        "qwen_image21": [("cfg", "CFG scale", True, 1.0), ("negative_prompt", "Negative prompt", False, "")],
-        "qwen_image21_gguf": [("cfg", "CFG scale", True, 1.0), ("negative_prompt", "Negative prompt", False, "")],
-        "qwen_image21_turbo": [("cfg", "CFG scale", True, 1.0), ("negative_prompt", "Negative prompt", False, "")],
-        "qwen_image21_turbo_gguf": [("cfg", "CFG scale", True, 1.0), ("negative_prompt", "Negative prompt", False, "")],
-        "qwen_image_edit_2511_aio": [("cfg", "CFG scale", True, 1.0), ("denoise", "Denoise", True, 1.0)],
+        **{
+            name: [("cfg", "CFG scale", True, 1.0), ("negative_prompt", "Negative prompt", False, ""),
+                   ("sampler", "Sampler", False, "euler"), ("scheduler", "Scheduler", False, "simple")]
+            for name in ("qwen_image21", "qwen_image21_gguf", "qwen_image21_turbo", "qwen_image21_turbo_gguf")
+        },
+        "qwen_image_edit_2511_aio": [("cfg", "CFG scale", True, 1.0), ("denoise", "Denoise", True, 1.0),
+                                     ("sampler", "Sampler", False, "sa_solver"), ("scheduler", "Scheduler", False, "beta")],
     }
 
     def test_optional_inputs_become_controls(self):
@@ -199,6 +211,9 @@ class ManifestModelTests(unittest.TestCase):
                 for option in options:
                     self.assertFalse(option.integer, option.name)  # CFG and denoise are fractional
                     self.assertIsInstance(option.convert(1), float if option.range else str)
+                choices = {o.name: o.choices for o in options}
+                self.assertEqual(choices["sampler"], tuple(SAMPLER_CHOICES))
+                self.assertEqual(choices["scheduler"], tuple(SCHEDULER_CHOICES))
 
     def edited(self, change) -> tuple:
         manifest, workflow = workflow_files.read_workflow_file(available_workflows()["qwen_image21"])
@@ -213,6 +228,7 @@ class ManifestModelTests(unittest.TestCase):
             "needs a range": lambda m, w: m["inputs"]["cfg"].pop("range"),
             "a binding every workflow has": lambda m, w: m["inputs"].update(seed={"target": "6.seed", "range": {"min": 0, "max": 9, "default": 0}}),
             "has no input 'nope'": lambda m, w: m["inputs"].update(extra={"target": "6.nope"}),
+            "not one of its choices": lambda m, w: m["inputs"]["scheduler"].update(choices=["karras", "normal"]),
         }
         for message, change in cases.items():
             with self.subTest(message):
@@ -257,8 +273,9 @@ class ManifestModelTests(unittest.TestCase):
                 refs = model._manifest["images"].get("references")
                 self.assertEqual(caps.max_reference_images, 1 + (refs["max"] if refs else 0))
                 self.assertEqual(caps.supports_loras, bool(model._manifest.get("loras")))
-                self.assertIn(caps.default_sampler, caps.sampler_choices)
-                self.assertIn(caps.default_scheduler, caps.scheduler_choices)
+                for option in caps.options:
+                    if option.choices:
+                        self.assertIn(option.default, option.choices)
                 self.assertIn(caps.default_resolution, caps.supported_resolutions)
                 self.assertIn(caps.default_aspect_ratio, caps.supported_aspect_ratios)
                 self.assertIsInstance(model.list_loras(), dict)
@@ -449,6 +466,17 @@ class ManifestModelTests(unittest.TestCase):
                 for name, value in inference.options.items():
                     node, _, key = model._option_targets[name].partition(".")
                     self.assertEqual(wf[node]["inputs"][key], value)
+
+    def test_a_choice_must_be_one_of_the_choices(self):
+        model = self.load(MANIFESTS[0])
+        with self.assertRaisesRegex(ValueError, "not one of the choices of sampler"):
+            self.run_generate(model, options={"sampler": "nope"})
+
+    def test_a_model_without_a_sampler_input_keeps_the_workflows(self):
+        model = WorkflowModel("x", *self.edited(lambda m, w: m["inputs"].pop("sampler")))
+        self.assertNotIn("sampler", [o.name for o in model.capabilities.options])
+        wf = model.build_workflow(self.inference(model), "/x/source.png", [], {n: 1024 for n in model._manifest["size"]["bind"]})
+        self.assertEqual(wf["6"]["inputs"]["sampler_name"], "euler")
 
     def test_an_option_the_model_does_not_have_is_rejected(self):
         for path in MANIFESTS:
