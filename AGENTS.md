@@ -124,3 +124,9 @@ Rules for any AI coding agent working in this repository.
   node installation, the entry points, the GPU argument choice, the ComfyUI client, image compositing and the session secret. Run them
   after any change; for code they don't reach (the UI, the ComfyUI client),
   also read the affected code paths end to end.
+- `tools/` holds scripts for working on the app, not part of it
+  (`convert_workflow.py`, tested in `tests/test_convert_workflow.py`, with the
+  built-in ComfyUI node definitions it brings in `comfy_builtin_nodes.json`).
+  When the workflow file format changes, update the converter with it; when
+  the Docker image's `COMFYUI_REF` changes, renew those definitions with
+  `--update-builtin-nodes`.

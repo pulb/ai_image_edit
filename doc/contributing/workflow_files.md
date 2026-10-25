@@ -76,6 +76,30 @@ about them except what the entry says:
   prompt"). Names are lower case letters, digits and underscores, and must
   not be one of the three `bind` names.
 
+## Converting a workflow from the editor
+
+The `workflow` section is the API format ("Save (API Format)"). A workflow saved with plain "Save"
+can be converted with `tools/convert_workflow.py`. It needs the node definitions to name the values
+the editor stores by position; those of ComfyUI's built-in nodes come with it, from the ComfyUI commit
+the Docker image pins:
+
+```
+python tools/convert_workflow.py my_workflow.json -o model.json
+```
+
+A workflow with custom nodes, or one saved in a ComfyUI whose built-in nodes differ, needs the
+definitions of a ComfyUI that has its nodes installed (its URL, or its `/object_info` saved to a file):
+`--object-info http://127.0.0.1:8188`. When the Docker image moves to another ComfyUI commit, renew the
+bundled ones from that ComfyUI's `/object_info`:
+`--update-builtin-nodes object_info.json --comfyui-ref <commit>` (a test checks they match the pin).
+
+It writes a workflow file whose manifest binds the first sampler, the prompt its conditioning comes
+from, the first `LoadImage` and an empty latent image (as a `fixed_area` size), offers the sampler's
+CFG, denoise, sampler and scheduler and the negative prompt as [optional inputs](#optional-inputs), and lists the files
+the model loaders name, with an empty `url` (`https://`). That is a starting point: the notes it prints
+say what is left (download URLs and licenses, custom nodes, reference images, LoRAs). `--api-only`
+writes just the graph. Subgraphs are not supported.
+
 ## Tests
 
 `PYTHONPATH=src python -m unittest discover -s tests` checks every file in
