@@ -53,7 +53,7 @@ ORIGINAL_ASPECT_RATIO = "Original"
 DEFAULT_SEED = 65454653
 
 # Inpainting mask edge softness (Gaussian blur radius), shared by the
-# UI's Feather slider and GenerationParams.feather_amount.
+# UI's Feather slider and Postprocessing.feather_amount.
 FEATHER_RANGE = RangeSpec(0, 16, 3, step=1)
 
 
@@ -67,9 +67,6 @@ class RescaleMode(str, Enum):
 
     ORIGINAL = "original"
     EDIT = "edit"
-
-
-DEFAULT_RESCALE_MODE = RescaleMode.EDIT
 
 
 @dataclass(frozen=True)
@@ -173,7 +170,7 @@ class Postprocessing:
     feather_amount: int = int(FEATHER_RANGE.default)  # masked edits
     color_correction: bool = False  # unmasked edits
     match_detail: bool = True  # masked edits
-    rescale_mode: RescaleMode = DEFAULT_RESCALE_MODE  # masked edits
+    rescale_mode: RescaleMode = RescaleMode.EDIT  # masked edits
 
 
 @dataclass(frozen=True)
@@ -209,6 +206,5 @@ class GenerationProgress:
 class GenerationResult:
     """What a model's generate() hands back to the UI."""
 
-    before_path: str
     after_path: str
     actual_seed: int

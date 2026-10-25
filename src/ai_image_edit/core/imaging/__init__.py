@@ -17,10 +17,10 @@ from PIL import Image
 
 from ai_image_edit.core.imaging.alignment import align_to_input, measure_shift
 from ai_image_edit.core.imaging.color import (
-    ColorMatch, apply_color_match, lab_to_rgb, masked_color_match, rgb_to_lab, whole_image_color_match,
+    apply_color_match, lab_to_rgb, masked_color_match, rgb_to_lab, whole_image_color_match,
 )
 from ai_image_edit.core.imaging.compositing import apply_whole_image_color_correction, composite_with_soft_transition
-from ai_image_edit.core.imaging.files import JPEG_QUALITY, compose_annotations, prepare_upload, read_mask, save_as_jpeg
+from ai_image_edit.core.imaging.files import compose_annotations, prepare_upload, save_as_jpeg
 from ai_image_edit.core.imaging.geometry import fit_image_to_size, resize_to_cover_and_crop
 from ai_image_edit.core.types import Postprocessing
 

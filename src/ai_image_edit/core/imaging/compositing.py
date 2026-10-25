@@ -14,7 +14,7 @@ from ai_image_edit.core.imaging.color import apply_color_match, masked_color_mat
 from ai_image_edit.core.imaging.files import read_mask
 from ai_image_edit.core.imaging.geometry import cover_geometry, resize_to_cover_and_crop
 from ai_image_edit.core.paths import new_work_file
-from ai_image_edit.core.types import DEFAULT_RESCALE_MODE, RescaleMode
+from ai_image_edit.core.types import RescaleMode
 
 # Detail matching for an enlarged patch (RescaleMode.EDIT with an original
 # larger than the generated image). The enlarged patch is smoother than the
@@ -231,7 +231,7 @@ def composite_with_soft_transition(
     gen_img_path: str,
     mask_img_path: Optional[str],
     feather_amount: int,
-    rescale_mode: RescaleMode = DEFAULT_RESCALE_MODE,
+    rescale_mode: RescaleMode,
     match_detail: bool = True,
 ) -> str:
     """

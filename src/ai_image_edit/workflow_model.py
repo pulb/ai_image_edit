@@ -623,7 +623,7 @@ class WorkflowModel:
             images.source_path, images.mask_path, images.annotated_path, (size.width, size.height), infer,
             params.postprocessing, input_size=size.input_size,
         )
-        return GenerationResult(before_path=images.source_path, after_path=final_output_path, actual_seed=inference.seed)
+        return GenerationResult(after_path=final_output_path, actual_seed=inference.seed)
 
 
 def get_model(workflow: str, variant: Optional[str] = None, **options: bool) -> WorkflowModel:

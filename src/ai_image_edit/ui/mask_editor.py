@@ -7,7 +7,7 @@ from nicegui import ui
 
 from ai_image_edit.core.paths import to_url
 from ai_image_edit.core.types import ANNOTATION_COLORS, FEATHER_RANGE, RangeSpec
-from ai_image_edit.ui.assets import ANNOTATION_STROKE, DEFAULT_BRUSH_SIZE, DEFAULT_FEATHER_AMOUNT, MAX_BRUSH_SIZE
+from ai_image_edit.ui.assets import ANNOTATION_STROKE, DEFAULT_BRUSH_SIZE, MAX_BRUSH_SIZE
 from ai_image_edit.ui.components import GROUP_CLASSES, PLACEHOLDER_TEXT, SliderPopup, attach_file_picker, call_js, create_image_frame, init_widget, save_data_url
 from ai_image_edit.ui.helpers import PRIMARY_COLOR
 
@@ -89,7 +89,7 @@ class MaskEditor:
         editor = cls(**options)
         await init_widget("AIE", editor._id, "MaskEditor", {
             "brush": DEFAULT_BRUSH_SIZE,
-            "feather": DEFAULT_FEATHER_AMOUNT,
+            "feather": int(FEATHER_RANGE.default),
             "annotationColor": ANNOTATION_COLORS[0],
             "annotationStroke": ANNOTATION_STROKE,
             "maskTint": PRIMARY_COLOR,
@@ -119,9 +119,7 @@ class MaskEditor:
                     )
                     brush_popup.slider.on("change", js_handler=f"() => AIE.hideBrushPreview('{editor_id}')")
                     feather_popup = SliderPopup(
-                        "blur_circular", "Feather",
-                        RangeSpec(FEATHER_RANGE.min, FEATHER_RANGE.max, DEFAULT_FEATHER_AMOUNT, FEATHER_RANGE.step),
-                        js_on_value=f"AIE.setFeather('{editor_id}', value);",
+                        "blur_circular", "Feather", FEATHER_RANGE, js_on_value=f"AIE.setFeather('{editor_id}', value);",
                     )
                     row_controls["mask"] = [brush_popup.button, feather_popup.button]
 
@@ -192,7 +190,7 @@ class MaskEditor:
     async def get_inputs(self) -> EditorInputs:
         data = await call_js("AIE", "getInputs", self._id, timeout=15.0) if self.path else None
         if not data:
-            return EditorInputs(None, None, DEFAULT_FEATHER_AMOUNT)
+            return EditorInputs(None, None, int(FEATHER_RANGE.default))
         return EditorInputs(
             save_data_url(data["mask"], "mask.png") if data["mask"] else None,
             save_data_url(data["annotations"], "annotations.png") if data["annotations"] else None,

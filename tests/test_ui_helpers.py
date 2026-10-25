@@ -88,9 +88,9 @@ class ParamsFromUiTest(unittest.TestCase):
         self.assertIsNone(self.params(randomize_seed=True).inference.seed)
         self.assertEqual(self.params(seed=42.0).inference.seed, 42)
 
-    def test_only_the_models_options_are_sent(self):
-        options = self.params(options={"cfg": 3, "denoise": 0.5, "negative_prompt": None}).inference.options
-        self.assertEqual(dict(options), {"cfg": 3.0})
+    def test_options_are_converted_to_what_the_workflow_takes(self):
+        options = self.params(options={"cfg": 3, "negative_prompt": "blurry"}).inference.options
+        self.assertEqual(dict(options), {"cfg": 3.0, "negative_prompt": "blurry"})
         self.assertIsInstance(options["cfg"], float)
 
     def test_a_choice_is_passed_as_text(self):

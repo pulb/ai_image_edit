@@ -53,7 +53,6 @@ Client-side JS:
 """
 from pathlib import Path
 
-from ai_image_edit.core.types import FEATHER_RANGE
 from ai_image_edit.ui.helpers import FRAME_BORDER, FRAME_BORDER_HOVER, PRIMARY_COLOR
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
@@ -63,8 +62,6 @@ STATIC_DIR = Path(__file__).resolve().parent / "static"
 # annotation stroke.
 DEFAULT_BRUSH_SIZE = 48
 MAX_BRUSH_SIZE = 80
-
-DEFAULT_FEATHER_AMOUNT = int(FEATHER_RANGE.default)
 
 # Annotation stroke width in on-screen CSS pixels (converted to image pixels
 # at draw time, like the brush). This is the default of the stroke slider.

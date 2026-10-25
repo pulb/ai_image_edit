@@ -543,7 +543,7 @@ def run(model: WorkflowModel) -> None:
                 await nicegui_run.io_bound(trim_work_dir, RECENT_FILES_KEPT, in_use)
 
                 prompt_card.seed_input.value = result.actual_seed
-                await result_card.show(result.before_path, result.after_path)
+                await result_card.show(source_path, result.after_path)
 
             except GenerationCancelled:
                 pass  # the user asked for it, so there is nothing to report

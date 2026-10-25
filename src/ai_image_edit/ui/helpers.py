@@ -6,7 +6,7 @@ from typing import Any, Mapping, Optional, Sequence
 
 from ai_image_edit.core.errors import GenerationError
 from ai_image_edit.core.types import (
-    DEFAULT_RESCALE_MODE, GenerationParams, GenerationProgress, Images, Inference, ModelCapabilities, Postprocessing,
+    GenerationParams, GenerationProgress, Images, Inference, ModelCapabilities, Postprocessing,
     ProgressStage, RescaleMode, Size,
 )
 
@@ -109,9 +109,9 @@ def params_from_ui(
 ) -> GenerationParams:
     """
     Builds the GenerationParams for one generation from the controls' values.
-    `options` holds the optional workflow inputs' controls by name; one the
-    model doesn't have, or that is None, is left out. Masks, LoRAs and the
-    masked-edit settings are dropped for a model without them.
+    `options` holds the values of the model's optional inputs' controls by
+    name. Masks, LoRAs and the masked-edit settings are dropped for a model
+    without them.
 
     lora_strength falls back to the capability's own default.
     rescale_mode is a RescaleMode or its value; anything else raises ValueError.
@@ -130,9 +130,7 @@ def params_from_ui(
             prompt=prompt or "",
             steps=int(steps),
             seed=None if randomize_seed or seed is None else int(seed),
-            options={
-                name: specs[name].convert(value) for name, value in options.items() if name in specs and value is not None
-            },
+            options={name: specs[name].convert(value) for name, value in options.items()},
             lora_files=tuple(lora_files) if caps.supports_loras else (),
             lora_strength=lora_strength if caps.supports_loras and lora_strength is not None else caps.lora_strength_range.default,
         ),
@@ -140,6 +138,6 @@ def params_from_ui(
             feather_amount=int(feather_amount) if inpainting and feather_amount is not None else 0,
             color_correction=bool(color_correction),
             match_detail=bool(match_detail),
-            rescale_mode=RescaleMode(rescale_mode) if inpainting and rescale_mode is not None else DEFAULT_RESCALE_MODE,
+            rescale_mode=RescaleMode(rescale_mode) if inpainting and rescale_mode is not None else Postprocessing.rescale_mode,
         ),
     )
