@@ -8,6 +8,7 @@ from typing import Awaitable, Callable, Optional, Tuple
 
 from nicegui import ui
 from nicegui import run as nicegui_run
+from PIL import UnidentifiedImageError
 
 from ai_image_edit.core import imaging
 from ai_image_edit.core.paths import new_work_file, to_url
@@ -144,8 +145,16 @@ def attach_file_picker(
     box.on("click", open_picker)
 
     async def handle_upload(e) -> None:
-        await on_file(await save_uploaded_file(e.file))
-        uploader.reset()
+        # Reset whatever happens: the uploader holds one file, and one left in
+        # it makes it refuse every further pick.
+        try:
+            await on_file(await save_uploaded_file(e.file))
+        except UnidentifiedImageError:
+            ui.notify(f"{Path(e.file.name).name} is not an image this app can open.", type="negative")
+        except Exception as exc:  # noqa: BLE001 — reported to the user instead of only to the log
+            ui.notify(f"The image could not be loaded: {exc}", type="negative")
+        finally:
+            uploader.reset()
 
     uploader.on_upload(handle_upload)
 
