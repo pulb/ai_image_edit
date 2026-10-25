@@ -73,17 +73,8 @@ RESCALE_MODE_INFO = {
     ),
 }
 
-# Every top-level section on the page (Prompt/Seed, Aspect ratio + editor,
-# the settings accordions, the Result panel) is wrapped in a ui.card using
-# this same class string, so their content all sits flush-aligned with each
-# other and none of them indents by a different amount than its neighbors.
-# q-pa-none strips QCard's default padding (Quasar's own utility class, not
-# a NiceGUI quirk) — genuinely needed, not just a style choice: the editor
-# canvas (.aie-editor-box) and the result comparison image (.ais-container)
-# are both width: 100% against their containing card, so the card's default
-# padding would inset them and shrink the actual touch-drawing/viewing area
-# on a small screen. Applied to all cards rather than just those two so
-# nothing looks oddly inset next to the ones that need it.
+# Every section's card. No padding, so the editor and the result image use the
+# card's full width on a phone; the same on all cards, so they line up.
 CARD_CLASSES = "w-full q-pa-none"
 
 
@@ -355,16 +346,10 @@ def build_reference_card(model: WorkflowModel, caps: ModelCapabilities) -> Refer
     return card
 
 
-# Aspect ratio + resolution + the unified image/mask editor. As soon
-# as a mask is drawn on a model that supports inpainting, dimensions
-# must come from the source image's own aspect ratio (a mask's
-# coordinates are only meaningful relative to the source's own
-# framing), so both Aspect ratio and Resolution are disabled while a
-# mask exists — Aspect ratio additionally force-set to "Original",
-# Resolution set to the tier the model will use for the image
-# (model.resolution_for_source) — only when the model actually
-# offers "Original" as a choice, and restored the moment the mask
-# is removed.
+# Aspect ratio, resolution and the image/mask editor. A mask only lines up with
+# the source's own framing, so while there is one (and the model offers
+# "Original") Aspect ratio shows "Original", Resolution the tier the model will
+# use, and both are disabled; removing the mask restores them.
 async def build_editor_card(model: WorkflowModel, caps: ModelCapabilities) -> EditorCard:
     with ui.card().classes(CARD_CLASSES):
         with ui.row().classes("w-full items-center gap-4"):
@@ -377,10 +362,7 @@ async def build_editor_card(model: WorkflowModel, caps: ModelCapabilities) -> Ed
                 resolution_options, value=caps.default_resolution, label="Resolution"
             ).props("outlined dark").classes("flex-1")
             if len(caps.supported_resolutions) == 1:
-                # Nothing to choose — showing a disabled single-option
-                # dropdown says "this model only supports 1K" more
-                # clearly than a dropdown that looks pickable but isn't.
-                resolution.disable()
+                resolution.disable()  # nothing to choose, but it shows the size
 
         previous_aspect_ratio = aspect_ratio.value
         previous_resolution = resolution.value
@@ -405,8 +387,6 @@ async def build_editor_card(model: WorkflowModel, caps: ModelCapabilities) -> Ed
                 aspect_ratio.value = previous_aspect_ratio
                 resolution.value = previous_resolution
                 if len(caps.supported_resolutions) > 1:
-                    # Otherwise it was already permanently disabled above
-                    # (nothing to choose), independent of any mask.
                     resolution.enable()
 
         editor = await MaskEditor.create(
@@ -418,28 +398,14 @@ async def build_editor_card(model: WorkflowModel, caps: ModelCapabilities) -> Ed
 
 
 def run(model: WorkflowModel) -> None:
-    # Everything below is model-dependent, so it lives inside run()
-    # rather than at module scope: app.py builds the model once and
-    # passes it in (see app.py and ui/__init__.py).
-
     @ui.page("/")
     async def main_page() -> None:
-        # add_head_html must run while the page is still being assembled — it
-        # only affects the initial HTML document, so it has to happen before
-        # the client connects below (once connected, the document this browser
-        # already has is fixed; adding to <head> after that point has no
-        # effect, which would silently drop the CLIENT_JS script and WIDGET_CSS
-        # stylesheet entirely).
+        # Only reaches the browser before the client connects below.
         ui.add_head_html(f"<style>{WIDGET_CSS}</style><script>{CLIENT_JS}</script>")
         apply_dark_theme()
 
-        # ui.run_javascript() already awaits the client connection internally
-        # before executing (since NiceGUI 3.0), so this isn't needed to make
-        # those calls work. It's kept because of how NiceGUI routes exceptions
-        # (see the "Error handling" section of the docs): anything raised
-        # before this point is page-blocking and produces a full 500 error
-        # page; after it, exceptions go to ui.on_exception instead, scoped to
-        # just this client.
+        # An exception before this point is a 500 error page; after it, it is
+        # reported to this client only (NiceGUI's error handling).
         await ui.context.client.connected()
 
         # Read once per page load. Everything below renders or hides controls
@@ -620,30 +586,13 @@ def run(model: WorkflowModel) -> None:
     password = os.environ.get("APP_PASSWORD", "")
     storage_secret = install_password_login(password) if password else None
 
-    # reload=False is important here: app.main() already started whatever the
-    # active model needs (e.g. ComfyUI) once, before this — NiceGUI's
-    # auto-reloader re-executes the app in a subprocess, which would
-    # launch a second instance on the same port if left on.
+    # reload=False: the auto-reloader would run the app again in a subprocess
+    # and start a second ComfyUI.
     #
-    # reconnect_timeout is optional — NiceGUI works fine without it,
-    # defaulting to 3 seconds. It governs the one websocket connection that
-    # this whole app runs over (not something specific to one feature): every
-    # click, slider/checkbox change, ui.run_javascript() call, and file upload
-    # flows over it in both directions, since NiceGUI keeps all UI state
-    # server-side and the browser just renders it. reconnect_timeout is how
-    # long the server keeps a client's session alive after that connection
-    # drops before discarding it and forcing a full reload on return. Mobile
-    # browsers (Android and iOS) kill a backgrounded tab's websocket outright,
-    # so returning to the tab after even a short time away needs a reconnect,
-    # and the 3s default is often too short for that. 300s (5 minutes) trades a
-    # bit of server-side cleanup delay for genuinely abandoned sessions
-    # (negligible at this app's likely traffic) for a lot more headroom on
-    # "switched apps and came back later" — an untested, reversible tuning
-    # choice, not a required setting. It also can't fully fix the reload: some
-    # backgrounding will always outlast any timeout, and a NiceGUI bug already
-    # tracks a related over-eager reload-on-reconnect case
-    # (github.com/zauberzeug/nicegui/issues/6018) — worth an upgrade if this
-    # keeps happening even for quick tab switches.
+    # reconnect_timeout: how long a page's session survives a dropped
+    # connection before it must reload. Mobile browsers drop a background
+    # tab's connection, and NiceGUI's 3s default is often too short to come
+    # back. A related reload-on-reconnect bug: github.com/zauberzeug/nicegui/issues/6018.
     ui.run(
         host=HOST,
         port=PORT,

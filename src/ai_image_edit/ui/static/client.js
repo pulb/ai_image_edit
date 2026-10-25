@@ -345,9 +345,8 @@ AIE.getInputs = function (id) {
 };
 
 AIS.init = function (id) {
-    // sliderValue is tracked here (rather than read back from the slider's
-    // own DOM) since range_slider is a Quasar-rendered ui.slider, not a raw
-    // <input> with a plain .value property.
+    // sliderValue is kept here: the slider is a Quasar component without a
+    // plain .value to read back.
     const state = AIU.newPanZoomState({
         wrap: document.getElementById(id + '_zoomwrap'),
         compare: false, sliderValue: 50,
@@ -373,10 +372,7 @@ AIS.setImages = function (id, beforeUrl, afterUrl) {
     const before = document.getElementById(id + '_before');
     if (after) { after.src = afterUrl; after.style.display = 'block'; }
     if (before) { before.src = beforeUrl; before.style.display = 'block'; }
-    // The slider's own value is reset from Python (see
-    // CompareSlider.set_images) — this just re-applies the clip/handle
-    // position to match, since a Python-side value push alone doesn't
-    // touch the clip-path.
+    // CompareSlider.set_images resets the slider itself; the clip follows here.
     AIS.applyClip(id, 50);
     AIU.resetPanZoom(state.wrap, state);
     AIS.setCompare(id, state.compare);

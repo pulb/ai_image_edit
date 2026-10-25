@@ -32,9 +32,9 @@ class MaskEditor:
     drawing an optional inpainting mask, with a resizable brush. A radio
     group switches between pinch-to-zoom (default), mask drawing and,
     when num_annotation_colors > 0, annotating in one of that many colours
-    (ANNOTATION_COLORS, with an adjustable stroke width). Drawing a stroke in
-    mask mode makes this an Inpaint Edit, "Remove mask" reverts to a plain Image Edit;
-    without supports_mask there is no mask mode. The Feather slider
+    (ANNOTATION_COLORS, with an adjustable stroke width). A stroke in mask
+    mode makes the edit a masked one until "Remove mask"; without
+    supports_mask there is no mask mode. The Feather slider
     (FEATHER_RANGE) is the Gaussian blur radius composite_with_soft_transition()
     applies to the mask edges; 0 falls back to a hard cutout.
 

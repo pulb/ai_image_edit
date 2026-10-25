@@ -33,15 +33,9 @@ class CompareSlider:
                 f'</div>',
                 sanitize=False,
             )
-            # A ui.slider rather than a raw <input type="range"> — a bare <input>
-            # (even type="range") is enough to pop the Android software keyboard
-            # on some WebViews/browsers just from being focused. No label (label-always) here: this
-            # overlays directly on the image, where a value bubble would be
-            # visual noise rather than useful information. js_handler keeps
-            # dragging fully client-side (see the module docstring of
-            # assets.py for why that matters) — 'update:model-value' fires continuously while
-            # dragging, calling AIS.applyClip directly with no server
-            # round-trip.
+            # A ui.slider, not an <input type="range">: a focused <input> can pop
+            # up the Android keyboard. The js_handler moves the clip while
+            # dragging without a server round trip.
             self._range = ui.slider(min=0, max=100, step=1, value=50).props("dense").classes("ais-range")
             self._range.props(f"id={slider_id}_range")
             self._range.on(
@@ -56,13 +50,8 @@ class CompareSlider:
         return slider
 
     async def set_images(self, before_path: str, after_path: str) -> None:
-        # The slider position itself is set from Python (NiceGUI's own
-        # reliable value-setting API) rather than from JS — programmatic
-        # value pushes don't fire the same DOM events a real drag does, so
-        # there's no update:model-value for a js_handler to catch here.
-        # AIS.setImages (below) still re-applies the clip/handle position
-        # to match via AIS.applyClip(id, 50), since setting the Python
-        # value alone doesn't touch the clip-path.
+        # Setting the value from Python fires no update:model-value in the
+        # browser, so AIS.setImages moves the clip to match.
         self._range.set_value(50)
         await call_js("AIS", "setImages", self._id, to_url(before_path), to_url(after_path), timeout=10.0)
         self.after_path = after_path

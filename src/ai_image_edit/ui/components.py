@@ -17,16 +17,11 @@ from ai_image_edit.ui.helpers import PRIMARY_COLOR
 
 async def save_uploaded_file(file) -> str:
     """
-    Saves a NiceGUI FileUpload — the `.file` attribute of the
-    UploadEventArguments a ui.upload widget's on_upload event delivers
-    (nicegui.elements.upload_files.FileUpload) — to a new file under
-    WORK_DIR, returning its local path. Uses FileUpload.save(), the
-    documented method for this (nicegui.elements.upload_files.FileUpload.save).
-    Always writes to a fresh, server-generated name — file.name (already
-    sanitized by NiceGUI itself) is only used for its extension, read via
-    pathlib so it can't smuggle in a path. The saved file is then prepared
-    (upright, sRGB; see imaging.prepare_upload()), which may replace it with a
-    PNG: the returned path is the one to use.
+    Saves an uploaded file (the on_upload event's .file) under a fresh name in
+    WORK_DIR; the upload's own name only gives the stem and extension, so it
+    cannot smuggle in a path. The file is then prepared (upright, sRGB; see
+    imaging.prepare_upload()), which may replace it with a PNG: the returned
+    path is the one to use.
     """
     suffix = Path(file.name).suffix or ".png"
     stem = Path(file.name).stem or "upload"
@@ -103,13 +98,7 @@ GROUP_CLASSES = f"w-full gap-3 bg-[{GROUP_BG}] rounded-lg"
 
 
 def apply_dark_theme() -> None:
-    """
-    Dark mode in this app's colours. dark_page is Quasar's page/body
-    background variable, dark is the surface color for dark-mode components
-    like ui.card — the documented way to set these
-    (nicegui.io/documentation/colors) rather than a manual `!important` CSS
-    override fighting Quasar's own theme layer.
-    """
+    """Dark mode in this app's colours: dark_page is the page background, dark that of cards and other surfaces."""
     ui.dark_mode().enable()
     ui.colors(primary=PRIMARY_COLOR, dark="#111111", dark_page="#000000")
 
@@ -163,23 +152,9 @@ def attach_file_picker(
 
 class ImageSlot:
     """
-    A click-to-upload image box with no editing — used for the reference
-    image slots. Clicking anywhere in the box calls pickFiles()
-    on a hidden ui.upload (QUploader's own file-picker method, invoked via
-    NiceGUI's documented run_method — the same mechanism NiceGUI's own
-    Upload.reset() uses internally for QUploader's reset()); once a file is
-    chosen, its on_upload event hands it to Python, which saves it and
-    swaps in the preview.
-
-    Styling (.aie-upload-box etc.) comes from WIDGET_CSS, a small stylesheet
-    this app defines itself and injects via ui.add_head_html (see the
-    module docstring of assets.py). The box itself is a real nicegui `ui.element`
-    rather than raw HTML so a NiceGUI click handler can be attached to it
-    directly (see attach_file_picker).
-
-    `path` always reflects the currently selected file's local path (or
-    None); clear() removes the selected image and set_visible() shows or
-    hides the whole slot.
+    A click-to-upload image box without editing, for the reference images.
+    `path` is the chosen file's local path (or None); clear() removes the
+    image and set_visible() shows or hides the whole slot.
     """
 
     def __init__(self, label: str) -> None:
