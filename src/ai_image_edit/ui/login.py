@@ -43,11 +43,10 @@ def install_password_login(password: str) -> str:
 
     @ui.page("/login")
     def login_page(redirect_to: str = "/") -> Optional[RedirectResponse]:
-        if app.storage.user.get("authenticated"):
-            return RedirectResponse("/")
-
         # Only same-site paths: "//host" and "/\host" would redirect off-site.
         target = redirect_to if redirect_to.startswith("/") and not redirect_to.startswith("//") and "\\" not in redirect_to else "/"
+        if app.storage.user.get("authenticated"):
+            return RedirectResponse("/" if target.split("?")[0] == "/login" else target)
 
         async def try_login() -> None:
             if hmac.compare_digest(field.value.encode(), password.encode()):
