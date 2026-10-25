@@ -29,8 +29,9 @@ class CompareSlider:
                 f'<div id="{slider_id}_zoomwrap" class="ais-zoomwrap">'
                 f'<img id="{slider_id}_after" class="ais-after">'
                 f'<img id="{slider_id}_before" class="ais-before">'
-                f'<div id="{slider_id}_handle" class="ais-handle"></div>'
-                f'</div>',
+                f'</div>'
+                # Outside the zoomed layer, so it stays under the slider's thumb.
+                f'<div id="{slider_id}_handle" class="ais-handle"></div>',
                 sanitize=False,
             )
             # A ui.slider, not an <input type="range">: a focused <input> can pop

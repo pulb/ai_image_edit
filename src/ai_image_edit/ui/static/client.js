@@ -10,6 +10,7 @@ AIU.newPanZoomState = function (extra) {
 
 AIU.applyPanZoom = function (wrap, state) {
     wrap.style.transform = 'translate(' + state.panX + 'px, ' + state.panY + 'px) scale(' + state.scale + ')';
+    if (state.onPanZoom) state.onPanZoom();
 };
 
 AIU.resetPanZoom = function (wrap, state) {
@@ -352,16 +353,25 @@ AIS.init = function (id) {
         compare: false, sliderValue: 50,
     });
     AIS[id] = state;
+    // The divider stays under the slider's thumb while zoomed, so the clip follows the pan and zoom.
+    state.onPanZoom = function () { if (state.compare) AIS.applyClip(id, state.sliderValue); };
     if (state.wrap) AIU.attachPanZoom(state.wrap, state, function () { return true; });
 };
 
+// val (0-100) is the divider's position across the visible frame. The handle
+// sits there on screen; the "before" image, inside the zoomed layer, is clipped
+// at the point of the image shown there: the layer is scaled about its centre,
+// then moved by pan.
 AIS.applyClip = function (id, val) {
     const state = AIS[id];
     if (!state) return;
     state.sliderValue = val;
     const before = document.getElementById(id + '_before');
     const handle = document.getElementById(id + '_handle');
-    if (before) before.style.clipPath = 'inset(0 ' + (100 - val) + '% 0 0)';
+    const width = state.wrap ? state.wrap.offsetWidth : 0;
+    const pan = width ? state.panX / width : 0;
+    const imageVal = Math.min(100, Math.max(0, ((val / 100 - 0.5 - pan) / state.scale + 0.5) * 100));
+    if (before) before.style.clipPath = 'inset(0 ' + (100 - imageVal) + '% 0 0)';
     if (handle) handle.style.left = val + '%';
 };
 
