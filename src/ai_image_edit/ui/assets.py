@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """
 The UI's stylesheet (static/widgets.css, with the accent and frame colours filled in)
-and client-side JavaScript (static/client.js), and the editor's starting values.
+and client-side JavaScript (static/client.js).
 
 Stylesheet:
     Named classes for this app's bespoke widget markup (the mask editor,
@@ -56,16 +56,6 @@ from pathlib import Path
 from ai_image_edit.ui.helpers import FRAME_BORDER, FRAME_BORDER_HOVER, PRIMARY_COLOR
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
-
-# The starting values of the editor's sliders, which MaskEditor also passes
-# to AIE.init in client.js. The maximum is shared by the mask brush and the
-# annotation stroke.
-DEFAULT_BRUSH_SIZE = 48
-MAX_BRUSH_SIZE = 80
-
-# Annotation stroke width in on-screen CSS pixels (converted to image pixels
-# at draw time, like the brush). This is the default of the stroke slider.
-ANNOTATION_STROKE = 3
 
 WIDGET_CSS = (
     (STATIC_DIR / "widgets.css").read_text(encoding="utf-8")

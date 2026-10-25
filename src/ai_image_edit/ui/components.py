@@ -114,31 +114,6 @@ def apply_dark_theme() -> None:
     ui.colors(primary=PRIMARY_COLOR, dark="#111111", dark_page="#000000")
 
 
-def create_hidden_uploader() -> ui.upload:
-    """
-    A hidden single-file ui.upload whose file picker a visible box opens via
-    run_method("pickFiles").
-
-    accept="*/*" rather than "image/*": on Android, restricting to images
-    forces a limited gallery-style picker and hides the full file browser
-    (folder navigation, cloud storage sources, etc.), which is often the
-    only practical way to reach a downloaded or shared image file. The type
-    is only a hint to the OS picker; a file that isn't an image fails when it
-    is opened (imaging.prepare_upload()).
-    """
-    # Hidden with a CSS class, not set_visibility(False): since NiceGUI 3.18
-    # the upload route rejects (403) uploads to elements that are not visible.
-    uploader = ui.upload(auto_upload=True, max_files=1).props('accept="*/*"').classes("hidden")
-    return uploader
-
-
-def create_clear_badge(on_click: Callable) -> ui.button:
-    """A round X button overlapping the top-right corner of its .aie-corner-wrap; hidden until shown."""
-    badge = ui.button(icon="close", on_click=on_click).props("round dense unelevated size=sm").classes("aie-clear")
-    badge.set_visibility(False)
-    return badge
-
-
 PLACEHOLDER_TEXT = "Click to upload an image"
 
 
@@ -146,11 +121,13 @@ def create_image_frame(box_class: str, on_clear: Callable) -> Tuple[ui.element, 
     """
     The wrapper shared by the editor and the reference-image slots: a
     .aie-corner-wrap holding the framed box (`box_class`) and its clear
-    badge. Returns (box, badge); the box's content goes in `with box:`.
+    badge, a round X over the top-right corner, hidden until shown. Returns
+    (box, badge); the box's content goes in `with box:`.
     """
     with ui.element("div").classes("aie-corner-wrap"):
         box = ui.element("div").classes(box_class)
-        badge = create_clear_badge(on_clear)
+        badge = ui.button(icon="close", on_click=on_clear).props("round dense unelevated size=sm").classes("aie-clear")
+        badge.set_visibility(False)
     return box, badge
 
 
@@ -162,8 +139,14 @@ def attach_file_picker(
     """
     Clicking `box` while enabled() is true opens the file picker of a hidden
     uploader; the chosen file is saved and its local path handed to on_file.
+
+    accept="*/*" rather than "image/*": on Android, images only means a
+    gallery picker without the file browser, often the only way to reach a
+    downloaded file. A file that isn't an image fails in prepare_upload().
     """
-    uploader = create_hidden_uploader()
+    # Hidden with a CSS class, not set_visibility(False): since NiceGUI 3.18
+    # the upload route rejects (403) uploads to elements that are not visible.
+    uploader = ui.upload(auto_upload=True, max_files=1).props('accept="*/*"').classes("hidden")
 
     async def open_picker() -> None:
         if enabled():

@@ -15,7 +15,7 @@ into the workflow.
 """
 import math
 from dataclasses import dataclass, field
-from typing import Any, Dict, FrozenSet, List, Optional, Tuple
+from typing import Any, Dict, FrozenSet, Optional, Sequence, Tuple
 
 from PIL import Image
 
@@ -42,18 +42,18 @@ class ResolvedSize:
 
 
 class SizePolicy:
-    """Built from the manifest's "size" section."""
+    """What a size policy offers and computes; see the module docstring."""
 
-    aspect_ratios: List[str]
+    aspect_ratios: Sequence[str]
     default_aspect_ratio: str
-    resolutions: List[int]
+    resolutions: Sequence[int]
     default_resolution: int
     # The names resolve() puts in ResolvedSize.values. A manifest must bind
     # exactly these, so a choice offered in the UI cannot end up unused.
     value_names: FrozenSet[str]
 
     def __init__(self, config: dict) -> None:
-        pass
+        """config is the manifest's "size" section; a policy without settings ignores it."""
 
     def resolution_for_source(self, source_image_path: str) -> Optional[int]:
         """The resolution that fits the source image, or None if the policy has no such notion."""
@@ -79,7 +79,7 @@ QWEN21_ASPECT_RATIOS: Dict[str, Tuple[int, int]] = {
 }
 
 # The model's resolution tiers: 1K, 1.5K and 2K.
-QWEN21_RESOLUTIONS = [1024, 1536, 2048]
+QWEN21_RESOLUTIONS = (1024, 1536, 2048)
 QWEN21_DEFAULT_RESOLUTION = 1024
 
 # How far (as a share) a source's aspect ratio may be from the chosen ratio for
@@ -165,7 +165,7 @@ class Qwen21Tiers(SizePolicy):
     tier, as the node would have scaled it, and the model recomposes it.
     """
 
-    aspect_ratios = [ORIGINAL_ASPECT_RATIO, *QWEN21_ASPECT_RATIOS]
+    aspect_ratios = (ORIGINAL_ASPECT_RATIO, *QWEN21_ASPECT_RATIOS)
     default_aspect_ratio = ORIGINAL_ASPECT_RATIO
     resolutions = QWEN21_RESOLUTIONS
     default_resolution = QWEN21_DEFAULT_RESOLUTION
@@ -226,7 +226,7 @@ class FixedArea(SizePolicy):
         self.default_resolution = config.get("default_resolution", self.resolutions[0])
         self.multiple = int(config.get("multiple", 8))
 
-    def _dimensions_for(self, aspect_w: int, aspect_h: int, target_area: float) -> Tuple[int, int]:
+    def _snapped_size(self, aspect_w: int, aspect_h: int, target_area: float) -> Tuple[int, int]:
         width, height = _split_area(aspect_w / aspect_h, target_area)
         return (int(round(width / self.multiple) * self.multiple), int(round(height / self.multiple) * self.multiple))
 
@@ -239,7 +239,7 @@ class FixedArea(SizePolicy):
             ratio_w, ratio_h = _image_size(source_path)
         else:
             ratio_w, ratio_h = self.RATIOS[aspect]
-        width, height = self._dimensions_for(ratio_w, ratio_h, target_area)
+        width, height = self._snapped_size(ratio_w, ratio_h, target_area)
         return ResolvedSize(width, height, {"width": width, "height": height}, {}, f"resolution={size.resolution}")
 
 
