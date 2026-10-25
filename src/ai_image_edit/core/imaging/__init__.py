@@ -24,6 +24,12 @@ from ai_image_edit.core.imaging.files import compose_annotations, prepare_upload
 from ai_image_edit.core.imaging.geometry import fit_image_to_size, resize_to_cover_and_crop
 from ai_image_edit.core.types import Postprocessing
 
+# How far (as a share) the output's aspect ratio may be from the model input's
+# for the output to count as showing the input's framing, which an unmasked
+# colour correction needs. A workflow that scales its input itself rounds the
+# output's sides (to multiples of 8 or so) and lands within this.
+FRAMING_ASPECT_TOLERANCE = 0.01
+
 
 def run_generation(
     source_image_path: str,
@@ -52,7 +58,8 @@ def run_generation(
       as its rescale_mode selects, and sharpened and grained if its match_detail.
     - Otherwise the raw result is returned as-is, or color-corrected as a
       whole if postprocessing.color_correction is set and it shows the
-      input's framing (with a mask that setting has no effect:
+      input's framing, its aspect ratio within FRAMING_ASPECT_TOLERANCE of
+      the input's (with a mask that setting has no effect:
       composite_with_soft_transition() matches colours by itself).
 
     The model's input image is annotated_image_path if given, else
@@ -78,11 +85,12 @@ def run_generation(
             postprocessing.rescale_mode, postprocessing.match_detail,
         )
     if postprocessing.color_correction:
-        # The output shows the input's framing when it has the input's size:
-        # the source fitted to it, or a source already that size. Otherwise it
-        # was recomposed, and its colours differ because its content does.
+        # The output shows the input's framing when it has the input's aspect
+        # ratio, whatever its size. Otherwise it was recomposed, and its colours
+        # differ because its content does.
         with Image.open(model_input_path) as model_input, Image.open(output_path) as output:
-            framed = model_input.size == output.size
+            (in_w, in_h), (out_w, out_h) = model_input.size, output.size
+        framed = abs((out_w / out_h) / (in_w / in_h) - 1) <= FRAMING_ASPECT_TOLERANCE
         if not framed:
             print("[color_correction] Not corrected: the output has another framing than the input, so its colours can't be compared.", flush=True)
             return output_path

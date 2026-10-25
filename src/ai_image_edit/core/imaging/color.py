@@ -103,11 +103,12 @@ COLOR_LOCAL_LIMIT_DE = 15.0
 # made no visible difference to the selfie, while correcting such small
 # differences pulls back colour changes asked for.
 #
-# It compares pixel by pixel, so it needs the output to show the input's
-# framing (the source was fitted to the output's size). A recomposed output
-# (another aspect ratio) is not corrected: its colours differ because its
-# content does (more wall, less sky), which its statistics can't tell from a
-# drift.
+# It tells changed pixels from the rest pixel by pixel, so it needs the output
+# to show the input's framing (the same aspect ratio; see run_generation()).
+# A slight misalignment only drops edge pixels from the measurement. A
+# recomposed output (another aspect ratio) is not corrected: its colours differ
+# because its content does (more wall, less sky), which its statistics can't
+# tell from a drift.
 
 # sRGB (D65) <-> CIE XYZ matrices, used by rgb_to_lab()/lab_to_rgb() for the
 # LAB color-space conversion the colour matching does its work in.
@@ -405,4 +406,4 @@ def apply_color_match(img: Image.Image, match: ColorMatch, box: Tuple[int, int, 
         for i in range(3):
             channel = Image.fromarray(match.field[:, :, i], mode="F")
             arr[:, :, i] += np.array(channel.resize(img.size, Image.Resampling.BILINEAR, box=source))
-    return Image.fromarray(lab_to_rgb(arr).astype(np.uint8), mode="RGB")
+    return Image.fromarray(np.rint(lab_to_rgb(arr)).astype(np.uint8), mode="RGB")

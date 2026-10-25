@@ -810,6 +810,24 @@ class OtherHelpersTest(unittest.TestCase):
                     target = np.array(grey if corrected else tinted, dtype=float)
                     self.assertLessEqual(float(np.abs(pixel - target).max()), 1)
 
+    def test_an_output_of_another_size_with_the_inputs_ratio_is_colour_corrected(self):
+        # A workflow that scales its input itself: the source is sent as it is.
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(paths, "WORK_DIR", Path(tmp)):
+            source, output = Path(tmp) / "s.png", Path(tmp) / "o.png"
+            Image.new("RGB", (400, 301), (100, 100, 100)).save(source)
+            Image.new("RGB", (1184, 888), (110, 100, 92)).save(output)  # 4:3 at 1 MP in multiples of 8, 0.3% off
+            with contextlib.redirect_stdout(io.StringIO()):
+                result = imaging.run_generation(str(source), None, None, None, lambda path: str(output), Postprocessing(color_correction=True))
+            with Image.open(result) as img:
+                self.assertEqual(img.size, (1184, 888))
+                self.assertLessEqual(max(abs(c - 100) for c in img.getpixel((5, 5))), 1)
+
+    def test_colour_matching_without_a_correction_keeps_the_pixels(self):
+        rng = np.random.default_rng(0)
+        img = Image.fromarray(rng.integers(0, 256, (64, 64, 3), dtype=np.uint8))
+        same = imaging.apply_color_match(img, color.ColorMatch(img.size, [(0.0, 1.0)] * 3), (0, 0, 64, 64))
+        self.assertTrue(np.array_equal(np.array(same), np.array(img)))
+
     def test_a_recomposed_unmasked_generation_is_not_colour_corrected(self):
         with tempfile.TemporaryDirectory() as tmp, mock.patch.object(paths, "WORK_DIR", Path(tmp)):
             source, output = Path(tmp) / "s.png", Path(tmp) / "o.png"
