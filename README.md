@@ -52,6 +52,12 @@ each workflow, its variants and licenses are in [doc/models.md](doc/models.md).
 | **Hugging Face Space** | Alternative to RunPod if you already have a Hugging Face account; runs as a Docker Space on a paid GPU | [`deployments/huggingface`](deployments/huggingface/DEPLOY.md) |
 | **Docker** | Self-hosted, on your own machine with a GPU | [`deployments/docker`](deployments/docker/DEPLOY.md) |
 
+**One user at a time:** the app is made for a single person. Several people
+can open it at once, and their generations wait for each other, but they share
+one working folder and one cache of the last result. When that folder reaches
+its size limit, one person's generation can delete the images another person
+still has open.
+
 ## Generation times
 
 Approximate generation times by output resolution (1K is about 1024 × 1024

@@ -46,6 +46,9 @@ value to keep sessions independent of the password. A wrong password is delayed 
 limiting. For stronger protection, don't expose the port and use an
 SSH tunnel or Tailscale.
 
+The password does not make the app ready for several users: it is made for
+one person at a time (see the [README](../../README.md#deployments)).
+
 ## When the app cannot start
 
 If the app cannot start (a missing password, an invalid setting or workflow,
