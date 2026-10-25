@@ -444,9 +444,15 @@ class ManifestModelTests(unittest.TestCase):
                     self.run_generate(model, seed=None)
                     self.assertEqual(seen, [(spec["min"], spec["max"])])
                     random.randint = real
-                    chosen = 2 ** 40 + 5
-                    expected = chosen % (spec["max"] + 1) if spec.get("wrap") else chosen
-                    self.assertEqual(self.run_generate(model, seed=chosen), expected)
+                    if spec.get("wrap"):
+                        chosen = 2 ** 40 + 5
+                        self.assertEqual(self.run_generate(model, seed=chosen), chosen % (spec["max"] + 1))
+                        self.assertEqual(self.run_generate(model, seed=-1), spec["max"])
+                    else:
+                        self.assertEqual(self.run_generate(model, seed=spec["max"]), spec["max"])
+                        for outside in (spec["min"] - 1, spec["max"] + 1):
+                            with self.assertRaisesRegex(GenerationError, "seed must be between"):
+                                self.run_generate(model, seed=outside)
         finally:
             random.randint = real
 

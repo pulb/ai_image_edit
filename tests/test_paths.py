@@ -36,6 +36,12 @@ class WorkMaxSizeTest(unittest.TestCase):
             paths.read_settings()
         self.assertEqual(paths.WORK_MAX_BYTES, 1024)
 
+    def test_an_empty_setting_is_the_default(self):
+        with mock.patch.dict(os.environ, {"AI_IMAGE_EDIT_WORK_MAX_SIZE": " "}), \
+                mock.patch.object(paths.shutil, "disk_usage", return_value=mock.Mock(total=2 ** 40)):
+            paths.read_settings()
+        self.assertEqual(paths.WORK_MAX_BYTES, paths.parse_size(paths.DEFAULT_WORK_MAX_SIZE))
+
     def test_an_invalid_setting_is_an_error(self):
         with mock.patch.dict(os.environ, {"AI_IMAGE_EDIT_WORK_MAX_SIZE": "lots"}):
             with self.assertRaisesRegex(ValueError, "AI_IMAGE_EDIT_WORK_MAX_SIZE='lots' is not a size"):

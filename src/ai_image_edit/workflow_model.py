@@ -524,12 +524,16 @@ class WorkflowModel:
     # ------------------------------------------------------------ generation
 
     def _pick_seed(self, seed: Optional[int]) -> int:
-        """The seed to use: a random one for None."""
+        """The seed to use: a random one for None. Without wrap, one outside min..max is a GenerationError."""
         spec = self._manifest.get("seed", {"min": 0, "max": 2 ** 32 - 1})
         if seed is None:
             return random.randint(spec["min"], spec["max"])
         seed = int(seed)
-        return seed % (spec["max"] + 1) if spec.get("wrap") else seed
+        if spec.get("wrap"):
+            return seed % (spec["max"] + 1)
+        if not spec["min"] <= seed <= spec["max"]:
+            raise GenerationError(f"The seed must be between {spec['min']} and {spec['max']}.")
+        return seed
 
     def generate(
         self,

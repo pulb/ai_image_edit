@@ -59,11 +59,12 @@ def _effective_max_bytes() -> int:
     512m), limited to 90% of the filesystem WORK_DIR is on — /dev/shm is often
     far smaller than expected (Docker's default is 64 MB) and a full one makes
     writes fail before any cap is reached. 0 means "as much as the
-    filesystem allows". Prints a warning when the setting had to be lowered.
+    filesystem allows"; empty is the default. Prints a warning when the setting
+    had to be lowered.
     """
-    raw = os.environ.get("AI_IMAGE_EDIT_WORK_MAX_SIZE", DEFAULT_WORK_MAX_SIZE)
+    raw = os.environ.get("AI_IMAGE_EDIT_WORK_MAX_SIZE", "").strip() or DEFAULT_WORK_MAX_SIZE
     try:
-        configured = parse_size(raw or "0")
+        configured = parse_size(raw)
     except ValueError:
         raise ValueError(f"AI_IMAGE_EDIT_WORK_MAX_SIZE={raw!r} is not a size such as 512m or 2g.") from None
     limit = int(shutil.disk_usage(WORK_DIR).total * 0.9)
