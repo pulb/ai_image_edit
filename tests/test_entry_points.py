@@ -309,6 +309,19 @@ class CustomNodeTests(unittest.TestCase):
             custom_nodes.install(self.spec, self.root)
         self.assertEqual((self.root / "My-Node/node.py").read_text(), "one")
 
+        # A commit that only another branch has.
+        repo = Path(self.spec["git"])
+        git = ["git", "-c", "user.name=t", "-c", "user.email=t@example.org", "-C", str(repo)]
+        default = subprocess.check_output([*git, "branch", "--show-current"], text=True).strip()
+        subprocess.run([*git, "checkout", "-qb", "side"], check=True)
+        (repo / "node.py").write_text("side")
+        subprocess.run([*git, "commit", "-qam", "side"], check=True)
+        side = subprocess.check_output([*git, "rev-parse", "HEAD"], text=True).strip()
+        subprocess.run([*git, "checkout", "-q", default], check=True)
+        with mock.patch.object(custom_nodes, "_run", refuse_shallow):
+            custom_nodes.install({**self.spec, "name": "Side-Node", "ref": side}, self.root)
+        self.assertEqual((self.root / "Side-Node/node.py").read_text(), "side")
+
     def test_failed_install_leaves_nothing(self):
         with self.assertRaises(RuntimeError):
             custom_nodes.install({**self.spec, "ref": "0" * 40}, self.root)

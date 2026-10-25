@@ -283,23 +283,22 @@ def submit_workflow_and_wait(
 
 def fetch_generated_image(prompt_id: str) -> str:
     """
-    Downloads the first output image from a completed ComfyUI prompt's
-    history to a local path. Raises GenerationError if none is found.
+    Downloads the first image a SaveImage-like node saved (type "output") in a
+    completed ComfyUI prompt's history to a local path, so a preview image
+    (type "temp") of the same workflow is not taken for the result. Raises
+    GenerationError if there is none.
     """
     try:
         history = requests.get(f"http://{SERVER_ADDRESS}/history/{prompt_id}", timeout=REQUEST_TIMEOUT_SECONDS).json()
         outputs = history[prompt_id]["outputs"]
-
-        for node_id in outputs:
-            if "images" in outputs[node_id]:
-                img_data = outputs[node_id]["images"][0]
-                query = urllib.parse.urlencode({k: img_data[k] for k in ("filename", "subfolder", "type")})
-                output_path = WORK_DIR / f"output_{prompt_id}.png"
-                res = requests.get(f"http://{SERVER_ADDRESS}/view?{query}", timeout=REQUEST_TIMEOUT_SECONDS)
-                res.raise_for_status()
-                output_path.write_bytes(res.content)
-                return str(output_path)
+        saved = [img for node in outputs.values() for img in node.get("images", []) if img.get("type") == "output"]
+        if not saved:
+            raise GenerationError("ComfyUI finished but saved no output image.")
+        query = urllib.parse.urlencode({k: saved[0][k] for k in ("filename", "subfolder", "type")})
+        output_path = WORK_DIR / f"output_{prompt_id}.png"
+        res = requests.get(f"http://{SERVER_ADDRESS}/view?{query}", timeout=REQUEST_TIMEOUT_SECONDS)
+        res.raise_for_status()
+        output_path.write_bytes(res.content)
+        return str(output_path)
     except (requests.RequestException, OSError, ValueError, LookupError) as e:
         raise GenerationError(f"Error retrieving generated image: {e}")
-
-    raise GenerationError("ComfyUI finished but produced no output image.")

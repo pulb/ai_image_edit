@@ -44,8 +44,8 @@ def install(spec: dict, root: Path = CUSTOM_NODES_DIR) -> None:
         _run("git", "init", "-q", cwd=tmp)
         try:
             _run("git", "fetch", "-q", "--depth", "1", spec["git"], spec["ref"], cwd=tmp)
-        except RuntimeError:  # the server does not hand out a commit by its hash: fetch its history
-            _run("git", "fetch", "-q", spec["git"], cwd=tmp)
+        except RuntimeError:  # the server does not hand out a commit by its hash: fetch every branch and tag
+            _run("git", "fetch", "-q", spec["git"], "+refs/heads/*:refs/remotes/source/*", "+refs/tags/*:refs/tags/*", cwd=tmp)
             _run("git", "checkout", "-q", spec["ref"], cwd=tmp)
         else:
             _run("git", "checkout", "-q", "FETCH_HEAD", cwd=tmp)

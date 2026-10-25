@@ -51,6 +51,22 @@ class FetchImageTest(unittest.TestCase):
         self.assertIn("filename=a+b.png&subfolder=x%26y&type=output", get.call_args_list[1].args[0])
         self.assertTrue(path.endswith("output_p.png"))
 
+    def test_a_preview_image_is_not_taken_for_the_result(self):
+        outputs = {
+            "3": {"images": [{"filename": "preview.png", "subfolder": "", "type": "temp"}]},
+            "9": {"images": [{"filename": "result.png", "subfolder": "", "type": "output"}]},
+        }
+        with mock.patch.object(client.requests, "get", side_effect=[response({"p": {"outputs": outputs}}), response(None)]) as get, \
+                mock.patch.object(client, "WORK_DIR", __import__("pathlib").Path(__import__("tempfile").mkdtemp())):
+            client.fetch_generated_image("p")
+        self.assertIn("filename=result.png", get.call_args_list[1].args[0])
+
+    def test_no_saved_image_is_an_error(self):
+        outputs = {"3": {"images": [{"filename": "preview.png", "subfolder": "", "type": "temp"}]}}
+        with mock.patch.object(client.requests, "get", return_value=response({"p": {"outputs": outputs}})):
+            with self.assertRaisesRegex(GenerationError, "saved no output image"):
+                client.fetch_generated_image("p")
+
 
 class _Timeout(Exception):
     pass
