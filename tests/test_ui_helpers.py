@@ -58,7 +58,7 @@ class ParamsFromUiTest(unittest.TestCase):
             ),
         )
         kwargs = dict(
-            prompt="p", source_image_path="s.png", mask_path="m.png", reference_images=[], seed=1,
+            prompt="p", source_path="s.png", mask_path="m.png", reference_paths=[], seed=1,
             randomize_seed=False, aspect_ratio="Original", resolution=1024, steps=8,
             options={}, lora_files=[], color_correction=False,
         )

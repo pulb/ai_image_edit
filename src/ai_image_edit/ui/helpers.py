@@ -90,10 +90,10 @@ def params_from_ui(
     caps: ModelCapabilities,
     *,
     prompt: Optional[str],
-    source_image_path: str,
+    source_path: str,
     mask_path: Optional[str],
-    annotated_image_path: Optional[str] = None,
-    reference_images: Sequence[str],
+    annotated_path: Optional[str] = None,
+    reference_paths: Sequence[str],
     seed: Optional[float],
     randomize_seed: bool,
     aspect_ratio: str,
@@ -120,10 +120,10 @@ def params_from_ui(
     specs = {spec.name: spec for spec in caps.options}
     return GenerationParams(
         images=Images(
-            source_path=source_image_path,
+            source_path=source_path,
             mask_path=mask_path if inpainting else None,
-            annotated_path=annotated_image_path,
-            reference_paths=tuple(reference_images),
+            annotated_path=annotated_path,
+            reference_paths=tuple(reference_paths),
         ),
         size=Size(aspect_ratio=aspect_ratio, resolution=resolution),
         inference=Inference(

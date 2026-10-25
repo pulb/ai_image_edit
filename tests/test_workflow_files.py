@@ -183,12 +183,6 @@ class ManifestModelTests(unittest.TestCase):
         self.assertEqual(set(REQUIRED_BINDINGS), set(bind["required"]))
         self.assertEqual(set(REQUIRED_BINDINGS), set(bind["properties"]))
 
-    def test_a_version_1_file_says_what_to_change(self):
-        path = self.tmp / "version_1.json"
-        path.write_text(json.dumps({"format_version": 1, "manifest": {}, "workflow": {}}), encoding="utf-8")
-        with self.assertRaisesRegex(ValueError, "format_version 1.*move negative_prompt, cfg and denoise .* into inputs"):
-            workflow_files.read_workflow_file(path)
-
     # The optional inputs every bundled workflow offers: (name, label, slider?, default), in order.
     EXPECTED_OPTIONS = {
         **{

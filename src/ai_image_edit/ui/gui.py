@@ -502,23 +502,23 @@ def run(model: WorkflowModel) -> None:
             generate_btn.set_text("Cancel")
             await result_card.clear()
             try:
-                source_image_path = editor.path
+                source_path = editor.path
                 editor_inputs = await editor.get_inputs()
-                annotated_image_path = None
+                annotated_path = None
                 if caps.num_annotation_colors > 0 and editor_inputs.annotation_layer_path:
-                    annotated_image_path = await nicegui_run.io_bound(
-                        imaging.compose_annotations, source_image_path, editor_inputs.annotation_layer_path
+                    annotated_path = await nicegui_run.io_bound(
+                        imaging.compose_annotations, source_path, editor_inputs.annotation_layer_path
                     )
                 lora_files = references.available_loras.get(value_of(references.lora_name), [])
-                reference_images = [slot.path for slot in references.slots if slot.path]
+                reference_paths = [slot.path for slot in references.slots if slot.path]
 
                 params = params_from_ui(
                     caps,
                     prompt=prompt_card.prompt.value,
-                    source_image_path=source_image_path,
+                    source_path=source_path,
                     mask_path=editor_inputs.mask_path,
-                    annotated_image_path=annotated_image_path,
-                    reference_images=reference_images,
+                    annotated_path=annotated_path,
+                    reference_paths=reference_paths,
                     seed=prompt_card.seed_input.value,
                     randomize_seed=prompt_card.randomize_seed.value,
                     aspect_ratio=editor_card.aspect_ratio.value,
@@ -539,7 +539,7 @@ def run(model: WorkflowModel) -> None:
                 # The input image (which may be an older result that was used as
                 # the input), the references and the result on show must outlive
                 # the trim, however many files later generations add.
-                in_use = [source_image_path, result.after_path, *reference_images]
+                in_use = [source_path, result.after_path, *reference_paths]
                 await nicegui_run.io_bound(trim_work_dir, RECENT_FILES_KEPT, in_use)
 
                 prompt_card.seed_input.value = result.actual_seed
