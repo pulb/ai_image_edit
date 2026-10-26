@@ -27,7 +27,7 @@ from ai_image_edit.core.types import (
 )
 from ai_image_edit.ui.assets import CLIENT_JS, WIDGET_CSS
 from ai_image_edit.ui.compare_slider import CompareSlider
-from ai_image_edit.ui.components import GROUP_BG, GROUP_CLASSES, ImageSlot, StatusLine, apply_dark_theme, create_value_slider
+from ai_image_edit.ui.building_blocks import GROUP_BG, GROUP_CLASSES, ImageSlot, StatusLine, apply_dark_theme, create_value_slider
 from ai_image_edit.ui.helpers import (
     HOST,
     RESCALE_MODE_OPTIONS,

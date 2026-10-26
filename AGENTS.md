@@ -48,7 +48,7 @@ Rules for any AI coding agent working in this repository.
   `workflows.py` (finding, reading and schema-checking workflow files),
   `sizes.py` (output-size policies), `version.py` (the version setuptools-scm derives from the git tags), `comfy/` (client, downloads, custom
   nodes, GPU arguments), `ui/` (the NiceGUI UI: `gui.py` is the page, built from one function per section, with `login.py`,
-  `components.py`, `helpers.py`, `assets.py`, `mask_editor.py`, `compare_slider.py` and `error_page.py`; its CSS and JS are
+  `building_blocks.py`, `helpers.py`, `assets.py`, `mask_editor.py`, `compare_slider.py` and `error_page.py`; its CSS and JS are
   in `ui/static/`) and `core/` (types, errors, paths, result cache, and the `imaging/` package: colour matching, compositing, alignment, geometry and image files). It is started with `ai-image-edit`.
   Imports are absolute (`from ai_image_edit.core import …`). Dependencies
   live in `pyproject.toml`: everything the app needs (including NiceGUI and

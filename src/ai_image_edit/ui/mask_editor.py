@@ -7,7 +7,7 @@ from nicegui import ui
 
 from ai_image_edit.core.paths import to_url
 from ai_image_edit.core.types import ANNOTATION_COLORS, FEATHER_RANGE, RangeSpec
-from ai_image_edit.ui.components import GROUP_CLASSES, PLACEHOLDER_TEXT, SliderPopup, attach_file_picker, call_js, create_image_frame, init_widget, save_data_url
+from ai_image_edit.ui.building_blocks import GROUP_CLASSES, PLACEHOLDER_TEXT, SliderPopup, attach_file_picker, call_js, create_image_frame, init_widget, save_data_url
 from ai_image_edit.ui.helpers import PRIMARY_COLOR
 
 # The starting values of the editor's sliders, in on-screen CSS pixels (turned

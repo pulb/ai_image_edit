@@ -6,7 +6,7 @@ from typing import Optional
 from nicegui import ui
 
 from ai_image_edit.core.paths import to_url
-from ai_image_edit.ui.components import call_js, init_widget
+from ai_image_edit.ui.building_blocks import call_js, init_widget
 
 
 class CompareSlider:

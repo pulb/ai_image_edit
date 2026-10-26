@@ -7,7 +7,7 @@ the log.
 """
 from nicegui import ui
 
-from ai_image_edit.ui.components import apply_dark_theme
+from ai_image_edit.ui.building_blocks import apply_dark_theme
 from ai_image_edit.ui.helpers import HOST, PORT
 from ai_image_edit.ui.login import LOGO_URI
 

@@ -12,7 +12,7 @@ from fastapi.responses import RedirectResponse
 from nicegui import app, ui
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from ai_image_edit.ui.components import apply_dark_theme
+from ai_image_edit.ui.building_blocks import apply_dark_theme
 from ai_image_edit.ui.helpers import storage_secret
 
 # The logo is embedded in the page, so it needs no route that would have to be
