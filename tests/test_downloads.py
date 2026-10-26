@@ -36,6 +36,7 @@ class Handler(BaseHTTPRequestHandler):
     gate = None  # an Event the response waits for, to keep a download "in progress"
     ranges = True  # False: behave like a server that ignores Range
     fail_once = set()  # range starts whose first request is answered with a 500
+    throttle_once = set()  # range starts whose first request is answered with a 429 and Retry-After: 7
     delay = 0.0  # seconds each ranged response takes
     active = peak = 0  # requests being served at once, and the most there have been
     lock = threading.Lock()
@@ -62,6 +63,13 @@ class Handler(BaseHTTPRequestHandler):
             if first in Handler.fail_once:
                 Handler.fail_once.discard(first)
                 self.send_error(500)
+                return
+            if first in Handler.throttle_once:
+                Handler.throttle_once.discard(first)
+                self.send_response(429)
+                self.send_header("Retry-After", "7")
+                self.send_header("Content-Length", "0")
+                self.end_headers()
                 return
             body = PAYLOAD[first:last + 1]
             self.send_response(206)
@@ -97,6 +105,7 @@ class ServerCase(unittest.TestCase):
         self._cwd = os.getcwd()
         os.chdir(self.tmp)
         Handler.hits, Handler.gate, Handler.ranges, Handler.fail_once = [], None, True, set()
+        Handler.throttle_once = set()
         Handler.delay, Handler.active, Handler.peak = 0.0, 0, 0
         patch = mock.patch.object(downloads, "PART_SIZE", 100_000)  # ~11 parts of the test payload
         patch.start()
@@ -163,6 +172,13 @@ class DownloadTests(ServerCase):
         with mock.patch.object(downloads.time, "sleep"):
             downloads.download_file(self.url + "/f", self.tmp / "b.bin", sha256=hashlib.sha256(PAYLOAD).hexdigest())
         self.assertEqual((self.tmp / "b.bin").read_bytes(), PAYLOAD)
+
+    def test_a_throttled_part_is_retried_after_the_time_the_server_asks_for(self):
+        Handler.throttle_once = {200_000}
+        with mock.patch.object(downloads.time, "sleep") as sleep:
+            downloads.download_file(self.url + "/f", self.tmp / "b.bin", sha256=hashlib.sha256(PAYLOAD).hexdigest())
+        self.assertEqual((self.tmp / "b.bin").read_bytes(), PAYLOAD)
+        sleep.assert_any_call(7)
 
     def test_server_without_range_support_is_fetched_in_one_piece(self):
         Handler.ranges = False

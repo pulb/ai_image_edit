@@ -114,7 +114,7 @@ in the background; ComfyUI is launched when the last one is complete, and until 
 stays off while the page says what is being downloaded. Custom nodes are installed after the downloads, before ComfyUI launches. A failed download or
 install is reported the same way and retried on the next start.
 
-- Files are fetched to `<name>.part` in 64 MB pieces, 8 at a time (`DOWNLOAD_CONNECTIONS`, at
+- Files are fetched to `<name>.part` in 64 MB pieces, 16 at a time (`DOWNLOAD_CONNECTIONS`, at
   most 32; a server that does not support range requests gets one connection), and renamed when
   complete. An interrupted download continues with the missing pieces, and a file under its real
   name is never partial.

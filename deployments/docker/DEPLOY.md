@@ -81,7 +81,7 @@ docker run -p 7860:7860 --gpus all --shm-size=640m \
 | `MODEL_WORKFLOW` | Model workflow: `qwen_image21` (default; the official bf16 weights, or the smaller `int8` ones with `MODEL_VARIANT=int8`; needs a large GPU), `qwen_image21_gguf` (quantized, for smaller GPUs), `qwen_image21_turbo` / `qwen_image21_turbo_gguf` (the 8-step Turbo version, full precision or quantized) or `qwen_image_edit_2511_aio`. A path to a workflow file in the container (mount it) runs that file instead. |
 | `MODEL_VARIANT` | Variant of the model, e.g. `Q8_0` for `qwen_image21_gguf` (`Q4_0`, `Q4_K_M` (default), `Q5_K_M`, `Q6_K`, `Q8_0`, `BF16`: the uncensored third-party version; `standard-Q4_0` to `standard-Q8_0`: the unmodified model; `qwen_image21_turbo_gguf` has `Q2_K` to `F16`, default `Q4_K_M`). Larger is better and needs more memory. |
 | `DOWNLOAD_LORAS` | `0` skips the LoRAs a workflow brings along (the Turbo LoRA of `qwen_image21`). LoRAs already in the folder are still offered. On by default. |
-| `DOWNLOAD_CONNECTIONS` | Parts of a file downloaded at once (default 8, at most 32). |
+| `DOWNLOAD_CONNECTIONS` | Parts of a file downloaded at once (default 16, at most 32). |
 | `HF_TOKEN` | Hugging Face token, if a file needs a login. Sent to Hugging Face only. |
 
 The same can be given as arguments to the image's command, `ai-image-edit`:

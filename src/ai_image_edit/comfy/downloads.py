@@ -4,7 +4,7 @@ Downloads the weight files a workflow file lists (manifest "files"), so a model
 can be started on a machine that does not have them yet.
 
 Files are fetched to "<name>.part" next to their destination, in pieces over
-several connections at once (HTTP Range requests; DOWNLOAD_CONNECTIONS, default 8),
+several connections at once (HTTP Range requests; DOWNLOAD_CONNECTIONS, default 16),
 verified (if the manifest gives a size and/or sha256) and only then renamed, so a file
 under its final name is always complete. A download that was cut off continues with
 the pieces that are missing.
@@ -22,12 +22,14 @@ import requests
 
 CHUNK = 1024 * 1024
 PART_SIZE = 64 * 1024 * 1024  # a file is fetched in pieces of this size, several at a time
+MAX_RETRY_AFTER = 120  # seconds; a longer Retry-After is cut to this
 
 
 class DownloadError(RuntimeError):
-    def __init__(self, message: str, fatal: bool = False) -> None:
+    def __init__(self, message: str, fatal: bool = False, retry_after: Optional[float] = None) -> None:
         super().__init__(message)
         self.fatal = fatal  # True: trying again cannot help (a refused or missing file)
+        self.retry_after = retry_after  # seconds the server asked to wait before trying again
 
 
 class DownloadCancelled(DownloadError):
@@ -51,13 +53,13 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-DEFAULT_CONNECTIONS = 8
+DEFAULT_CONNECTIONS = 16
 MAX_CONNECTIONS = 32
 
 
 def connections() -> int:
     """
-    How many parts of a file are fetched at once: DOWNLOAD_CONNECTIONS (default 8,
+    How many parts of a file are fetched at once: DOWNLOAD_CONNECTIONS (default 16,
     at most 32). Raises ValueError for a value that is not a whole number of at least 1.
     """
     raw = os.environ.get("DOWNLOAD_CONNECTIONS", "").strip()
@@ -68,18 +70,22 @@ def connections() -> int:
     return min(MAX_CONNECTIONS, int(raw))
 
 
-def _check_status(url: str, status: int) -> None:
+def _check_status(url: str, r: requests.Response) -> None:
+    """Raises DownloadError for an error status; 429 (too many requests) and 5xx can be retried."""
+    status = r.status_code
     if status in (401, 403):
         raise DownloadError(f"{url}: access denied (HTTP {status}). If the file needs a login, set HF_TOKEN.", fatal=True)
     if status >= 400:
-        raise DownloadError(f"{url}: HTTP {status}", fatal=status < 500)
+        retry_after = r.headers.get("Retry-After", "").strip()  # only the seconds form is used
+        raise DownloadError(f"{url}: HTTP {status}", fatal=status < 500 and status != 429,
+                            retry_after=min(int(retry_after), MAX_RETRY_AFTER) if retry_after.isdigit() else None)
 
 
 def _probe(url: str) -> Optional[int]:
     """The file's size if the server supports Range requests, else None."""
     try:
         with requests.get(url, headers={**_headers(url), "Range": "bytes=0-0"}, stream=True, timeout=60) as r:
-            _check_status(url, r.status_code)
+            _check_status(url, r)
             if r.status_code != 206:
                 return None
             total = r.headers.get("Content-Range", "").rpartition("/")[2]
@@ -121,7 +127,7 @@ def _fetch_part(url: str, part: Path, start: int, end: int, progress: _Progress,
         try:
             with requests.get(url, headers={**_headers(url), "Range": f"bytes={start}-{end}"},
                               stream=True, timeout=60) as r:
-                _check_status(url, r.status_code)
+                _check_status(url, r)
                 if r.status_code != 206:
                     raise DownloadError(f"{url}: the server stopped honouring Range requests")
                 with open(part, "r+b") as f:
@@ -144,7 +150,7 @@ def _fetch_part(url: str, part: Path, start: int, end: int, progress: _Progress,
             fetched = 0
             if attempt == 3:
                 raise DownloadError(f"{url}: {exc} (run again to resume)") from exc
-            time.sleep(2 ** attempt)
+            time.sleep(max(2 ** attempt, getattr(exc, "retry_after", None) or 0))
 
 
 def _download_parts(
@@ -212,7 +218,7 @@ def _download_single(
     """One plain request, for servers without Range support. Cannot be resumed."""
     try:
         with requests.get(url, headers=_headers(url), stream=True, timeout=60) as r:
-            _check_status(url, r.status_code)
+            _check_status(url, r)
             total = int(r.headers.get("Content-Length", 0)) or None
             done = 0
             with open(part, "wb") as f:
