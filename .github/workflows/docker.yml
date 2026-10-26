@@ -58,15 +58,24 @@ jobs:
 
       # Only the Dockerfile is needed from the checkout: the app comes from
       # GitHub at this commit, so the context is empty.
+      #
+      # Pushed with zstd-compressed layers, which unpack several times faster
+      # than gzip when a host pulls the image (Docker 23 or newer can pull them).
+      #
+      # Only builds of the default branch write the layer cache. The cache holds
+      # 10 GB for the whole repository and evicts beyond that; a branch build
+      # writing its own gigabytes could evict the default branch's, and its next
+      # build would then make every layer anew, which every host would have to
+      # download again in full.
       - uses: docker/build-push-action@v6
         with:
           context: deployments/docker
           file: deployments/docker/Dockerfile
-          push: true
+          outputs: type=registry,compression=zstd,force-compression=true,oci-mediatypes=true
           build-args: |
             APP_REPO=${{ github.repository }}
             APP_REF=${{ github.sha }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-to: ${{ github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && 'type=gha,mode=max' || '' }}

@@ -65,6 +65,10 @@ runs the app is already up: the page shows the progress, and Generate stays off
 until everything is there and ComfyUI has started. Nothing is baked in, so the
 image is small and, as it contains no weights, can be public.
 
+The published image (`ghcr.io/pulb/ai_image_edit`) has zstd-compressed layers,
+which unpack faster than gzip; pulling it needs Docker 23 or newer (or a
+containerd of 1.5 or newer).
+
 ```bash
 docker build -f deployments/docker/Dockerfile -t ai-image-edit deployments/docker
 docker run -p 7860:7860 --gpus all --shm-size=640m \

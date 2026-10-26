@@ -42,19 +42,46 @@ ENV AI_IMAGE_EDIT_WORK_MAX_SIZE=512m
 # its own), so the app refuses to start unless APP_PASSWORD is set.
 ENV REQUIRE_PASSWORD=1
 
+# Install PyTorch (CUDA 12.6 wheels) manually — this base image has no
+# CUDA/PyTorch preinstalled, unlike the pytorch/pytorch image. Before ComfyUI,
+# so that bumping COMFYUI_REF leaves these gigabytes as they are: a host that has
+# the previous image then only downloads the layers after them.
+#
+# The CUDA libraries PyTorch brings come in several layers rather than one, so
+# a pull downloads and unpacks them in parallel. pip first reports what PyTorch
+# installs (a dry run); the steps below install those exact files group by
+# group, and the last one installs the rest and PyTorch itself, which finds
+# everything in place.
+ARG TORCH_VERSION=2.11.0
+ARG TORCHVISION_VERSION=0.26.0
+ARG TORCHAUDIO_VERSION=2.11.0
+ARG TORCH_INDEX=https://download.pytorch.org/whl/cu126
+# The groups, by package name (whatever matches none goes with PyTorch itself):
+# cuDNN, cuBLAS, cuSPARSE, the solvers and NCCL, the remaining CUDA libraries.
+RUN pip install --dry-run --ignore-installed --quiet --report /tmp/torch.json \
+        torch==${TORCH_VERSION} torchvision==${TORCHVISION_VERSION} torchaudio==${TORCHAUDIO_VERSION} \
+        --index-url ${TORCH_INDEX} && \
+    python -c 'import json, re; \
+groups = [("cudnn", "nvidia-cudnn"), ("cublas", "nvidia-cublas"), ("cusparse", "nvidia-cusparse"), \
+          ("solvers", "nvidia-(cufft|curand|cusolver|nccl|nvshmem)"), ("cuda", "nvidia-|triton")]; \
+items = json.load(open("/tmp/torch.json"))["install"]; \
+group = lambda name: next((g for g, pattern in groups if re.match(pattern, name.lower().replace("_", "-"))), "rest"); \
+[open(f"/tmp/torch-{g}.txt", "w").write("".join(i["download_info"]["url"] + "\n" for i in items if group(i["metadata"]["name"]) == g)) \
+ for g in [*dict(groups), "rest"]]'
+RUN if [ -s /tmp/torch-cudnn.txt ]; then pip install --no-cache-dir --no-deps -r /tmp/torch-cudnn.txt; fi
+RUN if [ -s /tmp/torch-cublas.txt ]; then pip install --no-cache-dir --no-deps -r /tmp/torch-cublas.txt; fi
+RUN if [ -s /tmp/torch-cusparse.txt ]; then pip install --no-cache-dir --no-deps -r /tmp/torch-cusparse.txt; fi
+RUN if [ -s /tmp/torch-solvers.txt ]; then pip install --no-cache-dir --no-deps -r /tmp/torch-solvers.txt; fi
+RUN if [ -s /tmp/torch-cuda.txt ]; then pip install --no-cache-dir --no-deps -r /tmp/torch-cuda.txt; fi
+RUN if [ -s /tmp/torch-rest.txt ]; then pip install --no-cache-dir --no-deps -r /tmp/torch-rest.txt; fi && \
+    pip install --no-cache-dir torch==${TORCH_VERSION} torchvision==${TORCHVISION_VERSION} torchaudio==${TORCHAUDIO_VERSION} \
+        --index-url ${TORCH_INDEX}
+
 # Clone ComfyUI, pinned to a known commit (0.39.0) so that a later ComfyUI
 # change cannot silently break a model's nodes. Bump it deliberately and re-test.
 ARG COMFYUI_REF=87c32827017c50c6a629da941439015b4ad656e6
 RUN git clone https://github.com/Comfy-Org/ComfyUI.git . && \
     git checkout ${COMFYUI_REF}
-
-# Install PyTorch (CUDA 12.6 wheels) manually — this base image has no
-# CUDA/PyTorch preinstalled, unlike the pytorch/pytorch image.
-ARG TORCH_VERSION=2.11.0
-ARG TORCHVISION_VERSION=0.26.0
-ARG TORCHAUDIO_VERSION=2.11.0
-RUN pip install --no-cache-dir torch==${TORCH_VERSION} torchvision==${TORCHVISION_VERSION} torchaudio==${TORCHAUDIO_VERSION} \
-    --index-url https://download.pytorch.org/whl/cu126
 
 # ComfyUI's own Python dependencies, from the git clone above.
 RUN pip install --no-cache-dir -r requirements.txt
