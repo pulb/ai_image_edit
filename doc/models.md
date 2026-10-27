@@ -1,7 +1,7 @@
 # Model workflows
 
 A model in AI Image Edit is a *model workflow*: one JSON file that holds a
-[ComfyUI](https://github.com/comfyanonymous/ComfyUI) workflow and a manifest
+[ComfyUI](https://github.com/Comfy-Org/ComfyUI) workflow and a manifest
 describing everything the app needs to run it (weights to download, custom
 nodes to install, variants, which workflow inputs the prompt, seed and images go
 to). The app starts a ComfyUI process, loads the workflow into it and downloads
@@ -95,13 +95,18 @@ Qwen-Image-Edit 2511 in
 [Phr00t's Rapid-AIO merge](https://huggingface.co/Phr00t/Qwen-Image-Edit-Rapid-AIO),
 combined with a curated set of LoRAs (camera angle changes, style transfer,
 photo-realism, polaroid look, unblurring and upscaling, comic and noir styles,
-pose transfer). The LoRAs are downloaded with the model and can be applied from
-the UI.
+Pixar-style 3D, pose transfer). The LoRAs are downloaded with the model and can
+be applied from the UI.
 
 - **Use it for:** fast edits: it needs only 1 to 10 steps (4 by default) and
   supports a LoRA strength setting.
 - **License:** the weights and LoRAs come from third parties; check the licenses
   of the linked repositories before use.
+
+The workflow is based on the ComfyUI workflow from
+[Phr00t's Hugging Face page](https://huggingface.co/Phr00t/Qwen-Image-Edit-Rapid-AIO):
+
+![ComfyUI workflow of qwen_image_edit_2511_aio](screenshots/comfy_workflow.png)
 
 ## Postprocessing
 

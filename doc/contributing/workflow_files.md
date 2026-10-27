@@ -118,6 +118,8 @@ install is reported the same way and retried on the next start.
   most 32; a server that does not support range requests gets one connection), and renamed when
   complete. An interrupted download continues with the missing pieces, and a file under its real
   name is never partial.
+- A piece that fails is tried up to four times; a server that answers 429 (too many requests) is
+  given the time its `Retry-After` asks for (at most 120 s).
 - Folders are relative to the directory the app runs in (the ComfyUI root). To keep the weights
   elsewhere, mount a volume at `<ComfyUI root>/models`.
 - `HF_TOKEN` is sent as a bearer token to huggingface.co only.

@@ -161,6 +161,6 @@ accept yet).
 `.github/workflows/docker.yml` builds the image on pushes to `main` that touch
 the Dockerfile, `pyproject.toml` or `src/`, on `v*` tags and on manual runs. It
 installs the app from the commit it was started for and pushes
-`ghcr.io/<owner>/<repo>` tagged `latest`, the git tag and the short commit
-SHA. The app's version (shown in the page header and the log, printed by
+`ghcr.io/<owner>/<repo>` tagged `sha-<short commit>`, plus `latest` for builds
+of `main` and the git tag for tag builds. The app's version (shown in the page header and the log, printed by
 `ai-image-edit --version`) is derived from the git tags, so a `v*` tag marks a release.
