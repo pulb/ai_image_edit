@@ -124,11 +124,16 @@ def create_image_frame(box_class: str, on_clear: Callable) -> Tuple[ui.element, 
 def attach_file_picker(
     box: ui.element,
     on_file: Callable[[str], Awaitable[None]],
-    enabled: Callable[[], bool] = lambda: True,
+    pick_class: Optional[str] = None,
 ) -> None:
     """
-    Clicking `box` while enabled() is true opens the file picker of a hidden
-    uploader; the chosen file is saved and its local path handed to on_file.
+    Clicking `box` opens the file picker of a hidden uploader, if `pick_class`
+    is given only while the box has that CSS class; the chosen file is saved
+    and its local path handed to on_file.
+
+    The picker is opened in the browser, within the click: Safari (and so
+    every browser on iOS) opens it only as the direct result of a tap, not
+    for a call that comes back from the server.
 
     accept="*/*" rather than "image/*": on Android, images only means a
     gallery picker without the file browser, often the only way to reach a
@@ -138,11 +143,8 @@ def attach_file_picker(
     # the upload route rejects (403) uploads to elements that are not visible.
     uploader = ui.upload(auto_upload=True, max_files=1).props('accept="*/*"').classes("hidden")
 
-    async def open_picker() -> None:
-        if enabled():
-            await uploader.run_method("pickFiles", timeout=5.0)
-
-    box.on("click", open_picker)
+    condition = f"e.currentTarget.classList.contains('{pick_class}') && " if pick_class else ""
+    box.on("click", js_handler=f"(e) => {condition}runMethod({uploader.id}, 'pickFiles', [])")
 
     async def handle_upload(e) -> None:
         # Reset whatever happens: the uploader holds one file, and one left in
