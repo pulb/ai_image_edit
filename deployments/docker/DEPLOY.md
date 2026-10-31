@@ -11,16 +11,16 @@ of your own works too.
 Uploads and results are kept in RAM, in a folder under `/dev/shm`, so they
 never reach the container's disk, and they disappear when the container stops.
 The app deletes the oldest files once the folder exceeds
-`AI_IMAGE_EDIT_WORK_MAX_SIZE` (default `512m`, set in the Dockerfile; `0` means as
+`AI_IMAGE_EDIT_WORK_MAX_SIZE` (default `256m`, set in the Dockerfile; `0` means as
 much as the filesystem allows). It keeps the image you are editing, the
 reference images and the result on screen, so the folder can stay above the
 limit while they alone are larger than it.
 
 The actual cap may be lower than that setting. It is limited to 90% of the
 size of `/dev/shm`, and Docker gives `/dev/shm` only 64 MB by default: pass
-`--shm-size=640m` (or more) to `docker run`. 640 MB is the smallest round
-size that fits the default 512 MB cap: 512 MB needs a `/dev/shm` of at least
-about 570 MB (512 / 0.9), and 640 MB leaves some headroom. If you raise
+`--shm-size=320m` (or more) to `docker run`. 320 MB is the smallest round
+size that fits the default 256 MB cap: 256 MB needs a `/dev/shm` of at least
+about 285 MB (256 / 0.9), and 320 MB leaves some headroom. If you raise
 `AI_IMAGE_EDIT_WORK_MAX_SIZE`, raise `--shm-size` to at least that value
 divided by 0.9. If the setting had to be lowered,
 the app prints a warning at startup. `/dev/shm` is shared with anything else
@@ -71,7 +71,7 @@ containerd of 1.5 or newer).
 
 ```bash
 docker build -f deployments/docker/Dockerfile -t ai-image-edit deployments/docker
-docker run -p 7860:7860 --gpus all --shm-size=640m \
+docker run -p 7860:7860 --gpus all --shm-size=320m \
     -v ai-image-edit-models:/home/user/app/models \
     -e APP_PASSWORD=... ai-image-edit
 ```

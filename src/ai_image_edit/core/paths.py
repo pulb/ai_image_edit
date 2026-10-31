@@ -32,7 +32,7 @@ def _default_work_dir() -> Path:
 WORK_DIR = Path(os.environ.get("AI_IMAGE_EDIT_WORK_DIR") or _default_work_dir())
 WORK_DIR.mkdir(parents=True, exist_ok=True)
 
-DEFAULT_WORK_MAX_SIZE = "512m"
+DEFAULT_WORK_MAX_SIZE = "256m"
 _UNITS = {"k": 1024, "m": 1024**2, "g": 1024**3, "t": 1024**4}
 
 
@@ -56,7 +56,7 @@ def format_size(n: int) -> str:
 def _effective_max_bytes() -> int:
     """
     The cap trim_work_dir() enforces: AI_IMAGE_EDIT_WORK_MAX_SIZE (default
-    512m), limited to 90% of the filesystem WORK_DIR is on — /dev/shm is often
+    256m), limited to 90% of the filesystem WORK_DIR is on — /dev/shm is often
     far smaller than expected (Docker's default is 64 MB) and a full one makes
     writes fail before any cap is reached. 0 means "as much as the
     filesystem allows"; empty is the default. Prints a warning when the setting

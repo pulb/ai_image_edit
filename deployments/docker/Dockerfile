@@ -36,7 +36,7 @@ WORKDIR $HOME/app
 # deleting the oldest files first. It cannot exceed 90% of the container's
 # /dev/shm (docker run --shm-size; Docker's default is 64 MB), and the app
 # warns at startup if it had to lower it.
-ENV AI_IMAGE_EDIT_WORK_MAX_SIZE=512m
+ENV AI_IMAGE_EDIT_WORK_MAX_SIZE=256m
 
 # This image is meant for public hosts (RunPod's HTTP proxy has no login of
 # its own), so the app refuses to start unless APP_PASSWORD is set.
