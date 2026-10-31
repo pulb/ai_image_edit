@@ -5,8 +5,7 @@ is described in [Docker](../docker/DEPLOY.md). This page covers only what is
 specific to RunPod.
 
 A public [RunPod template](https://console.runpod.io/hub/template/ayt3pyrp7w?ref=e1nr94ls)
-works with any model workflow. You only need to replace its container image with
-your own (see [Pod setup](#pod-setup)).
+is preconfigured and ready to go, and works with any model workflow.
 
 | Model workflow (`MODEL_WORKFLOW`) | Weights |
 |---|---|
