@@ -5,7 +5,9 @@ is described in [Docker](../docker/DEPLOY.md). This page covers only what is
 specific to RunPod.
 
 A public [RunPod template](https://console.runpod.io/hub/template/ayt3pyrp7w?ref=e1nr94ls)
-is preconfigured and ready to go, and works with any model workflow.
+is preconfigured and ready to go. It works with any model workflow stated below.
+
+<br>
 
 | Model workflow (`MODEL_WORKFLOW`) | Weights |
 |---|---|
