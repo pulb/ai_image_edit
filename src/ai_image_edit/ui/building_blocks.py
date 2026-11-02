@@ -121,14 +121,13 @@ def create_image_frame(box_class: str, on_clear: Callable) -> Tuple[ui.element, 
     return box, badge
 
 
-def attach_file_picker(
-    box: ui.element,
-    on_file: Callable[[str], Awaitable[None]],
-    enabled: Callable[[], bool] = lambda: True,
-) -> None:
+def attach_file_picker(box: ui.element, on_file: Callable[[str], Awaitable[None]]) -> None:
     """
-    Clicking `box` while enabled() is true opens the file picker of a hidden
-    uploader; the chosen file is saved and its local path handed to on_file.
+    Covers `box` with an invisible file input (.aie-file-input), so a click
+    on the box is a click on the input itself and the browser opens its file
+    picker; Safari, and so every browser on iOS, does not open one for a
+    hidden input clicked by script. The chosen file goes to a hidden uploader,
+    is saved, and its local path is handed to on_file.
 
     accept="*/*" rather than "image/*": on Android, images only means a
     gallery picker without the file browser, often the only way to reach a
@@ -138,11 +137,13 @@ def attach_file_picker(
     # the upload route rejects (403) uploads to elements that are not visible.
     uploader = ui.upload(auto_upload=True, max_files=1).props('accept="*/*"').classes("hidden")
 
-    async def open_picker() -> None:
-        if enabled():
-            await uploader.run_method("pickFiles", timeout=5.0)
-
-    box.on("click", open_picker)
+    with box:
+        picker = ui.element("input").props('type=file accept="*/*"').classes("aie-file-input")
+    # Copied to an array before the input is emptied, which empties its FileList.
+    picker.on("change", js_handler=(
+        f"(e) => {{ const files = Array.from(e.target.files); e.target.value = '';"
+        f" if (files.length) runMethod({uploader.id}, 'addFiles', [files]); }}"
+    ))
 
     async def handle_upload(e) -> None:
         # Reset whatever happens: the uploader holds one file, and one left in

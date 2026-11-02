@@ -80,9 +80,9 @@ class MaskEditor:
             )
 
         # Once an image is loaded, a click on the box draws on the canvas instead
-        # of reopening the picker — self.path already tells us which state
-        # we're in, no need to ask the browser.
-        attach_file_picker(editor_box, self.set_image, enabled=lambda: not self.path)
+        # of reopening the picker: the file input covers the box only while it
+        # is empty (the class aie-pick, see widgets.css).
+        attach_file_picker(editor_box, self.set_image)
 
         self._radios: Dict[str, ui.element] = {}
         self._swatches: Dict[str, ui.button] = {}

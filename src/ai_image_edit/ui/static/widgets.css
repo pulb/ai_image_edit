@@ -34,10 +34,25 @@
 }
 
 /* Clickable to open the file picker: always for the upload box, and for the
-   editor only while it is empty (once loaded, a click draws). */
+   editor only while it is empty (once loaded, a click draws). The click lands
+   on an invisible file input over the whole box (attach_file_picker()). */
 .aie-upload-box,
 .aie-editor-box.aie-pick {
     cursor: pointer;
+}
+
+.aie-file-input {
+    position: absolute;
+    inset: 0;
+    z-index: 4;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    cursor: pointer;
+}
+
+.aie-editor-box:not(.aie-pick) .aie-file-input {
+    display: none;
 }
 
 .aie-preview {
