@@ -29,7 +29,8 @@
     min-height: 120px;
 }
 
-.ais-container {
+/* Only while empty: a result sets the frame's height itself. */
+.ais-container:not(:has(.ais-after[src])) {
     min-height: 200px;
 }
 
@@ -149,22 +150,29 @@
     display: none;
 }
 
-.ais-after {
+/* The result ("after") sets the frame's height at its own aspect ratio; the
+   original ("before") lies over it, clipped at the divider. Its object-fit
+   (cover by default) is set per pair by AIS.setImages: cover trims it like
+   the original fitted to the result's framing, contain shows all of it on
+   black where the model recomposed it into another shape. */
+.ais-after,
+.ais-before {
     display: none;
     width: 100%;
+    object-fit: cover;
+}
+
+.ais-after {
     height: auto;
-    min-height: 200px;
 }
 
 .ais-before {
     position: absolute;
     top: 0;
     left: 0;
-    width: 100%;
     height: 100%;
-    object-fit: cover;
+    background: #000;
     clip-path: inset(0 100% 0 0);
-    display: none;
 }
 
 .ais-handle {

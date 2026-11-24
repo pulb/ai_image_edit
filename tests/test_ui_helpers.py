@@ -45,6 +45,19 @@ class ResolutionTest(unittest.TestCase):
                 self.assertEqual(Qwen21Tiers({}).resolution_for_source(path), expected, size)
 
 
+class BeforeImageFitTest(unittest.TestCase):
+    def test_same_framing_is_covered(self):
+        self.assertEqual(common.before_image_fit((1376, 768), (1376, 768)), "cover")
+        self.assertEqual(common.before_image_fit((4000, 3000), (1216, 896)), "cover")  # a 4:3 photo at 4:3, 1K
+
+    def test_rounding_of_the_original_ratio_is_covered(self):
+        self.assertEqual(common.before_image_fit((1000, 3000), (576, 1760)), "cover")  # "Original" at 1K, 1.8% off
+
+    def test_another_offered_ratio_is_contained(self):
+        self.assertEqual(common.before_image_fit((3000, 4000), (1216, 896)), "contain")  # 3:4 recomposed as 4:3
+        self.assertEqual(common.before_image_fit((1920, 1080), (1280, 832)), "contain")  # 16:9 recomposed as 3:2
+
+
 class ParamsFromUiTest(unittest.TestCase):
     def params(self, *, inpainting=True, **overrides):
         caps = ModelCapabilities(

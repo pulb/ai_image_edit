@@ -375,13 +375,14 @@ AIS.applyClip = function (id, val) {
     if (handle) handle.style.left = val + '%';
 };
 
-AIS.setImages = function (id, beforeUrl, afterUrl) {
+// fit is the "before" image's object-fit over the result (before_image_fit()).
+AIS.setImages = function (id, beforeUrl, afterUrl, fit) {
     const state = AIS[id];
     if (!state) return;
     const after = document.getElementById(id + '_after');
     const before = document.getElementById(id + '_before');
     if (after) { after.src = afterUrl; after.style.display = 'block'; }
-    if (before) { before.src = beforeUrl; before.style.display = 'block'; }
+    if (before) { before.src = beforeUrl; before.style.objectFit = fit; before.style.display = 'block'; }
     // CompareSlider.set_images resets the slider itself; the clip follows here.
     AIS.applyClip(id, 50);
     AIU.resetPanZoom(state.wrap, state);
@@ -397,8 +398,8 @@ AIS.setCompare = function (id, enabled) {
     const before = document.getElementById(id + '_before');
     if (!handle || !before) return;
     // Hiding "before" with display:none rather than a clip at 100%: its box
-    // is computed independently from "after"'s (object-fit: cover vs. the
-    // zoomwrap's auto height), so a clip boundary at exactly 100% can leave
+    // is computed independently from "after"'s (it fills the zoomwrap, whose
+    // height "after" sets), so a clip boundary at exactly 100% can leave
     // a sub-pixel sliver of it visible at the bottom/right edge.
     const display = enabled ? 'block' : 'none';
     before.style.display = display;
