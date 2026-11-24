@@ -4,9 +4,11 @@ import uuid
 from typing import Optional
 
 from nicegui import ui
+from PIL import Image
 
 from ai_image_edit.core.paths import to_url
 from ai_image_edit.ui.building_blocks import call_js, init_widget
+from ai_image_edit.ui.helpers import before_image_fit
 
 
 class CompareSlider:
@@ -54,7 +56,9 @@ class CompareSlider:
         # Setting the value from Python fires no update:model-value in the
         # browser, so AIS.setImages moves the clip to match.
         self._range.set_value(50)
-        await call_js("AIS", "setImages", self._id, to_url(before_path), to_url(after_path), timeout=10.0)
+        with Image.open(before_path) as before, Image.open(after_path) as after:
+            fit = before_image_fit(before.size, after.size)
+        await call_js("AIS", "setImages", self._id, to_url(before_path), to_url(after_path), fit, timeout=10.0)
         self.after_path = after_path
 
     async def set_compare(self, enabled: bool) -> None:

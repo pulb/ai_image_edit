@@ -2,7 +2,7 @@
 """Constants and helpers shared by the UI."""
 import hashlib
 import os
-from typing import Any, Mapping, Optional, Sequence
+from typing import Any, Mapping, Optional, Sequence, Tuple
 
 from ai_image_edit.core.errors import GenerationError
 from ai_image_edit.core.types import (
@@ -22,6 +22,26 @@ FRAME_BORDER_HOVER = "#888"
 # generation that just finished (source, mask, annotated, result, ...). The
 # files the page still uses are protected separately, however old they are.
 RECENT_FILES_KEPT = 8
+
+# Aspect ratios of the original and the result closer than this (as a share)
+# mean the original was fitted to the result's size by trimming its edges: a
+# mask, the "Original" ratio (rounding to multiples of 32 px makes up to about
+# 3.5% at 1K) or a ratio within sizes.QWEN21_FIT_ASPECT_TOLERANCE. Any two of
+# the offered ratios differ by 10% or more; a result in another one was
+# recomposed from the whole original.
+SAME_FRAMING_TOLERANCE = 0.05
+
+
+def before_image_fit(before_size: Tuple[int, int], after_size: Tuple[int, int]) -> str:
+    """
+    The CSS object-fit of the compare slider's "before" image over the result:
+    "cover" trims the original as it was fitted to the result's framing, so
+    the two line up; "contain" shows all of an original the model recomposed
+    into a clearly different shape.
+    """
+    mismatch = abs((before_size[0] / before_size[1]) / (after_size[0] / after_size[1]) - 1)
+    return "cover" if mismatch <= SAME_FRAMING_TOLERANCE else "contain"
+
 
 HOST = "0.0.0.0"
 PORT = 7860
